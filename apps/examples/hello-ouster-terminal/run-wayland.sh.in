@@ -1,0 +1,103 @@
+#!@bash@/bin/bash
+set -euo pipefail
+
+export PATH="@clientPath@${PATH:+:$PATH}"
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+export NO_AT_BRIDGE=1
+export LIBSEAT_BACKEND=seatd
+
+_ld_sw=""
+[[ -d /run/current-system/sw/lib ]] && _ld_sw=:/run/current-system/sw/lib
+
+log() { echo "hello-ouster-terminal: $*" >&2; }
+die() { log "$*"; exit 1; }
+
+libdir_has_client_egl() {
+  [[ -n "$1" && -d "$1" ]] || return 1
+  [[ -e "$1/libEGL_nvidia.so.0" || -e "$1/libEGL_mesa.so.0" || -e "$1/libEGL.so.1" ]] || return 1
+}
+
+filter_runtime_ld_path() {
+  local IFS=: part out=""
+  for part in ${1:-}; do
+    [[ -n "$part" ]] || continue
+    case "$part" in
+      */*-glibc-*/lib|*/*-glibc-*/lib64) continue ;;
+    esac
+    if [[ -z "$out" ]]; then
+      out="$part"
+    else
+      out="${out}:$part"
+    fi
+  done
+  printf '%s\n' "$out"
+}
+
+# Prefer /run/opengl-driver; else a libdir from generator LD_LIBRARY_PATH (host stack, pre-client).
+resolve_portable_gl_prefix() {
+  local libdir
+  if libdir_has_client_egl /run/opengl-driver/lib; then
+    printf '%s\n' /run/opengl-driver
+    return 0
+  fi
+  if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+    local IFS=:
+    for libdir in ${LD_LIBRARY_PATH}; do
+      libdir_has_client_egl "$libdir" || continue
+      printf '%s\n' "${libdir%/lib}"
+      return 0
+    done
+  fi
+  return 1
+}
+
+_ogl="$(resolve_portable_gl_prefix)" \
+  || die "missing GL/EGL libs (checked LD_LIBRARY_PATH, /run/opengl-driver)"
+_opengl_driver_real="$(readlink -f "$_ogl" 2>/dev/null || printf '%s\n' "$_ogl")"
+_tegra_l4t=0
+[[ "${LD_LIBRARY_PATH:-}" == *nvidia-l4t* || "$_opengl_driver_real" == *nvidia-l4t* ]] \
+  && _tegra_l4t=1
+
+[[ -n "${LD_LIBRARY_PATH:-}" ]] || LD_LIBRARY_PATH="${_ogl}/lib${_ld_sw}"
+if [[ "$_tegra_l4t" -eq 0 ]]; then
+  LD_LIBRARY_PATH="$(filter_runtime_ld_path "$LD_LIBRARY_PATH")"
+fi
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:@clientLd@"
+
+@ldPreloadExport@
+
+export XDG_RUNTIME_DIR=/run/hello-ouster-terminal
+export HOME="$XDG_RUNTIME_DIR"
+_kiosk_pkg="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+export SHELL=@bash@/bin/bash
+export FONTCONFIG_FILE=@fontsConf@
+
+mkdir -p "$XDG_RUNTIME_DIR"
+mkdir -p "$XDG_RUNTIME_DIR/fontconfig-cache"
+export MESA_SHADER_CACHE_DIR="$XDG_RUNTIME_DIR/mesa-shader-cache"
+mkdir -p "$MESA_SHADER_CACHE_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+install -m644 @bashrc@ "$HOME/.bashrc"
+ln -sfn "$_kiosk_pkg/docs" "$HOME/docs"
+
+unset WAYLAND_DISPLAY DISPLAY 2>/dev/null || true
+
+filter_wlroots_stderr() {
+  local _orphan='run\[[0-9]+\]: "[[:space:]]*$'
+  local _bare='^[[:space:]]*\"[[:space:]]*$'
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      *eglQueryDmaBufModifiersEXT*) continue ;;
+      *'Failed to query dmabuf number of modifiers'*) continue ;;
+      *'NVMAP_IOC_PARAMETERS failed'*) continue ;;
+    esac
+    if [[ "$line" =~ $_orphan ]] || [[ "$line" =~ $_bare ]]; then
+      continue
+    fi
+    printf '%s\n' "$line" >&2
+  done
+}
+
+log "Sway + foot + ouster-cli viz (GLFW Wayland)"
+exec dbus-run-session -- sway --unsupported-gpu --config @swayConfig@ 2> >(filter_wlroots_stderr)

@@ -1,0 +1,17 @@
+[package]
+name = "mc-portable-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", features = ["ws"] }
+parking_lot = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+socket2 = "0.6"
+tokio = { version = "1", features = ["sync", "time", "signal", "rt"] }
+tracing = "0.1"
+reqwest = { version = "0.13", features = ["json", "blocking"], default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sd-notify = "0.5"

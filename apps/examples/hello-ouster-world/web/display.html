@@ -1,0 +1,138 @@
+<h2>hello-ouster-world</h2>
+<p>Example visualizer app with Ouster Dynamo integration</p>
+
+<div class="how-stack">
+    <div class="stat-card how-display-card">
+        <div class="service-header">
+            <div class="service-header-title">Display</div>
+            <div class="service-header-actions how-display-toolbar">
+                <label class="mc-switch service-auto-enable" id="display-output-wrap" title="Enable on-device display output (Sway/SimpleViz). Changing this restarts the app.">
+                    <input type="checkbox" class="mc-switch-cb" id="display-output-toggle" checked>
+                    <span class="mc-switch-track" aria-hidden="true"></span>
+                    <span id="display-output-label">Display ON</span>
+                </label>
+                <div id="display-controls" class="how-display-controls">
+                    <label class="mc-switch service-auto-enable" id="hdmi-toggle-wrap" title="On-device HDMI panel">
+                        <input type="checkbox" class="mc-switch-cb" id="hdmi-toggle" checked>
+                        <span class="mc-switch-track" aria-hidden="true"></span>
+                        <span id="hdmi-label">Show on HDMI</span>
+                    </label>
+                    <label class="mc-switch service-auto-enable" title="Browser Display stream">
+                        <input type="checkbox" class="mc-switch-cb" id="stream-toggle" checked>
+                        <span class="mc-switch-track" aria-hidden="true"></span>
+                        <span id="stream-label">Show in Browser</span>
+                    </label>
+                    <label class="how-res-label" title="Browser stream scale (HDMI stays at panel mode)">
+                        <span>Resolution</span>
+                        <select id="resolution" class="mc-input how-res-select">
+                            <option value="480">480p</option>
+                            <option value="720">720p</option>
+                            <option value="1080">1080p</option>
+                            <option value="max" selected>Max</option>
+                        </select>
+                    </label>
+                    <span id="control-status" class="how-control-status" aria-live="polite">Watching&nbsp;&nbsp;&nbsp;</span>
+                </div>
+            </div>
+        </div>
+        <div id="display-error" class="mc-alert" style="display: none;"></div>
+        <div class="iface-block iface-block-condensed how-source-block">
+            <div class="how-source-heading">
+                <div class="section-title how-source-title">Source</div>
+            </div>
+            <div class="iface-block-header how-source-header">
+                <div class="iface-block-row-left">
+                    <span class="how-source-mode-segmented" role="group" title="OSF recording or live sensor">
+                        <button type="button" class="btn btn-small how-source-mode-seg how-source-mode-seg--local_file how-source-mode-seg-active" data-lidar="osf">Local file</button>
+                        <button type="button" class="btn btn-secondary btn-small how-source-mode-seg how-source-mode-seg--sensor" data-lidar="sensor">Sensor</button>
+                    </span>
+                    <span id="frameset-source-hint" class="app-meta-chip app-meta-chip--type" hidden></span>
+                    <select id="frameset-source" hidden aria-hidden="true" tabindex="-1">
+                        <option value="local_file">Local file</option>
+                        <option value="app">App FrameSet socket</option>
+                        <option value="sensor">connected sensor</option>
+                    </select>
+                    <input type="hidden" id="cfg-app-socket" value="/run/ouster-dynamo/frameset.sock">
+                </div>
+                <div class="iface-block-actions">
+                    <button type="button" class="btn btn-primary btn-small" id="btn-apply-source">Apply</button>
+                </div>
+            </div>
+            <div class="how-source-fields-stack">
+                <div id="cfg-osf-wrap" class="how-source-field">
+                    <label class="form-label" for="cfg-osf-select">Recorded OSFs</label>
+                    <div class="how-osf-row">
+                        <select id="cfg-osf-select" class="mc-input mc-select how-osf-select" title="OSF on device or Studio seed to download">
+                            <option value="">— none on device —</option>
+                        </select>
+                        <div id="how-osf-actions" class="how-osf-actions">
+                            <label class="btn btn-secondary btn-small how-osf-file-btn" for="cfg-osf-upload-input">Upload…
+                                <input type="file" id="cfg-osf-upload-input" accept=".osf" hidden>
+                            </label>
+                            <button type="button" class="btn btn-secondary btn-small" id="btn-osf-fetch">Download</button>
+                            <button type="button" class="btn btn-secondary btn-small" id="btn-osf-delete">Delete</button>
+                            <a class="btn btn-secondary btn-small" id="osf-sample-library" href="https://studio.ouster.com/public/sample_library/public_collection" target="_blank" rel="noopener">Public Sample Library</a>
+                        </div>
+                    </div>
+                    <div id="osf-fetch-progress" class="how-osf-fetch-progress" hidden>
+                        <div id="osf-fetch-bar-wrap" class="mc-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                            <div id="osf-fetch-bar" class="mc-progress-bar-fill"></div>
+                        </div>
+                        <span id="osf-fetch-status" class="how-osf-fetch-caption"></span>
+                    </div>
+                </div>
+                <div id="cfg-sensor-wrap" class="how-source-field" style="display: none;">
+                    <label class="form-label" for="cfg-sensor-host">HOST</label>
+                    <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input" placeholder="os1-… / IP" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="how-source-field">
+                    <label class="form-label" for="via-dynamo-toggle">Ouster Dynamo</label>
+                    <div class="how-via-dynamo-control">
+                        <label class="mc-switch service-auto-enable" title="Optional. Ouster Dynamo is proprietary software installed separately. When on, Dynamo processes this source and SimpleViz reads its FrameSets. When off, SimpleViz opens the OSF or sensor directly.">
+                            <input type="checkbox" class="mc-switch-cb" id="via-dynamo-toggle">
+                            <span class="mc-switch-track" aria-hidden="true"></span>
+                            <span id="via-dynamo-label">Off</span>
+                        </label>
+                        <span id="via-dynamo-hint" class="how-via-dynamo-hint">SimpleViz opens this source directly</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <dl class="how-meta">
+            <div><dt>Source</dt><dd id="meta-source">—</dd></div>
+            <div><dt>Stream</dt><dd id="meta-stream">—</dd></div>
+        </dl>
+        <div id="stream-panel" class="how-stream-panel">
+            <div id="stream-wrap" class="how-stream-wrap" tabindex="0" aria-label="Remote display">
+                <canvas id="stream-canvas" class="how-stream-canvas" width="854" height="480"></canvas>
+                <div id="stream-idle-hint" class="how-stream-idle-hint" hidden>
+                    <p class="how-stream-idle-title">Browser stream turned off</p>
+                    <p>Click, drag, or type in this window to control the HDMI SimpleViz display.</p>
+                </div>
+                <div id="peer-source-hint" class="how-stream-idle-hint" hidden>
+                    <p class="how-stream-idle-title" id="peer-source-title">Waiting for peer FrameSets</p>
+                    <p id="peer-source-body">
+                        Start Ouster Dynamo (proprietary, installed separately)
+                        so it publishes /run/ouster-dynamo/frameset.sock.
+                        Visualization starts automatically when FrameSets arrive.
+                    </p>
+                </div>
+            </div>
+            <div id="display-output-disabled-hint" class="how-stream-idle-hint" hidden>
+                <p class="how-stream-idle-title">Display output disabled</p>
+                <p>Turn on Display to start Sway/SimpleViz. Other apps can use the panel while this is off.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card how-console-card">
+        <div class="service-header">
+            <div class="service-header-title">Console</div>
+            <div class="service-header-actions">
+                <button type="button" class="btn btn-primary btn-small" id="btn-reconnect">Reconnect</button>
+            </div>
+        </div>
+        <div id="console-error" class="mc-alert" style="display: none;"></div>
+        <div id="terminal" class="how-terminal" aria-label="Portable console"></div>
+    </div>
+</div>

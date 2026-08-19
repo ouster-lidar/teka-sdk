@@ -1,0 +1,21 @@
+#!@bash@/bin/bash
+set -euo pipefail
+
+@wlrootsPortableWaylandEnv@
+
+export FONTCONFIG_FILE=@fontsConf@
+
+export XCURSOR_THEME=Adwaita
+export XCURSOR_SIZE=32
+export XCURSOR_PATH=@cursorIcons@/share/icons
+export GTK_CURSOR_THEME=Adwaita
+export XDG_DATA_DIRS="@cursorIcons@/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+
+log() { echo "@logTag@: $*" >&2; }
+
+mkdir -p "$XDG_RUNTIME_DIR"
+mkdir -p "$XDG_RUNTIME_DIR/fontconfig-cache"
+chmod 700 "$XDG_RUNTIME_DIR"
+
+log "@startLog@"
+exec dbus-run-session -- @compositorCmd@ 2> >(filter_wlroots_stderr)

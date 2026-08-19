@@ -1,0 +1,73 @@
+<h2>NVIDIA DevTools</h2>
+<p class="config-hint">SSH shell with CUDA profiling tools on the device (port 2223). Host <code>libcuda</code> via PortableGPU.</p>
+
+<div class="stat-card" id="ndt-monitor-card">
+    <div class="service-header">
+        <div class="service-header-title">Jetson monitor</div>
+        <span id="ndt-monitor-status" class="ndt-monitor-status ndt-monitor-status--idle">Connecting…</span>
+    </div>
+    <p class="config-hint">Live <code>tegrastats</code> from the device — rolling 60&nbsp;s history.</p>
+    <div class="ndt-metrics" id="ndt-metrics"></div>
+    <div class="ndt-chart-wrap" id="ndt-chart-wrap">
+        <canvas id="ndt-chart" class="ndt-chart" width="800" height="280" aria-label="Jetson metrics chart"></canvas>
+        <div id="ndt-chart-tooltip" class="ndt-chart-tooltip" hidden></div>
+    </div>
+    <pre id="ndt-tegra-raw" class="ndt-tegra-raw" aria-live="polite"></pre>
+</div>
+
+<div class="stat-card" id="ndt-ssh-card">
+    <div class="service-header">
+        <div class="service-header-title">SSH access</div>
+    </div>
+    <p class="config-hint">Paste your public key below before connecting — nothing is authorized at first boot. Login as <code>js</code> — <code>ncu</code>, <code>nsys</code>, <code>tegrastats</code>, <code>nvidia-smi</code>, and <code>compute-sanitizer</code> are on <code>PATH</code>. Use <code>root</code> only when you need privileged host access.</p>
+    <div class="ndt-ssh-cmds">
+        <div class="ndt-ssh-row">
+            <span class="ndt-ssh-label">js</span>
+            <code id="ndt-ssh-js" class="ndt-ssh-cmd">ssh -p 2223 js@…</code>
+            <button type="button" class="btn btn-secondary btn-small" id="ndt-copy-js">Copy</button>
+        </div>
+        <div class="ndt-ssh-row">
+            <span class="ndt-ssh-label">root</span>
+            <code id="ndt-ssh-root" class="ndt-ssh-cmd">ssh -p 2223 root@…</code>
+            <button type="button" class="btn btn-secondary btn-small" id="ndt-copy-root">Copy</button>
+        </div>
+    </div>
+</div>
+
+<div class="stat-card" id="ndt-examples-card">
+    <div class="service-header">
+        <div class="service-header-title">Examples</div>
+    </div>
+    <pre class="ndt-examples"><code>ncu --version
+nsys --version
+tegrastats --interval 1000
+nvidia-smi
+
+# Profile a new process
+nsys profile ./your-cuda-app
+
+# Attach to a running process (needs root for ptrace)
+sudo nsys profile --pid &lt;PID&gt; --duration 30
+ncu --target-processes all --set full -o report --attach &lt;PID&gt;
+
+compute-sanitizer --tool memcheck ./your-cuda-app</code></pre>
+    <p class="config-hint">Run <code>ncu-ui</code> / <code>nsys-ui</code> on your workstation for remote profiling; target this device with the CLI tools above.</p>
+</div>
+
+<div class="stat-card" id="ndt-keys-card">
+    <div class="service-header">
+        <div class="service-header-title">Authorized keys</div>
+        <div class="service-header-actions">
+            <button type="button" id="ndt-save" class="btn btn-primary btn-small">Save</button>
+        </div>
+    </div>
+    <p class="config-hint">One public key per line (OpenSSH <code>authorized_keys</code> format). Comments (<code>#</code>) and blank lines are ignored on save.</p>
+    <div id="ndt-error" class="mc-alert" style="display: none;"></div>
+    <div id="ndt-success" class="mc-alert mc-alert--success" style="display: none;"></div>
+
+    <label class="form-label" for="ndt-keys-js">js</label>
+    <textarea id="ndt-keys-js" class="mc-input ndt-keys-area" rows="4" spellcheck="false" autocomplete="off"></textarea>
+
+    <label class="form-label ndt-keys-label-root" for="ndt-keys-root">root</label>
+    <textarea id="ndt-keys-root" class="mc-input ndt-keys-area" rows="4" spellcheck="false" autocomplete="off"></textarea>
+</div>

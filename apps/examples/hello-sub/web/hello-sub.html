@@ -1,0 +1,47 @@
+<h2>Hello Subscriber</h2>
+<p>Demo event subscriber. Mirrors events from one or more <code>hello-pub</code> publishers (local or remote).</p>
+
+<div class="stat-card">
+    <div class="service-header">
+        <div class="service-header-title">Status</div>
+        <div class="service-header-actions">
+            <span id="conn-chip" class="app-meta-chip app-meta-chip--state">0/0</span>
+            <button type="button" class="btn btn-primary btn-small" id="btn-peer-state" title="GET each publisher /state once without waiting for the next stream snapshot">Refresh peer state</button>
+        </div>
+    </div>
+    <div id="sub-error" class="mc-alert" style="display: none;"></div>
+    <div class="hello-status-body">
+        <div class="hello-status-stats">
+            <div class="hello-status-field">
+                <div class="hello-status-label">Events received</div>
+                <div id="events-received" class="hello-status-value">0</div>
+            </div>
+            <div class="hello-status-field">
+                <div class="hello-status-label">Publishers</div>
+                <div id="publisher-count" class="hello-status-value">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="stat-card">
+    <div class="section-title">Subscribed to</div>
+    <p class="config-hint">Paste a host, <code>http://host</code>, or full feature URL from hello-pub’s Copy button. Add to the list, then Apply to connect.</p>
+    <div id="publishers-list" class="hello-publishers-list"></div>
+    <form id="peer-config-form" class="hello-config-form">
+        <label class="form-label" for="cfg-publisher-url">Add publisher URL</label>
+        <input type="text" id="cfg-publisher-url" class="mc-input" placeholder="http://other-box/api/v1/app/hello-pub" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn btn-secondary" id="btn-add-peer">Add</button>
+        <button type="submit" class="btn btn-primary" id="btn-apply-peer">Apply &amp; reconnect</button>
+    </form>
+</div>
+
+<div class="stat-card">
+    <div class="hello-feed-bar">
+        <div class="section-title">Feed</div>
+        <div id="feed-filters" class="hello-feed-filters" aria-label="Filter publishers"></div>
+    </div>
+    <div id="events-list" class="stream-list">
+        <div class="stream-item"><span class="stream-meta">Waiting for publishers</span></div>
+    </div>
+</div>

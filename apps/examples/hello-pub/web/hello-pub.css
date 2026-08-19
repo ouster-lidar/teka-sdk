@@ -1,0 +1,171 @@
+/* hello-pub page-private styles */
+
+.hello-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    margin: 0.75rem 0 0;
+}
+
+.hello-meta dt {
+    font-size: 0.75rem;
+    color: #5a6a7a;
+    margin: 0;
+}
+
+.hello-meta dd {
+    margin: 0.15rem 0 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.hello-pub-url {
+    margin-top: 1rem;
+}
+
+.hello-pub-url-label {
+    font-size: 0.75rem;
+    color: #5a6a7a;
+    margin: 0 0 0.35rem;
+}
+
+.hello-pub-url-hint {
+    font-weight: 400;
+    color: #64748b;
+}
+
+.hello-pub-url-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.hello-pub-url-value {
+    flex: 1 1 12rem;
+    min-width: 0;
+    display: block;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #94a3b8;
+    background: transparent;
+    border: 1px solid #334155;
+    border-radius: 0.25rem;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
+
+.hello-publish-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0;
+}
+
+.hello-publish-row .mc-input {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.hello-interval {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.hello-interval-input {
+    width: 3.25rem;
+    padding: 0.2rem 0.35rem;
+    text-align: center;
+}
+
+.hello-event-kind {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-right: 0.4rem;
+    color: #94a3b8;
+}
+
+.hello-pub-card .hello-pub-section {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #334155;
+}
+
+.hello-pub-card .hello-pub-section .section-title {
+    margin-top: 0;
+}
+
+/* Recent events — match hello-sub feed expand/collapse */
+#events-list.stream-list {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.hello-feed-event.stream-item {
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.hello-feed-event-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0.65rem;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.hello-feed-event-text {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.hello-feed-event-text .stream-meta {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hello-feed-event-text .stream-stats.hello-feed-event-msg {
+    margin-top: 0.15rem;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 1.45em;
+    line-height: 1.35;
+}
+
+.hello-feed-event--expanded .hello-feed-event-text .stream-stats.hello-feed-event-msg {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    max-height: none;
+    white-space: pre-wrap;
+    overflow: hidden;
+}
+
+.hello-feed-expand {
+    flex: 0 0 auto;
+    margin-left: auto;
+    align-self: flex-start;
+}

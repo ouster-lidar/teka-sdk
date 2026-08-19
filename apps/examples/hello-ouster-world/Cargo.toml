@@ -1,0 +1,32 @@
+[package]
+name = "hello-ouster-world"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hello_ouster_world"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hello-ouster-world"
+path = "src/main.rs"
+
+[dependencies]
+mc-portable-runtime = { path = "../../lib/mc-portable-runtime" }
+axum = { version = "0.8", features = ["json", "ws"] }
+tower-http = { version = "0.6", features = ["cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+parking_lot = "0.12"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+inotify = { version = "0.11", default-features = false }

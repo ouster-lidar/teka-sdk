@@ -1,0 +1,44 @@
+<h2>Hello Publisher</h2>
+<p>Demo event publisher. Publishes events to local and remote subscribers.</p>
+
+<div class="stat-card hello-pub-card">
+    <div class="service-header">
+        <div class="service-header-title">Publisher</div>
+        <div class="service-header-actions">
+            <label class="hello-interval service-auto-enable" title="Seconds between random events">
+                <span>Interval</span>
+                <input type="number" id="generator-interval" class="mc-input hello-interval-input" min="1" max="10" step="1" value="5">
+                <span>s</span>
+            </label>
+            <label class="mc-switch service-auto-enable" title="Publish a random event on an interval">
+                <input type="checkbox" class="mc-switch-cb" id="generator-toggle">
+                <span class="mc-switch-track" aria-hidden="true"></span>
+                <span>Auto generator</span>
+            </label>
+        </div>
+    </div>
+    <div id="pub-error" class="mc-alert" style="display: none;"></div>
+    <dl class="hello-meta">
+        <div><dt>Total published</dt><dd id="total-published">0</dd></div>
+    </dl>
+    <div class="hello-pub-url">
+        <div class="hello-pub-url-label">Publisher URL <span class="hello-pub-url-hint">(paste into remote hello-sub)</span></div>
+        <div class="hello-pub-url-row">
+            <code id="publisher-url" class="hello-pub-url-value">—</code>
+            <button type="button" class="btn btn-primary btn-small" id="btn-copy-url">Copy</button>
+        </div>
+    </div>
+    <div class="hello-pub-section">
+        <div class="section-title">Publish</div>
+        <form id="publish-form" class="hello-publish-row">
+            <input type="text" id="event-message" class="mc-input" value='{"key": "value test 🧪"}' maxlength="200" autocomplete="off" spellcheck="false">
+            <button type="submit" class="btn btn-primary" id="btn-publish">Publish event</button>
+        </form>
+    </div>
+    <div class="hello-pub-section">
+        <div class="section-title">Recent events</div>
+        <div id="events-list" class="stream-list">
+            <div class="stream-item"><span class="stream-meta">No events yet</span></div>
+        </div>
+    </div>
+</div>

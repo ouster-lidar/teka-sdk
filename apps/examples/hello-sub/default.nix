@@ -1,0 +1,125 @@
+{
+  ps,
+  pkgs,
+  lib,
+  writeText,
+  runCommand,
+}:
+
+let
+  pe = import ../../nix/portable-app.nix {
+    inherit
+      ps
+      pkgs
+      lib
+      runCommand
+      ;
+  };
+
+  name = "hello-sub";
+
+  helloSubSrc = pe.mcRustSrc { srcDir = ./.; };
+
+  helloSubBin = pe.buildMcCrate2nix {
+    cargoNix = ./Cargo.nix;
+    crateName = "hello-sub";
+    filteredSrc = helloSubSrc;
+    nativeBuildInputs = pe.mcOpensslNative;
+    meta = {
+      mainProgram = "hello-sub";
+    };
+  };
+
+  jp = pe.mcJetstreamPortable;
+
+  webTree = pe.mcWebTree {
+    inherit name;
+    webSrc = ./web;
+    webFiles = [
+      "index.html"
+      "hello-sub.html"
+      "hello-sub.js"
+      "hello-sub.css"
+    ];
+  };
+
+  mcManifest = writeText "mission-control-manifest.json" ''
+    {
+      "id": "hello-sub",
+      "version": "1.0.0",
+      "display_name": "Hello Subscriber",
+      "nav": {
+        "label": "Hello Sub",
+        "path": "/app/hello-sub",
+        "section": "apps",
+        "order": 41,
+        "panels": [{ "label": "Subscriber", "panel": "hello-sub" }]
+      },
+      "ui": {
+        "mode": "static",
+        "title": "Hello Subscriber",
+        "template": "index.html",
+        "styles": ["hello-sub.css"]
+      },
+      "backend": {
+        "mode": "proxy",
+        "runtime_listen": true,
+        "health_path": "/api/v1/status",
+        "card_stream_path": "/api/v1/cards/stream"
+      },
+      "registers": [
+        { "alias": "hello-sub", "panel": "hello-sub" }
+      ],
+      "app_cards": [
+        {
+          "card_id": "hello-sub",
+          "title": "Hello Sub",
+          "description": "Demo event subscriber",
+          "icon": "📥",
+          "link_alias": "hello-sub"
+        }
+      ],
+      "auth": {
+        "scheme": "ojs-proxy-identity",
+        "version": "0.1.0"
+      }
+    }
+  '';
+in
+
+ps.makePortableErofsImage {
+  inherit name;
+  unit = writeText "${name}.service" ''
+    [Unit]
+    Description=hello-sub (Jetstream hello pub-sub subscriber demo)
+    Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
+    After=mission-control.service network.target
+    ${ps.jetstreamMcPortableBackendUnitLines}
+    Wants=network.target
+
+    [Service]
+    ${ps.mcPortableNotifyServiceLines}
+    ProtectSystem=no
+    ProtectHome=no
+    StateDirectory=${name}
+    StateDirectoryMode=0750
+    Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+    Environment=APP_ID=hello-sub
+    Environment=MC_HELLO_PUB_APP_ID=hello-pub
+    Environment=PATH=${lib.makeBinPath [ helloSubBin ]}
+    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${jp.serviceFragment}
+    ExecStart=${lib.getExe helloSubBin}
+    SyslogIdentifier=${name}
+    StandardOutput=journal
+    StandardError=journal
+    Restart=on-failure
+
+    [Install]
+    WantedBy=jetstream-apps.target
+  '';
+  copyFiles = pe.mcManifestCopyFiles {
+    inherit name mcManifest webTree;
+  };
+  runtimeClosures = [ helloSubBin ];
+}

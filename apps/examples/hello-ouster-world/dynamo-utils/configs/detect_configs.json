@@ -1,0 +1,28 @@
+{
+  "class_ids": {
+    "car": 0,
+    "truck": 1,
+    "bus": 2,
+    "trailer": 3,
+    "construction_vehicle": 4,
+    "pedestrian": 5,
+    "motorcycle": 6,
+    "bicycle": 7,
+    "traffic_cone": 8,
+    "barrier": 9,
+    "ego": 11
+  },
+  "class_colors": {
+    "car": [255, 0, 0],
+    "truck": [255, 105, 180],
+    "bus": [128, 0, 128],
+    "trailer": [0, 255, 255],
+    "construction_vehicle": [255, 140, 0],
+    "pedestrian": [0, 0, 255],
+    "motorcycle": [255, 255, 0],
+    "bicycle": [255, 215, 0],
+    "traffic_cone": [255, 165, 0],
+    "barrier": [190, 190, 190],
+    "ego": [255, 255, 255]
+  }
+}
