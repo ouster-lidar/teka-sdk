@@ -138,10 +138,7 @@ class StreamTarget:
 
 
 class VizPid:
-    """Publishes this process's pid so Rust can SIGINT SimpleViz cleanly.
-
-    Used when the Display panel applies a new source or the console sends Ctrl-C.
-    """
+    """Publishes this process pid so Rust can detect stale SimpleViz processes."""
 
     def __init__(self, path: Path | None = None) -> None:
         self.path = path if path is not None else RUNTIME_DIR / "viz.pid"
@@ -731,6 +728,7 @@ class JetstreamDisplayBridge:
         self._publisher: Optional[FramePublisher] = None
         self._keys: Optional[KeyBridge] = None
         self._demand: Optional[DemandController] = None
+        self._config_watch: Any = None
 
     @property
     def is_app(self) -> bool:
@@ -768,8 +766,9 @@ class JetstreamDisplayBridge:
         self._destroy_pointviz()
         return None
 
-    def prepare(self, simple: Any, source: Any) -> None:
+    def prepare(self, simple: Any, source: Any, *, config_watch: Any = None) -> None:
         """After SimpleViz is constructed: bind source, keys, and status."""
+        self._config_watch = config_watch
         self._source = source
         on_disconnect = getattr(source, "set_on_disconnect", None)
         if callable(on_disconnect):
@@ -833,6 +832,20 @@ class JetstreamDisplayBridge:
             while not stop.is_set():
                 try:
                     if not viz.running():
+                        break
+                    watch = self._config_watch
+                    if watch is not None and watch.reload_requested():
+                        print(
+                            "hello-ouster-world: source-config changed; stopping viz",
+                            flush=True,
+                        )
+                        try:
+                            viz.running(False)
+                        except Exception as exc:  # noqa: BLE001
+                            print(
+                                f"hello-ouster-world: reload stop failed: {exc!r}",
+                                flush=True,
+                            )
                         break
                     time.sleep(publisher.try_grab(viz))
                 except Exception as exc:  # noqa: BLE001

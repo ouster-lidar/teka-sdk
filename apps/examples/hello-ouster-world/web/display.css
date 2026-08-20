@@ -1,4 +1,4 @@
-/* hello-ouster-world: Display, then full-width Console, then Subscriber */
+/* hello-ouster-world: Display card, then Console card */
 
 .how-stack {
     display: flex;
@@ -51,11 +51,6 @@
     box-sizing: border-box;
 }
 
-.how-status-muted {
-    font-weight: 400;
-    color: #5a6a7a;
-}
-
 .how-display-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -105,20 +100,17 @@
     padding: 0.55rem 0.75rem 0.65rem;
 }
 
-.how-source-title.section-title {
+.how-source-title {
     margin: 0;
-    padding: 0;
-    background: none;
-    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #5a6a7a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .how-source-heading {
     margin-bottom: 0.45rem;
-}
-
-.how-source-header.iface-block-header {
-    justify-content: flex-start;
-    gap: 0.65rem;
 }
 
 .how-source-mode-segmented {
@@ -150,17 +142,6 @@
     flex-direction: column;
     gap: 0.65rem;
     margin-top: 0.55rem;
-}
-
-.how-producer-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.65rem;
-}
-
-.how-producer-heading .how-source-title {
-    margin: 0;
 }
 
 .how-source-field {
@@ -198,12 +179,6 @@
     margin: 0;
 }
 
-.how-source-kind {
-    flex: 0 0 auto;
-    min-width: 10rem;
-    width: auto;
-}
-
 .how-osf-row {
     display: flex;
     flex-wrap: wrap;
@@ -217,16 +192,45 @@
     width: auto;
 }
 
-.how-sock-fields {
+.how-sensor-row {
+    align-items: center;
+}
+
+.how-record-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.5rem 0.75rem;
+    flex: 2 1 24rem;
+    min-width: 14rem;
 }
 
-.how-sock-fields .how-sock-input {
-    flex: 1 1 10rem;
-    min-width: 0;
+.how-record-toggle {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.how-sensor-host-input {
+    flex: 0 1 22rem;
+    min-width: 16rem;
+    max-width: 28rem;
+    width: auto;
+}
+
+.how-record-filename {
+    flex: 2 1 22rem;
+    min-width: 16rem;
+    max-width: 36rem;
+}
+
+.how-toggle-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.how-toggle-disabled .mc-switch-cb {
+    pointer-events: none;
 }
 
 .how-sock-input {
@@ -295,15 +299,6 @@
     display: inline-block;
     min-width: 14ch; /* "Show on HDMI" / "Show in Browser" */
     font-variant-numeric: tabular-nums;
-}
-
-.how-toggle-disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.how-toggle-disabled .mc-switch-cb {
-    pointer-events: none;
 }
 
 .how-stream-wrap {

@@ -36,40 +36,38 @@
             </div>
         </div>
         <div id="display-error" class="mc-alert" style="display: none;"></div>
-        <div class="iface-block iface-block-condensed how-source-block">
+        <div class="iface-block how-source-block">
             <div class="how-source-heading">
-                <div class="section-title how-source-title">Source</div>
+                <div class="how-source-title">Source</div>
             </div>
             <div class="iface-block-header how-source-header">
                 <div class="iface-block-row-left">
                     <span class="how-source-mode-segmented" role="group" title="OSF recording or live sensor">
                         <button type="button" class="btn btn-small how-source-mode-seg how-source-mode-seg--local_file how-source-mode-seg-active" data-lidar="osf">Local file</button>
-                        <button type="button" class="btn btn-secondary btn-small how-source-mode-seg how-source-mode-seg--sensor" data-lidar="sensor">Sensor</button>
+                        <button type="button" class="btn btn-secondary btn-small how-source-mode-seg how-source-mode-seg--sensor" data-lidar="sensor">Connected sensor</button>
                     </span>
                     <span id="frameset-source-hint" class="app-meta-chip app-meta-chip--type" hidden></span>
-                    <select id="frameset-source" hidden aria-hidden="true" tabindex="-1">
-                        <option value="local_file">Local file</option>
-                        <option value="app">App FrameSet socket</option>
-                        <option value="sensor">connected sensor</option>
-                    </select>
                     <input type="hidden" id="cfg-app-socket" value="/run/ouster-dynamo/frameset.sock">
                 </div>
                 <div class="iface-block-actions">
-                    <button type="button" class="btn btn-primary btn-small" id="btn-apply-source">Apply</button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-stop btn-small" id="btn-stop-source" title="Stop lidar/OSF playback and recording">Stop</button>
+                        <button type="button" class="btn btn-primary btn-small" id="btn-apply-source">Apply</button>
+                    </div>
                 </div>
             </div>
             <div class="how-source-fields-stack">
                 <div id="cfg-osf-wrap" class="how-source-field">
                     <label class="form-label" for="cfg-osf-select">Recorded OSFs</label>
                     <div class="how-osf-row">
-                        <select id="cfg-osf-select" class="mc-input mc-select how-osf-select" title="OSF on device or Studio seed to download">
+                        <select id="cfg-osf-select" class="mc-input mc-select how-osf-select" title="OSF on device or Studio example (catalog entries fetch on Apply)">
                             <option value="">— none on device —</option>
                         </select>
                         <div id="how-osf-actions" class="how-osf-actions">
                             <label class="btn btn-secondary btn-small how-osf-file-btn" for="cfg-osf-upload-input">Upload…
                                 <input type="file" id="cfg-osf-upload-input" accept=".osf" hidden>
                             </label>
-                            <button type="button" class="btn btn-secondary btn-small" id="btn-osf-fetch">Download</button>
+                            <button type="button" class="btn btn-secondary btn-small" id="btn-osf-download" title="Download OSF to your computer">Download</button>
                             <button type="button" class="btn btn-secondary btn-small" id="btn-osf-delete">Delete</button>
                             <a class="btn btn-secondary btn-small" id="osf-sample-library" href="https://studio.ouster.com/public/sample_library/public_collection" target="_blank" rel="noopener">Public Sample Library</a>
                         </div>
@@ -82,18 +80,28 @@
                     </div>
                 </div>
                 <div id="cfg-sensor-wrap" class="how-source-field" style="display: none;">
-                    <label class="form-label" for="cfg-sensor-host">HOST</label>
-                    <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input" placeholder="os1-… / IP" autocomplete="off" spellcheck="false">
+                    <label class="form-label" for="cfg-sensor-host">Sensor host</label>
+                    <div class="how-osf-row how-sensor-row">
+                        <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input how-sensor-host-input" placeholder="os1-… / IP" autocomplete="off" spellcheck="false">
+                        <div class="how-record-controls">
+                            <label class="mc-switch service-auto-enable how-record-toggle" title="Record sensor to OSF on Apply (same flow as source changes)">
+                                <input type="checkbox" class="mc-switch-cb" id="record-enabled-toggle">
+                                <span class="mc-switch-track" aria-hidden="true"></span>
+                                <span id="record-enabled-label">Record</span>
+                            </label>
+                            <input type="text" id="record-filename" class="mc-input how-record-filename" placeholder="hello-ouster-world-YYYYMMDD-HHMMSS.osf" autocomplete="off" spellcheck="false" disabled title="Basename under /srv/recordings/ (empty = auto)">
+                        </div>
+                    </div>
                 </div>
                 <div class="how-source-field">
                     <label class="form-label" for="via-dynamo-toggle">Ouster Dynamo</label>
-                    <div class="how-via-dynamo-control">
-                        <label class="mc-switch service-auto-enable" title="Optional. Ouster Dynamo is proprietary software installed separately. When on, Dynamo processes this source and SimpleViz reads its FrameSets. When off, SimpleViz opens the OSF or sensor directly.">
+                    <div class="how-via-dynamo-control" id="via-dynamo-wrap">
+                        <label class="mc-switch service-auto-enable" title="Optional. Ouster Dynamo is proprietary software installed separately. When on, Dynamo ingests lidar and publishes detections on the app FrameSet stream. When off, lidar/OSF is opened directly without Dynamo overlays.">
                             <input type="checkbox" class="mc-switch-cb" id="via-dynamo-toggle">
                             <span class="mc-switch-track" aria-hidden="true"></span>
                             <span id="via-dynamo-label">Off</span>
                         </label>
-                        <span id="via-dynamo-hint" class="how-via-dynamo-hint">SimpleViz opens this source directly</span>
+                        <span id="via-dynamo-hint" class="how-via-dynamo-hint">Direct lidar/OSF — no Dynamo detections overlay</span>
                     </div>
                 </div>
             </div>
@@ -117,10 +125,10 @@
                         Visualization starts automatically when FrameSets arrive.
                     </p>
                 </div>
-            </div>
-            <div id="display-output-disabled-hint" class="how-stream-idle-hint" hidden>
-                <p class="how-stream-idle-title">Display output disabled</p>
-                <p>Turn on Display to start Sway/SimpleViz. Other apps can use the panel while this is off.</p>
+                <div id="display-output-disabled-hint" class="how-stream-idle-hint" hidden>
+                    <p class="how-stream-idle-title">Display output disabled</p>
+                    <p>Turn on Display to start Sway/SimpleViz. Other apps can use the panel while this is off.</p>
+                </div>
             </div>
         </div>
     </div>

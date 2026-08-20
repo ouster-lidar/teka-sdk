@@ -23,7 +23,7 @@ Customer-facing **Jetstream** demo apps. Build portable app images from `apps/`,
 
 ### hello-ouster-world
 
-Lidar viz. SDK matches `hello-ouster-terminal`. Get recordings from the Display UI (**Download** an example or **Upload** an `.osf`). Optional peer: **Ouster Dynamo** — proprietary app, installed separately, not built from this repo — publishes on `/run/ouster-dynamo/frameset.sock`.
+Lidar viz. SDK matches `hello-ouster-terminal`. Get recordings from the Display UI (**Upload** an `.osf`, or pick a catalog example to fetch on Apply). Optional peer: **Ouster Dynamo** — proprietary app, installed separately, not built from this repo — publishes on `/run/ouster-dynamo/frameset.sock`.
 
 ## Build and deploy
 

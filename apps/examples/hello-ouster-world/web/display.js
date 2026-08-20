@@ -79,14 +79,7 @@
     }
 
     function showError(msg) {
-        if (window.showInlineError) {
-            window.showInlineError('display-error', msg);
-        } else {
-            var el = document.getElementById('display-error');
-            if (!el) return;
-            el.textContent = msg || '';
-            el.style.display = msg ? 'block' : 'none';
-        }
+        window.showInlineError('display-error', msg || '');
     }
 
     function api(path) {
@@ -599,29 +592,45 @@
         };
     }
 
-    var framesetSourceSelect = document.getElementById('frameset-source');
     var framesetSourceHint = document.getElementById('frameset-source-hint');
     var cfgOsfSelect = document.getElementById('cfg-osf-select');
     var cfgOsfUploadInput = document.getElementById('cfg-osf-upload-input');
     var osfLibraryLink = document.getElementById('osf-sample-library');
-    var btnOsfFetch = document.getElementById('btn-osf-fetch');
+    var btnOsfDownload = document.getElementById('btn-osf-download');
     var btnOsfDelete = document.getElementById('btn-osf-delete');
     var osfFetchProgress = document.getElementById('osf-fetch-progress');
     var osfFetchBarWrap = document.getElementById('osf-fetch-bar-wrap');
     var osfFetchBar = document.getElementById('osf-fetch-bar');
     var osfFetchStatus = document.getElementById('osf-fetch-status');
     var cfgAppSocket = document.getElementById('cfg-app-socket');
-    var cfgAppSocketPreset = document.getElementById('cfg-app-socket-preset');
     var cfgSensorHost = document.getElementById('cfg-sensor-host');
     var viaDynamoToggle = document.getElementById('via-dynamo-toggle');
     var viaDynamoLabel = document.getElementById('via-dynamo-label');
     var viaDynamoHint = document.getElementById('via-dynamo-hint');
     var btnApplySource = document.getElementById('btn-apply-source');
+    var btnStopSource = document.getElementById('btn-stop-source');
+    var recordEnabledToggle = document.getElementById('record-enabled-toggle');
+    var recordFilename = document.getElementById('record-filename');
+    var viaDynamoWrap = document.getElementById('via-dynamo-wrap');
+    var lastRecord = { active: false };
+    var lastRuntime = {};
+    var osfWrapWasVisible = false;
+    var recordFilenameUserEdited = false;
+    var lastSuggestedRecordName = '';
     var sourceBusy = false;
+    var sourceBusyTimer = null;
+    var SOURCE_BUSY_MS = 500;
+
+    function setSourceBusy(busy) {
+        sourceBusy = busy;
+        if (btnApplySource) btnApplySource.disabled = busy;
+        if (btnStopSource) btnStopSource.disabled = busy;
+    }
     var sourceDraftDirty = false;
     var lastPersistedSource = null;
     var osfBusy = false;
     var osfFetchPollTimer = null;
+    var pendingApplyOpts = null;
     var lastOsfCatalog = null;
     var osfXferKey = '';
     var osfXferSamples = [];
@@ -640,8 +649,6 @@
     }
 
     function syncVizSourceSelect() {
-        if (!framesetSourceSelect) return;
-        framesetSourceSelect.value = vizSource();
         if (cfgAppSocket && viaDynamo() && !cfgAppSocket.value.trim()) {
             cfgAppSocket.value = DYNAMO_APP_SOCKET;
         }
@@ -687,10 +694,12 @@
         return !!(imp && imp.state === 'running');
     }
 
-    function updateOsfDownloadBtn(catalog) {
+    function updateOsfActionBtns(catalog) {
         catalog = catalog || lastOsfCatalog;
         var running = importRunning(catalog);
-        if (btnOsfFetch) btnOsfFetch.disabled = osfBusy || running || !selectedSeedName();
+        if (btnOsfDownload) {
+            btnOsfDownload.disabled = osfBusy || running || !selectedOsfName();
+        }
         if (btnOsfDelete) btnOsfDelete.disabled = osfBusy || running || !selectedOsfName();
     }
 
@@ -805,12 +814,12 @@
             });
         } else if (erred) {
             resetOsfXfer();
-            showOsfTransfer({ erred: true, msg: imp.error || 'Download failed' });
+            showOsfTransfer({ erred: true, msg: imp.error || 'Fetch failed' });
         } else {
             resetOsfXfer();
             showOsfTransfer({});
         }
-        updateOsfDownloadBtn();
+        updateOsfActionBtns();
     }
 
     function renderOsfSelect(catalog, preferredPath) {
@@ -841,7 +850,7 @@
             if (onDevice[s.name]) return;
             var opt = document.createElement('option');
             opt.value = SEED_PREFIX + s.name;
-            opt.textContent = s.name + ' — not on device · Download to fetch';
+            opt.textContent = s.name + ' — not on device · fetches on Apply';
             cfgOsfSelect.appendChild(opt);
         });
         if (prev) {
@@ -859,9 +868,12 @@
     }
 
     function loadOsfLibrary(preferredPath) {
+        var prefer = preferredPath
+            || (lastPersistedSource && lastPersistedSource.osf_path)
+            || '';
         return fetchAppJson(api('/osfs')).then(function (catalog) {
             if (!catalog) return null;
-            renderOsfSelect(catalog, preferredPath);
+            renderOsfSelect(catalog, prefer);
             if (importRunning(catalog) && !osfFetchPollTimer) startOsfFetchPoll();
             return catalog;
         }).catch(function () { return null; });
@@ -885,7 +897,11 @@
                 clearOsfFetchPoll();
                 osfBusy = false;
                 renderOsfSelect(catalog);
-                if (catalog.import && catalog.import.state === 'error') return;
+                if (catalog.import && catalog.import.state === 'error') {
+                    pendingApplyOpts = null;
+                    setSourceBusy(false);
+                    return;
+                }
                 var name = (catalog.import && catalog.import.name) || '';
                 var path = '';
                 (catalog.files || []).forEach(function (f) {
@@ -893,9 +909,16 @@
                 });
                 if (path) {
                     renderOsfSelect(catalog, path);
-                    if (framesetSourceSelect) framesetSourceSelect.value = 'local_file';
+                    lidarKind = 'osf';
                     updateSourceFieldsUi();
-                    postSourceConfig();
+                    if (pendingApplyOpts) {
+                        var ao = pendingApplyOpts;
+                        pendingApplyOpts = null;
+                        deliverSourceConfig(ao);
+                    }
+                } else if (pendingApplyOpts) {
+                    pendingApplyOpts = null;
+                    setSourceBusy(false);
                 }
             }).catch(function () {});
         }, 1000);
@@ -913,7 +936,7 @@
             return Promise.reject(new Error('File must have .osf extension'));
         }
         osfBusy = true;
-        updateOsfDownloadBtn();
+        updateOsfActionBtns();
         resetOsfXfer('ul:' + name);
         showOsfTransfer({ active: true, loaded: 0, total: file.size || 0 });
         return new Promise(function (resolve, reject) {
@@ -950,7 +973,7 @@
             return loadOsfLibrary(body.path).then(function () { return body; });
         }).finally(function () {
             osfBusy = false;
-            updateOsfDownloadBtn();
+            updateOsfActionBtns();
             if (cfgOsfUploadInput) cfgOsfUploadInput.value = '';
         });
     }
@@ -959,39 +982,61 @@
         if (osfBusy || importRunning(lastOsfCatalog)) return;
         var name = selectedSeedName();
         if (!name) {
-            setOsfStatus('Select a recording that is not on the device', 'state');
+            setOsfStatus('Select a Studio example that is not on the device', 'state');
+            pendingApplyOpts = null;
+            setSourceBusy(false);
             return;
         }
         osfBusy = true;
-        updateOsfDownloadBtn();
+        updateOsfActionBtns();
         resetOsfXfer('dl:' + name);
         showOsfTransfer({ active: true, loaded: 0, total: 0 });
         postJson(api('/osfs/imports'), { name: name })
             .then(function (resp) {
-                if (!resp) throw new Error('Import failed');
+                if (!resp) throw new Error('Fetch failed');
                 if (resp.error) {
-                    throw new Error(resp.error.message || 'Import failed');
+                    throw new Error(resp.error.message || 'Fetch failed');
                 }
                 if (resp.already_present) {
                     osfBusy = false;
                     resetOsfXfer();
-                    return loadOsfLibrary(resp.path);
+                    return loadOsfLibrary(resp.path).then(function (catalog) {
+                        if (pendingApplyOpts) {
+                            var ao = pendingApplyOpts;
+                            pendingApplyOpts = null;
+                            deliverSourceConfig(ao);
+                        }
+                        return catalog;
+                    });
                 }
                 startOsfFetchPoll();
             })
             .catch(function (e) {
                 osfBusy = false;
-                updateOsfDownloadBtn();
+                pendingApplyOpts = null;
+                setSourceBusy(false);
+                updateOsfActionBtns();
                 setOsfStatus(e.message || String(e), 'ro');
             });
+    }
+
+    function downloadOsfToBrowser() {
+        var name = selectedOsfName();
+        if (!name || osfBusy || importRunning(lastOsfCatalog)) return;
+        var a = document.createElement('a');
+        a.href = api('/osfs/' + encodeURIComponent(name));
+        a.download = name;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
     }
 
     function deleteSelectedOsf() {
         var name = selectedOsfName();
         if (!name || osfBusy || importRunning(lastOsfCatalog)) return;
-        if (!window.confirm('Delete ' + name + ' from this device?')) return;
         osfBusy = true;
-        updateOsfDownloadBtn();
+        updateOsfActionBtns();
         window.fetchAppJsonPost(api('/osfs/' + encodeURIComponent(name)), {}, 'DELETE')
             .then(function (resp) {
                 if (!resp || resp.error) {
@@ -1004,29 +1049,69 @@
             })
             .finally(function () {
                 osfBusy = false;
-                updateOsfDownloadBtn();
+                updateOsfActionBtns();
             });
     }
 
-    function syncSockPresetFromPath() {
-        if (!cfgAppSocketPreset || !cfgAppSocket) return;
-        var sock = (cfgAppSocket.value || '').trim();
-        var match = false;
-        for (var i = 0; i < cfgAppSocketPreset.options.length; i++) {
-            var opt = cfgAppSocketPreset.options[i];
-            if (opt.value && opt.value === sock) {
-                cfgAppSocketPreset.value = opt.value;
-                match = true;
-                break;
-            }
-        }
-        if (!match) cfgAppSocketPreset.value = '';
+    function recordDraftEnabled() {
+        return !!(recordEnabledToggle && recordEnabledToggle.checked);
     }
 
-    function applySockPreset() {
-        if (!cfgAppSocketPreset || !cfgAppSocket) return;
-        var preset = cfgAppSocketPreset.value;
-        if (preset) cfgAppSocket.value = preset;
+    function recordingUiLocked() {
+        return recordDraftEnabled() || !!(lastRecord && lastRecord.active);
+    }
+
+    function syncRecordControlsUi() {
+        if (recordFilename) {
+            recordFilename.disabled = !recordDraftEnabled() || !!(lastRecord && lastRecord.active);
+        }
+        if (viaDynamoWrap) {
+            viaDynamoWrap.classList.toggle('how-toggle-disabled', recordDraftEnabled());
+            viaDynamoWrap.title = recordDraftEnabled()
+                ? 'Recording requires direct sensor input (Dynamo off)'
+                : '';
+        }
+    }
+
+    function defaultRecordFilename() {
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = ('0' + (d.getMonth() + 1)).slice(-2);
+        var day = ('0' + d.getDate()).slice(-2);
+        var h = ('0' + d.getHours()).slice(-2);
+        var mi = ('0' + d.getMinutes()).slice(-2);
+        var s = ('0' + d.getSeconds()).slice(-2);
+        return 'hello-ouster-world-' + y + m + day + '-' + h + mi + s + '.osf';
+    }
+
+    function ensureOsfFilename(name) {
+        var s = String(name || '').trim();
+        if (!s) return '';
+        if (/\.osf$/i.test(s)) return s;
+        return s + '.osf';
+    }
+
+    function suggestRecordFilenameIfNeeded() {
+        if (!recordFilename || !recordDraftEnabled()) return;
+        var suggested = defaultRecordFilename();
+        lastSuggestedRecordName = suggested;
+        var cur = recordFilename.value.trim();
+        if (!recordFilenameUserEdited || !cur) {
+            recordFilename.value = suggested;
+        }
+    }
+
+    function normalizeRecordFilenameInput() {
+        if (!recordFilename) return '';
+        var v = ensureOsfFilename(recordFilename.value);
+        if (v) recordFilename.value = v;
+        return v;
+    }
+
+    function sourceEnabled(cfg) {
+        if (!cfg) return true;
+        if (typeof cfg.source_enabled === 'boolean') return cfg.source_enabled;
+        return true;
     }
 
     function syncLidarSegments() {
@@ -1051,11 +1136,23 @@
         if (viaDynamoLabel) {
             viaDynamoLabel.textContent = viaDynamo() ? 'On' : 'Off';
         }
-        if (viaDynamoHint) {
-            viaDynamoHint.textContent = viaDynamo()
-                ? 'SimpleViz reads Dynamo FrameSets'
-                : 'SimpleViz opens this source directly';
+        if (viaDynamoToggle) {
+            viaDynamoToggle.disabled = recordingUiLocked();
         }
+        if (viaDynamoHint) {
+            if (recordingUiLocked()) {
+                viaDynamoHint.textContent = 'Dynamo off while recording (direct sensor lidar)';
+            } else {
+                viaDynamoHint.textContent = viaDynamo()
+                    ? 'Dynamo ingest — detections on the app FrameSet stream'
+                    : 'Direct lidar/OSF — no Dynamo detections overlay';
+            }
+        }
+        if (showOsf && !osfWrapWasVisible) {
+            loadOsfLibrary();
+        }
+        osfWrapWasVisible = showOsf;
+        syncRecordControlsUi();
         syncLidarSegments();
     }
 
@@ -1070,9 +1167,6 @@
             lidarKind = cfg.producer_kind === 'sensor' ? 'sensor' : 'osf';
         } else {
             lidarKind = src === 'sensor' ? 'sensor' : 'osf';
-        }
-        if (framesetSourceSelect) {
-            framesetSourceSelect.value = via ? 'app' : (lidarKind === 'sensor' ? 'sensor' : 'local_file');
         }
         if (cfgOsfSelect && typeof cfg.osf_path === 'string' && cfg.osf_path) {
             var osfPath = cfg.osf_path;
@@ -1092,9 +1186,19 @@
         if (cfgAppSocket && typeof sock === 'string') {
             cfgAppSocket.value = sock;
         }
-        syncSockPresetFromPath();
         if (cfgSensorHost && typeof cfg.sensor_hostname === 'string') {
             cfgSensorHost.value = cfg.sensor_hostname;
+        }
+        if (recordEnabledToggle && typeof cfg.record_enabled === 'boolean') {
+            recordEnabledToggle.checked = cfg.record_enabled;
+        }
+        if (recordFilename && typeof cfg.record_filename === 'string' && cfg.record_filename) {
+            recordFilename.value = ensureOsfFilename(cfg.record_filename);
+            recordFilenameUserEdited = true;
+            lastSuggestedRecordName = recordFilename.value;
+        } else if (recordEnabledToggle && recordEnabledToggle.checked) {
+            recordFilenameUserEdited = false;
+            suggestRecordFilenameIfNeeded();
         }
         var srcForLabel = vizSource();
         var sockForLabel = cfgAppSocket ? cfgAppSocket.value.trim() : '';
@@ -1106,20 +1210,32 @@
     function applySourceRuntime(rt, extra) {
         extra = extra || {};
         rt = rt || {};
-        var srcForLabel = framesetSourceSelect
-            ? framesetSourceSelect.value
-            : (lastPersistedSource ? canonicalizeSource(lastPersistedSource.source) : 'local_file');
+        lastRuntime = rt;
+        var srcForLabel = vizSource();
         var sockForLabel = cfgAppSocket ? cfgAppSocket.value.trim() : '';
         var sockAvailable = extra.app_socket_available;
         if (typeof sockAvailable !== 'boolean' && lastPersistedSource) {
             sockAvailable = lastPersistedSource.app_socket_available;
         }
         if (framesetSourceHint) {
-            if (!isAppSource(srcForLabel) && srcForLabel !== 'sensor') {
+            if (!sourceEnabled(lastPersistedSource)) {
+                framesetSourceHint.textContent = 'Source stopped — Apply to resume';
+                framesetSourceHint.hidden = false;
+                framesetSourceHint.className = 'app-meta-chip app-meta-chip--state';
+            } else if (!isAppSource(srcForLabel) && srcForLabel !== 'sensor') {
                 framesetSourceHint.hidden = true;
                 framesetSourceHint.textContent = '';
             } else {
                 var hint = sourceLabel(srcForLabel, sockForLabel);
+                var chip = 'app-meta-chip app-meta-chip--type';
+                if (srcForLabel === 'sensor') {
+                    if (lastRecord && lastRecord.active) {
+                        hint += ' · recording';
+                        chip = 'app-meta-chip app-meta-chip--usage';
+                    } else if (recordDraftEnabled()) {
+                        hint += ' · record pending Apply';
+                    }
+                }
                 if (isAppSource(srcForLabel)) {
                     var bridge = rt.bridge || '';
                     if (bridge === 'connected') {
@@ -1136,7 +1252,6 @@
                 }
                 framesetSourceHint.textContent = hint;
                 framesetSourceHint.hidden = false;
-                var chip = 'app-meta-chip app-meta-chip--type';
                 if (isAppSource(srcForLabel)) {
                     var st = rt.bridge || '';
                     if (st === 'connected') chip = 'app-meta-chip app-meta-chip--usage';
@@ -1171,6 +1286,18 @@
         }
     }
 
+    function applyRecordStatus(rec) {
+        lastRecord = rec || { active: false };
+        if (lastRecord.error) {
+            showError(lastRecord.error);
+        }
+        updateSourceFieldsUi();
+        applySourceRuntime(lastRuntime);
+        if (!lastRecord.active && lidarKind === 'osf') {
+            loadOsfLibrary();
+        }
+    }
+
     function applyUiState(msg) {
         if (!msg) return;
         var t = String(msg.type || '').toLowerCase();
@@ -1184,6 +1311,7 @@
         if (typeof data.display_output_enabled === 'boolean') {
             setDisplayOutputUi(data.display_output_enabled);
         }
+        if (data.record) applyRecordStatus(data.record);
     }
 
     function bootStatusStream() {
@@ -1194,18 +1322,42 @@
         }
     }
 
-    function postSourceConfig() {
-        if (sourceBusy) return;
+    function deliverSourceConfig(opts) {
+        opts = opts || {};
+        var stoppingAll = !!opts.stoppingAll;
+        var wantRecord = stoppingAll ? false : recordDraftEnabled();
+        if (wantRecord) {
+            lidarKind = 'sensor';
+            if (viaDynamoToggle) viaDynamoToggle.checked = false;
+            syncVizSourceSelect();
+            normalizeRecordFilenameInput();
+        }
         var src = vizSource();
         var sock = DYNAMO_APP_SOCKET;
         var osfPath = selectedOsfPath();
-        if (lidarKind === 'osf' && !osfPath) {
-            showError('Select an OSF on the device (Upload or Download first)');
+        if (!wantRecord && !stoppingAll && lidarKind === 'osf' && !osfPath) {
+            var seed = selectedSeedName();
+            if (seed) {
+                pendingApplyOpts = opts;
+                setSourceBusy(true);
+                if (importRunning(lastOsfCatalog)) {
+                    if (!osfFetchPollTimer) startOsfFetchPoll();
+                    return;
+                }
+                startOsfFetch();
+                return;
+            }
+            showError('Select an OSF on the device (Upload, or pick a catalog example to fetch on Apply)');
             return;
         }
+        pendingApplyOpts = null;
         var host = cfgSensorHost ? cfgSensorHost.value.trim() : '';
-        if (lidarKind === 'sensor' && !host) {
+        if (!stoppingAll && (wantRecord || lidarKind === 'sensor') && !host) {
             showError('Enter sensor hostname or IP');
+            return;
+        }
+        if (wantRecord && !displayOutputEnabled) {
+            showError('Turn Display output on before recording');
             return;
         }
         var body = {
@@ -1213,10 +1365,15 @@
             osf_path: osfPath,
             sensor_hostname: cfgSensorHost ? cfgSensorHost.value : '',
             app_socket: sock,
-            producer_kind: lidarKind,
-            via_dynamo: viaDynamo(),
+            producer_kind: wantRecord ? 'sensor' : lidarKind,
+            via_dynamo: wantRecord || stoppingAll ? false : viaDynamo(),
+            record_enabled: wantRecord,
+            source_enabled: !stoppingAll,
+            record_filename: wantRecord ? normalizeRecordFilenameInput() : (
+                recordFilename ? ensureOsfFilename(recordFilename.value) : ''
+            ),
         };
-        sourceBusy = true;
+        setSourceBusy(true);
         showError('');
         postJson(api('/source-config'), body)
             .then(function (resp) {
@@ -1240,21 +1397,30 @@
                         });
                     }
                 }
-                showError('Source updated — SimpleViz rebinding…');
+                if (resp.record) applyRecordStatus(resp.record);
+                showError('');
                 if (resp.dynamo && resp.dynamo.ok === false) {
                     showError(
                         'Source saved; Dynamo not updated: '
                         + (resp.dynamo.error || resp.dynamo.status || 'unreachable')
                     );
                 }
-                setTimeout(function () { showError(''); }, 2500);
+                if (sourceBusyTimer) clearTimeout(sourceBusyTimer);
+                sourceBusyTimer = setTimeout(function () {
+                    sourceBusyTimer = null;
+                    setSourceBusy(false);
+                    showError('');
+                }, SOURCE_BUSY_MS);
             })
             .catch(function (e) {
                 showError(e.message || String(e));
-            })
-            .finally(function () {
-                sourceBusy = false;
+                setSourceBusy(false);
             });
+    }
+
+    function postSourceConfig(opts) {
+        if (sourceBusy) return;
+        deliverSourceConfig(opts);
     }
 
     function hydrateStatus() {
@@ -1264,7 +1430,9 @@
             if (st && typeof st.display_output_enabled === 'boolean') {
                 setDisplayOutputUi(st.display_output_enabled);
             }
+            if (st && st.source) applyPersistedSource(st.source);
             if (st && st.display) applyDisplayStatus(st.display);
+            if (st && st.record) applyRecordStatus(st.record);
             if (!displayOutputEnabled) return st;
             var dst = st && st.display;
             // Sync server to persisted dropdown so stream matches UI across restarts.
@@ -1293,7 +1461,18 @@
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
-        }).then(function (r) { return r.json(); });
+        }).then(function (r) {
+            return r.json().then(function (data) {
+                if (!r.ok) {
+                    var msg = (data && data.error && data.error.message) || r.statusText || 'request failed';
+                    return { error: { message: msg } };
+                }
+                return data;
+            }).catch(function () {
+                if (!r.ok) return { error: { message: r.statusText || 'request failed' } };
+                return null;
+            });
+        });
     }
 
     hdmiToggle.addEventListener('change', function () {
@@ -1480,14 +1659,7 @@
     var ptyWantConnected = true;
 
     function showConsoleError(msg) {
-        if (window.showInlineError) {
-            window.showInlineError('console-error', msg);
-        } else {
-            var el = document.getElementById('console-error');
-            if (!el) return;
-            el.textContent = msg || '';
-            el.style.display = msg ? 'block' : 'none';
-        }
+        window.showInlineError('console-error', msg || '');
     }
 
     function ptyUrl() {
@@ -1745,18 +1917,15 @@
             confirmDisplayOutputChange(!!displayOutputToggle.checked);
         });
     }
-    if (framesetSourceSelect) {
-        framesetSourceSelect.addEventListener('change', function () {
-            sourceDraftDirty = true;
-            updateSourceFieldsUi();
-        });
-    }
     document.querySelectorAll('.how-source-mode-seg[data-lidar]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var kind = btn.getAttribute('data-lidar');
             if (!kind) return;
             sourceDraftDirty = true;
             lidarKind = kind === 'sensor' ? 'sensor' : 'osf';
+            if (kind !== 'sensor' && recordEnabledToggle && recordEnabledToggle.checked) {
+                recordEnabledToggle.checked = false;
+            }
             updateSourceFieldsUi();
         });
     });
@@ -1767,18 +1936,6 @@
         });
     }
     updateSourceFieldsUi();
-    if (cfgAppSocketPreset) {
-        cfgAppSocketPreset.addEventListener('change', function () {
-            sourceDraftDirty = true;
-            applySockPreset();
-        });
-    }
-    if (cfgAppSocket) {
-        cfgAppSocket.addEventListener('input', function () {
-            sourceDraftDirty = true;
-            syncSockPresetFromPath();
-        });
-    }
     if (cfgSensorHost) {
         cfgSensorHost.addEventListener('input', function () {
             sourceDraftDirty = true;
@@ -1790,6 +1947,40 @@
     if (btnApplySource) {
         btnApplySource.addEventListener('click', postSourceConfig);
     }
+    if (btnStopSource) {
+        btnStopSource.addEventListener('click', function () {
+            if (recordEnabledToggle) recordEnabledToggle.checked = false;
+            if (viaDynamoToggle) viaDynamoToggle.checked = false;
+            recordFilenameUserEdited = false;
+            sourceDraftDirty = true;
+            updateSourceFieldsUi();
+            postSourceConfig({ stoppingAll: true });
+        });
+    }
+    if (recordEnabledToggle) {
+        recordEnabledToggle.addEventListener('change', function () {
+            sourceDraftDirty = true;
+            if (recordDraftEnabled()) {
+                lidarKind = 'sensor';
+                if (viaDynamoToggle) viaDynamoToggle.checked = false;
+                suggestRecordFilenameIfNeeded();
+            }
+            updateSourceFieldsUi();
+        });
+    }
+    if (recordFilename) {
+        recordFilename.addEventListener('input', function () {
+            sourceDraftDirty = true;
+            var v = recordFilename.value.trim();
+            recordFilenameUserEdited = !!(v && v !== lastSuggestedRecordName);
+        });
+        recordFilename.addEventListener('blur', function () {
+            if (!recordFilename.value.trim()) return;
+            recordFilename.value = ensureOsfFilename(recordFilename.value);
+            var v = recordFilename.value.trim();
+            recordFilenameUserEdited = !!(v && v !== lastSuggestedRecordName);
+        });
+    }
     if (cfgOsfUploadInput) {
         cfgOsfUploadInput.addEventListener('change', function () {
             var file = cfgOsfUploadInput.files && cfgOsfUploadInput.files[0];
@@ -1800,13 +1991,16 @@
         });
     }
     if (cfgOsfSelect) {
+        cfgOsfSelect.addEventListener('focus', function () {
+            loadOsfLibrary();
+        });
         cfgOsfSelect.addEventListener('change', function () {
             sourceDraftDirty = true;
-            updateOsfDownloadBtn();
+            updateOsfActionBtns();
         });
     }
-    if (btnOsfFetch) {
-        btnOsfFetch.addEventListener('click', startOsfFetch);
+    if (btnOsfDownload) {
+        btnOsfDownload.addEventListener('click', downloadOsfToBrowser);
     }
     if (btnOsfDelete) {
         btnOsfDelete.addEventListener('click', deleteSelectedOsf);

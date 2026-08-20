@@ -28,17 +28,25 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from osf_socket import open_source
+from ouster.sdk import osf
 from ouster.sdk.viz import SimpleViz
 
 from dynamo_viz_utils import clear_slam_viz_accumulators, enable_app_source_overlays
 from ouster_dynamo_api import unpack_dynamo_objects
 from source_config import (
     FrameSetSourceType,
+    SourceConfigWatch,
     SourceDefaults,
+    AppSocketStatus,
+    config_fingerprint,
     load as load_source_config,
+    load_record_runtime,
     resolve_source,
+    set_runtime_status,
+    wait_for_source_config_change,
 )
 from viz_utils import JetstreamDisplayBridge, VizPid
 
@@ -52,6 +60,15 @@ SOURCE_DEFAULTS = SourceDefaults(
 # Written by ouster-dynamo on Reset ego; hello-ouster-world consumes + unlinks.
 _CLEAR_SLAM_VIZ_FLAG = Path("/run/ouster-dynamo/clear_slam_viz")
 
+_active_bridge: Optional[JetstreamDisplayBridge] = None
+
+
+def _source_enabled(cfg: dict) -> bool:
+    v = cfg.get("source_enabled")
+    if v is None:
+        return True
+    return bool(v)
+
 
 def _consume_clear_slam_viz_flag() -> bool:
     if not _CLEAR_SLAM_VIZ_FLAG.is_file():
@@ -64,71 +81,119 @@ def _consume_clear_slam_viz_flag() -> bool:
 
 
 def main() -> FrameSetSourceType:
+    global _active_bridge
     src_config = load_source_config(defaults=SOURCE_DEFAULTS)
     src_type, frame_set_source = resolve_source(src_config, defaults=SOURCE_DEFAULTS)
 
     with JetstreamDisplayBridge(src_type, frame_set_source) as display_ctx:
+        _active_bridge = display_ctx
+        try:
+            src = open_source(frame_set_source)
 
-        src = open_source(frame_set_source)
+            # Hold SensorInfo identities for SimpleViz; osf_socket mutates
+            # sensor_to_body in place when Dynamo live-config extrinsics change.
+            viz_sensor_info = list(src.sensor_info)
+            viz_holder: list = []
+            osf_writer = None
+            osf_writer_path = ""
+            loop_osf = src_type is FrameSetSourceType.LOCAL_FILE
 
-        # Hold SensorInfo identities for SimpleViz; osf_socket mutates
-        # sensor_to_body in place when Dynamo live-config extrinsics change.
-        viz_sensor_info = list(src.sensor_info)
-        viz_holder: list = []
+            def make_fun(active_src):
+                def fun():
+                    nonlocal osf_writer, osf_writer_path
+                    for frames in active_src:
+                        if active_src.sensor_info and len(active_src.sensor_info) == len(
+                            viz_sensor_info
+                        ):
+                            for dst, src_si in zip(viz_sensor_info, active_src.sensor_info):
+                                try:
+                                    dst.sensor_to_body = src_si.sensor_to_body
+                                except Exception:
+                                    pass
+                        unpacked = unpack_dynamo_objects(frames)
+                        if (
+                            (unpacked.clear_slam_viz or _consume_clear_slam_viz_flag())
+                            and viz_holder
+                        ):
+                            clear_slam_viz_accumulators(viz_holder[0])
+                            print(
+                                "hello-ouster-world: cleared SLAM viz accumulators "
+                                "(Dynamo reset ego)",
+                                flush=True,
+                            )
+                        for frame in frames:
+                            if frame is None:
+                                continue
+                        rec = load_record_runtime()
+                        rec_path = str(rec.get("path") or "").strip()
+                        want = (
+                            src_type is FrameSetSourceType.SENSOR
+                            and rec.get("active")
+                            and rec_path
+                        )
+                        if want:
+                            if osf_writer is None or osf_writer_path != rec_path:
+                                _close_osf_writer(osf_writer)
+                                osf_writer = osf.Writer(rec_path, active_src.sensor_info)
+                                osf_writer_path = rec_path
+                                print(f"hello-ouster-world: recording {rec_path}", flush=True)
+                            try:
+                                osf_writer.save(frames)
+                            except Exception as exc:  # noqa: BLE001
+                                print(
+                                    f"hello-ouster-world: OSF save failed: {exc!r}",
+                                    flush=True,
+                                )
+                        elif osf_writer is not None:
+                            _close_osf_writer(osf_writer)
+                            osf_writer = None
+                            osf_writer_path = ""
+                            print("hello-ouster-world: recording closed", flush=True)
+                        yield frames
 
-        def fun():
-            for frames in src:
-                # Belt-and-suspenders if the source replaces its sensor_info list.
-                if src.sensor_info and len(src.sensor_info) == len(viz_sensor_info):
-                    for dst, src_si in zip(viz_sensor_info, src.sensor_info):
-                        try:
-                            dst.sensor_to_body = src_si.sensor_to_body
-                        except Exception:
-                            pass
-                unpacked = unpack_dynamo_objects(frames)
-                if (
-                    (unpacked.clear_slam_viz or _consume_clear_slam_viz_flag())
-                    and viz_holder
-                ):
-                    clear_slam_viz_accumulators(viz_holder[0])
-                    print(
-                        "hello-ouster-world: cleared SLAM viz accumulators "
-                        "(Dynamo reset ego)",
-                        flush=True,
-                    )
-                trk_objs = unpacked.tracked
-                ego_obj = unpacked.ego
-                ouster_dynamo_api_version = unpacked.ouster_dynamo_api_version
-                for frame in frames:
-                    if frame is None:
-                        continue
-                    # Custom LidarFrame / object processing:
-                    # trk_objs, ego_obj, ouster_dynamo_api_version
-                    # SimpleViz still draws from FrameSet.objects on yield.
-                yield frames
+                return fun
 
-        viz = SimpleViz(
-            viz_sensor_info,
-            rate=display_ctx.rate,
-            on_eof=display_ctx.on_eof,
-            _override_pointviz=display_ctx.pointviz,
-        )
-        viz_holder.append(viz)
+            viz = SimpleViz(
+                viz_sensor_info,
+                rate=display_ctx.rate,
+                on_eof="loop" if loop_osf else display_ctx.on_eof,
+                _override_pointviz=display_ctx.pointviz,
+            )
+            viz_holder.append(viz)
 
-        display_ctx.prepare(viz, src)
-        if src_type is FrameSetSourceType.APP:
-            enable_app_source_overlays(viz)
-        viz.run(fun())
+            config_watch = SourceConfigWatch(
+                config_fingerprint(load_source_config(defaults=SOURCE_DEFAULTS)),
+                defaults=SOURCE_DEFAULTS,
+            )
+            display_ctx.prepare(viz, src, config_watch=config_watch)
+            if src_type is FrameSetSourceType.APP:
+                enable_app_source_overlays(viz)
+            try:
+                if loop_osf:
+                    viz.run(src)
+                else:
+                    viz.run(make_fun(src)())
+            finally:
+                _close_osf_writer(osf_writer)
+        finally:
+            _active_bridge = None
 
     return src_type
 
 
-def _reexec_viz() -> None:
-    """Replace this process so GLFW cannot keep a leftover Ouster Viz window.
+def _close_osf_writer(writer) -> None:
+    if writer is None:
+        return
+    close = getattr(writer, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception as exc:  # noqa: BLE001
+            print(f"hello-ouster-world: OSF writer close failed: {exc!r}", flush=True)
 
-    Sway stays up (this Python is the ``exec`` child). Same pid → viz.pid still
-    valid. ``execv`` skips atexit, which is what we want.
-    """
+
+def _reexec_viz() -> None:
+    """Replace this process so GLFW cannot keep a leftover Ouster Viz window."""
     os.execv(sys.executable, [sys.executable, *sys.argv])
 
 
@@ -138,15 +203,23 @@ if __name__ == "__main__":
     atexit.register(viz_pid.clear)
     while True:
         try:
-            src_type = main()
-            if src_type is FrameSetSourceType.LOCAL_FILE:
-                # One-shot OSF: idle until source Apply SIGINTs the viz process.
+            src_config = load_source_config(defaults=SOURCE_DEFAULTS)
+            if not _source_enabled(src_config):
+                set_runtime_status(
+                    source=src_config.get("source", FrameSetSourceType.LOCAL_FILE.value),
+                    bridge=AppSocketStatus.N_A,
+                    message="Source stopped — select source and Apply to resume",
+                )
                 print(
-                    "hello-ouster-world: OSF playback finished; waiting for source change",
+                    "hello-ouster-world: source stopped; waiting for Apply",
                     flush=True,
                 )
-                while True:
-                    time.sleep(3600)
+                wait_for_source_config_change(
+                    config_fingerprint(src_config),
+                    defaults=SOURCE_DEFAULTS,
+                )
+                continue
+            main()
             print("hello-ouster-world: SimpleViz exited; restarting", flush=True)
             _reexec_viz()
         except KeyboardInterrupt:

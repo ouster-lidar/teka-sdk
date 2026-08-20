@@ -43,6 +43,7 @@ pub fn routes() -> Router<AppState> {
             "/source-config",
             get(get_source_config).post(post_source_config),
         )
+        .route("/record", get(get_record).post(post_record))
         .merge(display::routes())
         .merge(osf::routes())
 }
@@ -60,6 +61,7 @@ async fn status(State(state): State<AppState>) -> Json<serde_json::Value> {
         "display": state.display.status_json(),
         "display_output_enabled": state.display_output_enabled(),
         "source": source_config_json(&cfg),
+        "record": state.record.status_json(),
         "summary": cfg.dashboard_summary(),
     }))
 }
@@ -112,6 +114,12 @@ struct SourceConfigBody {
     producer_kind: Option<String>,
     #[serde(default)]
     via_dynamo: Option<bool>,
+    #[serde(default)]
+    record_enabled: Option<bool>,
+    #[serde(default)]
+    record_filename: Option<String>,
+    #[serde(default)]
+    source_enabled: Option<bool>,
 }
 
 fn source_config_json(cfg: &source_config::PersistedSourceConfig) -> serde_json::Value {
@@ -150,6 +158,21 @@ async fn post_source_config(
     if let Some(via) = body.via_dynamo {
         cfg.via_dynamo = Some(via);
     }
+    if let Some(rec) = body.record_enabled {
+        cfg.record_enabled = Some(rec);
+    }
+    if let Some(name) = body.record_filename {
+        cfg.record_filename = name;
+    }
+    if let Some(en) = body.source_enabled {
+        cfg.source_enabled = Some(en);
+    }
+    let source_on = cfg.source_enabled.unwrap_or(true);
+    let want_record = source_on && cfg.record_enabled.unwrap_or(false);
+    if want_record {
+        cfg.via_dynamo = Some(false);
+        cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
+    }
     cfg = cfg.normalize();
     source_config::save(&state_dir, &cfg).map_err(|e| {
         ApiError::new(
@@ -162,16 +185,88 @@ async fn post_source_config(
     if dynamo.get("ok") == Some(&json!(false)) {
         tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-world save kept)");
     }
-    // Rebind SimpleViz to the new source without dropping Sway.
-    let interrupted = state.interrupt_viz();
+    let record = if want_record {
+        if !state.display_output_enabled() {
+            return Err(ApiError::invalid_request(
+                "display output must be enabled to record (SimpleViz runs in the display unit)",
+            ));
+        }
+        if cfg.sensor_hostname.trim().is_empty() {
+            return Err(ApiError::invalid_request(
+                "sensor_hostname is required when recording is enabled",
+            ));
+        }
+        state
+            .record
+            .start_from_config(&state, &cfg)
+            .map_err(|e| ApiError::invalid_request(e))?
+    } else if state.record.is_active() {
+        state.record.stop(&state)
+    } else {
+        state.record.status_json()
+    };
+    // SimpleViz watches source-config.json mtime and execv restarts on Apply.
     ui_state::publish_ui(&state);
     Ok(Json(json!({
         "ok": true,
         "restart_required": true,
-        "viz_interrupted": interrupted,
         "dynamo": dynamo,
+        "record": record,
         "config": source_config_json(&cfg),
     })))
+}
+
+#[derive(Deserialize)]
+struct RecordBody {
+    active: bool,
+    #[serde(default)]
+    sensor_hostname: Option<String>,
+}
+
+async fn get_record(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(state.record.status_json())
+}
+
+async fn post_record(
+    State(state): State<AppState>,
+    Json(body): Json<RecordBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let state_dir = display_config::state_dir();
+    let mut cfg = source_config::load(&state_dir);
+    cfg.record_enabled = Some(body.active);
+    if let Some(h) = body.sensor_hostname {
+        let h = h.trim();
+        if !h.is_empty() {
+            cfg.sensor_hostname = h.to_string();
+        }
+    }
+    if body.active {
+        cfg.via_dynamo = Some(false);
+        cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
+    }
+    cfg = cfg.normalize();
+    source_config::save(&state_dir, &cfg).map_err(|e| {
+        ApiError::new(
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "internal",
+            e,
+        )
+    })?;
+    let rec = if body.active {
+        if !state.display_output_enabled() {
+            return Err(ApiError::invalid_request(
+                "display output must be enabled to record (SimpleViz runs in the display unit)",
+            ));
+        }
+        state
+            .record
+            .start_from_config(&state, &cfg)
+            .map_err(|e| ApiError::invalid_request(e))?
+    } else {
+        state.record.stop(&state)
+    };
+    ui_state::publish_ui(&state);
+    Ok(Json(json!({ "ok": true, "record": rec })))
 }
 
 async fn status_stream(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
@@ -394,16 +489,18 @@ async fn drain_log(
     }
 }
 
-fn note_ctrl_c(log_path: &str, state: &AppState) {
-    if state.interrupt_viz() {
+fn note_ctrl_c(log_path: &str, _state: &AppState) {
+    let state_dir = display_config::state_dir();
+    let cfg = source_config::load(&state_dir);
+    if source_config::save(&state_dir, &cfg).is_ok() {
         let _ = append_console_note(
             log_path,
-            "hello-ouster-world: ^C — interrupting SimpleViz (SIGINT)",
+            "hello-ouster-world: ^C — re-saved source-config; SimpleViz will reload",
         );
     } else {
         let _ = append_console_note(
             log_path,
-            "hello-ouster-world: ^C — no SimpleViz process to interrupt",
+            "hello-ouster-world: ^C — failed to re-save source-config",
         );
     }
 }

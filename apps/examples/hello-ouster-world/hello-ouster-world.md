@@ -11,10 +11,10 @@ Renders lidar FrameSets in SimpleViz on the HDMI panel and/or the web
 
 
 Selection is persisted in `/var/lib/hello-ouster-world/source-config.json` and
-exposed at `GET/POST /api/v1/source-config`. **Lidar** is OSF vs sensor.
+exposed at `GET/POST /api/v1/app/hello-ouster-world/source-config` (MC app proxy). **Lidar** is OSF vs sensor.
 **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo**
 is proprietary Ouster software, installed separately (not built from this repo).
-Changing source SIGINTs SimpleViz so it rebinds (Sway stays up). App FrameSet
+Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet
 sockets: see [apps/specs/frameset-socket.md](../../specs/frameset-socket.md).
 
 ## Ouster SDK
@@ -83,8 +83,10 @@ Skip that and install a `.raw` from `nix build` if you already built it.
 
 ### 2a. Running on local-file OSF
 
-In the Display panel, pick **Local file**, then **Download** an example from
-the catalog (or **Upload** your own `.osf`). Apply.
+In the Display panel, pick **Local file**, choose an OSF on the device or a
+Studio catalog example (fetched from the web on **Apply**), or **Upload** your
+own `.osf`. **Download** is a plain `GET /osfs/{name}` — the browser saves the
+streamed file. Apply.
 
 ### 2b. Running with ouster-dynamo (optional)
 
@@ -98,6 +100,10 @@ sensor itself.
 Set source to **connected sensor**, enter hostname/IP, Apply.
 The backend opens UDP **7502** (lidar) and **7503** (IMU). Point the sensor at
 this host on those ports.
+
+**Record** (same HOST row) writes
+`/srv/recordings/hello-ouster-world-YYYYMMDD-HHMMSS.osf` from SimpleViz FrameSets.
+Dynamo is forced off while recording (those UDP ports are exclusive).
 
 ### 3. To remotely view logs
 

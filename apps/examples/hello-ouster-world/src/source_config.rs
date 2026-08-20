@@ -36,6 +36,15 @@ pub struct PersistedSourceConfig {
     /// `None` on disk = infer from ``source == app`` (legacy files).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via_dynamo: Option<bool>,
+    /// Apply with sensor source: SimpleViz saves frames to ``record_filename`` (or auto name).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record_enabled: Option<bool>,
+    /// Basename under ``/srv/recordings/``; empty = ``hello-ouster-world-YYYYMMDD-HHMMSS.osf``.
+    #[serde(default)]
+    pub record_filename: String,
+    /// When false, SimpleViz idles until Apply re-enables (Stop button).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_enabled: Option<bool>,
 }
 
 fn default_source() -> String {
@@ -66,6 +75,9 @@ impl Default for PersistedSourceConfig {
             app_socket: default_app_socket(),
             producer_kind: default_producer_kind(),
             via_dynamo: None,
+            record_enabled: None,
+            record_filename: String::new(),
+            source_enabled: None,
         }
     }
 }
@@ -102,6 +114,7 @@ impl PersistedSourceConfig {
             self.app_socket = DEFAULT_DYNAMO_APP_SOCKET.to_string();
         }
         self.sensor_hostname = self.sensor_hostname.trim().to_string();
+        self.record_filename = self.record_filename.trim().to_string();
         self
     }
 
@@ -183,6 +196,9 @@ pub fn persisted_json(cfg: &PersistedSourceConfig) -> serde_json::Value {
         "producer_kind": cfg.producer_kind,
         "via_dynamo": cfg.is_via_dynamo(),
         "app_socket": cfg.app_socket,
+        "record_enabled": cfg.record_enabled.unwrap_or(false),
+        "record_filename": cfg.record_filename,
+        "source_enabled": cfg.source_enabled.unwrap_or(true),
         "app_socket_available": cfg.app_socket_available(),
         "valid_sources": [
             SOURCE_LOCAL_FILE,

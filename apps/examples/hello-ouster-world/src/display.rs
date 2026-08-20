@@ -1343,7 +1343,7 @@ fn spawn_capture_loop(display: DisplayState) {
                 }
                 Ok(Err(e)) => {
                     tracing::debug!(?e, "vizframe read failed; reconnecting");
-                    // Apply / Ctrl-C SIGINTs SimpleViz; the socket EOF is expected.
+                    // Apply rewrites source-config; viz reload is expected on socket EOF.
                     if !vizframe_producer_gone(&e) {
                         display.set_error(Some(e.to_string()));
                     }

@@ -5,12 +5,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::body::Body;
+use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderValue, StatusCode};
+use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use futures_util::stream::unfold;
 use futures_util::StreamExt;
+use tokio::io::AsyncReadExt;
 use mc_portable_runtime::api_error::ApiError;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -130,7 +133,8 @@ pub fn routes() -> Router<AppState> {
         .route("/osfs/imports", get(get_import).post(post_import))
         .route(
             "/osfs/{name}",
-            post(post_osf)
+            get(get_osf)
+                .post(post_osf)
                 .delete(delete_osf)
                 .layer(DefaultBodyLimit::disable()),
         )
@@ -411,6 +415,58 @@ fn find_studio_osf(files: &Value) -> Option<&Value> {
         o.get("output_type").and_then(Value::as_str) == Some("osf")
             && o.get("type").and_then(Value::as_str) == Some("osf")
     })
+}
+
+const DOWNLOAD_CHUNK: usize = 64 * 1024;
+
+async fn get_osf(AxumPath(name): AxumPath<String>) -> Result<Response, ApiError> {
+    let name = sanitize_osf_filename(&name)?;
+    let path = osf_path(&name);
+    let meta = fs::metadata(&path).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            ApiError::new(StatusCode::NOT_FOUND, "not_found", "OSF not on device")
+        } else {
+            io_err(e)
+        }
+    })?;
+    if !meta.is_file() || meta.len() == 0 {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            "OSF not on device",
+        ));
+    }
+    let file = File::open(&path).await.map_err(io_err)?;
+    let len = meta.len();
+    let stream = unfold(file, |mut file| async move {
+        let mut buf = vec![0u8; DOWNLOAD_CHUNK];
+        match file.read(&mut buf).await {
+            Ok(0) => None,
+            Ok(n) => {
+                buf.truncate(n);
+                Some((Ok(Bytes::from(buf)), file))
+            }
+            Err(e) => Some((Err(e), file)),
+        }
+    });
+    let body = Body::from_stream(stream);
+    let disposition = format!("attachment; filename=\"{}\"", name);
+    let mut resp = Response::new(body);
+    let headers = resp.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/octet-stream"),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&disposition).unwrap_or_else(|_| {
+            HeaderValue::from_static("attachment")
+        }),
+    );
+    if let Ok(v) = HeaderValue::from_str(&len.to_string()) {
+        headers.insert(header::CONTENT_LENGTH, v);
+    }
+    Ok(resp)
 }
 
 async fn delete_osf(
