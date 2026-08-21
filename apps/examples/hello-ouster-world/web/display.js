@@ -27,6 +27,8 @@
     var MOVE_MIN_MS = 16;
     var paintBusy = false;
     var pendingFrame = null;
+    var displayWsError = '';
+    var displayReconnectTimer = null;
 
     var canvas = document.getElementById('stream-canvas');
     var ctx = canvas.getContext('2d');
@@ -73,6 +75,13 @@
 
     function showError(msg) {
         window.showInlineError('display-error', msg || '');
+    }
+
+    function viewerLimitBanner(raw) {
+        var m = /too many display viewers \(max (\d+)\)/i.exec(raw || '');
+        if (!m) return '';
+        return 'Display stream is limited to ' + m[1] +
+            ' connections. Close other hello-ouster-world tabs.';
     }
 
     function api(path) {
@@ -371,7 +380,15 @@
     }
 
     function connect() {
-        showError('');
+        if (displayReconnectTimer) {
+            clearTimeout(displayReconnectTimer);
+            displayReconnectTimer = null;
+        }
+        var stayingOnLimit = !!viewerLimitBanner(displayWsError);
+        if (!stayingOnLimit) {
+            showError('');
+            displayWsError = '';
+        }
         if (ws) {
             try {
                 ws.onclose = null;
@@ -384,6 +401,7 @@
 
         ws.onopen = function () {
             showError('');
+            displayWsError = '';
             if (hoverStream) requestAcquire();
         };
 
@@ -406,7 +424,8 @@
                         if (msg.ok) showError('');
                     }
                 } else if (msg.type === 'error') {
-                    showError(msg.message || 'display error');
+                    displayWsError = msg.message || 'display error';
+                    showError(viewerLimitBanner(displayWsError) || displayWsError);
                 }
                 return;
             }
@@ -419,8 +438,15 @@
 
         ws.onclose = function () {
             setControlUi(false);
+            var limit = viewerLimitBanner(displayWsError);
+            if (limit) {
+                showError(limit);
+                displayReconnectTimer = setTimeout(connect, 8000);
+                return;
+            }
+            displayWsError = '';
             showError('Display disconnected — reconnecting…');
-            setTimeout(connect, 2000);
+            displayReconnectTimer = setTimeout(connect, 2000);
         };
     }
 

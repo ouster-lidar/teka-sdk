@@ -76,7 +76,7 @@ let
     export GLFW_WAYLAND_APP_ID=hello-ouster-world
     unset DISPLAY 2>/dev/null || true
     echo "hello-ouster-world: starting SimpleViz (GLFW Wayland)" >&2
-    exec ${pythonEnv}/bin/python3 /usr/lib/${name}/hello_ouster_world.py "$@"
+    ${pythonEnv}/bin/python3 /usr/lib/${name}/hello_ouster_world.py "$@"
   '';
 
   # HACK (x86 Mesa): same gallium/LLVM preload as hello-ouster-terminal — SimpleViz is
@@ -169,7 +169,11 @@ let
         sleep 0.5
 
         echo "hello-ouster-world: launching SimpleViz (GLFW Wayland)" >&2
-        exec ${vizCmd}
+        while true; do
+          ${vizCmd} || true
+          echo "hello-ouster-world: SimpleViz exited $?; restarting in 2s" >&2
+          sleep 2
+        done
   '';
 
   swayConfig = writeText "${name}-sway.conf" ''

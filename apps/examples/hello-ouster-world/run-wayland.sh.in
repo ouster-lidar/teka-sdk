@@ -91,6 +91,7 @@ filter_wlroots_stderr() {
     case "$line" in
       *eglQueryDmaBufModifiersEXT*) continue ;;
       *'Failed to query dmabuf number of modifiers'*) continue ;;
+      *'Failed to get backend DRM FD'*) continue ;;
       *'NVMAP_IOC_PARAMETERS failed'*) continue ;;
     esac
     if [[ "$line" =~ $_orphan ]] || [[ "$line" =~ $_bare ]]; then

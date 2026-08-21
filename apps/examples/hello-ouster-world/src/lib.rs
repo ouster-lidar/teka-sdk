@@ -3,6 +3,7 @@
 pub mod api;
 pub mod display;
 pub mod display_config;
+pub mod screencopy;
 pub mod osf;
 pub mod record;
 pub mod source_config;

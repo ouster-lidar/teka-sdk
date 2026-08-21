@@ -1,12 +1,11 @@
-//! Display stream: PointViz JPEG frames → WS, HDMI toggle, resolution, remote input.
+//! Display stream: grim JPEG → WS, HDMI toggle, resolution, remote input.
 
 use std::collections::HashMap;
-use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
@@ -16,8 +15,6 @@ use axum::{Json, Router};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::io::AsyncReadExt;
-use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, watch};
 
@@ -26,12 +23,10 @@ use crate::ui_state;
 use crate::vpointer::{VPtrButton, VPtrCmd, VirtualPointer};
 use crate::AppState;
 
-pub const MAX_DISPLAY_VIEWERS: usize = 2;
-// Match OSF content rate. Capture is gated on PointViz.update() so screenshots
-// ride the real drawn frame (no forced extra scene draw on Tegra).
+/// JPEG fan-out + one control lease.
+pub const MAX_DISPLAY_VIEWERS: usize = 8;
 const DEFAULT_FPS: u64 = 5;
 const ALLOWED_FPS: &[u64] = &[2, 5, 10];
-const VIZFRAME_SOCK_NAME: &str = "vizframe.sock";
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
 /// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
@@ -96,32 +91,32 @@ enum InjectCmd {
 
 #[derive(Clone)]
 pub struct DisplayState {
-    inner: Arc<DisplayInner>,
+    pub(crate) inner: Arc<DisplayInner>,
 }
 
-struct DisplayInner {
+pub(crate) struct DisplayInner {
     viewers: AtomicUsize,
     next_viewer: AtomicU64,
-    resolution: Mutex<Resolution>,
-    max_framerate: AtomicU64,
+    pub(crate) resolution: Mutex<Resolution>,
+    pub(crate) max_framerate: AtomicU64,
     fps_watch: watch::Sender<u64>,
     hdmi_enabled: Mutex<bool>,
     stream_enabled: Mutex<bool>,
     on_device_active: Mutex<bool>,
     need_render: Mutex<bool>,
     /// Last sway output name that hosts PointViz (for vpointer binding).
-    viz_output: Mutex<Option<String>>,
+    pub(crate) viz_output: Mutex<Option<String>>,
     /// Physical HDMI/DP connector currently present (cable plugged).
     hdmi_present: Mutex<bool>,
-    source_size: Mutex<(u32, u32)>,
-    scaled_size: Mutex<(u32, u32)>,
+    pub(crate) source_size: Mutex<(u32, u32)>,
+    pub(crate) scaled_size: Mutex<(u32, u32)>,
     controlling: Mutex<Option<u64>>,
-    frame_tx: broadcast::Sender<Arc<Vec<u8>>>,
-    capture_gate: watch::Sender<bool>,
+    pub(crate) frame_tx: broadcast::Sender<Arc<Vec<u8>>>,
+    pub(crate) capture_gate: watch::Sender<bool>,
     inject_tx: mpsc::UnboundedSender<InjectCmd>,
     vpointer: Mutex<VirtualPointer>,
-    last_error: Mutex<Option<String>>,
-    last_capture_ms: AtomicU64,
+    pub(crate) last_error: Mutex<Option<String>>,
+    pub(crate) last_capture_ms: AtomicU64,
 }
 
 impl DisplayState {
@@ -158,7 +153,7 @@ impl DisplayState {
         };
         let _ = write_stream_target(&state);
         spawn_inject_loop(state.clone(), inject_rx);
-        spawn_capture_loop(state.clone());
+        crate::screencopy::spawn_capture(state.clone());
         spawn_output_manager(state.clone());
         state
     }
@@ -194,11 +189,11 @@ impl DisplayState {
         })
     }
 
-    fn set_error(&self, msg: Option<String>) {
+    pub(crate) fn set_error(&self, msg: Option<String>) {
         *self.inner.last_error.lock() = msg;
     }
 
-    fn max_framerate(&self) -> u64 {
+    pub(crate) fn max_framerate(&self) -> u64 {
         self.inner.max_framerate.load(Ordering::Relaxed)
     }
 }
@@ -364,6 +359,7 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
     let viewers = state.display.inner.viewers.fetch_add(1, Ordering::SeqCst) + 1;
     if viewers > MAX_DISPLAY_VIEWERS {
         state.display.inner.viewers.fetch_sub(1, Ordering::SeqCst);
+        tracing::warn!(viewers, max = MAX_DISPLAY_VIEWERS, "display viewer rejected");
         let _ = send_event(
             &mut socket,
             ServerEvent::Error {
@@ -375,6 +371,8 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
         return;
     }
     let viewer_id = state.display.inner.next_viewer.fetch_add(1, Ordering::SeqCst);
+    // Subscribe before opening the capture gate so the first JPEG is not dropped.
+    let mut frames = state.display.inner.frame_tx.subscribe();
     let _ = state.display.inner.capture_gate.send(true);
     let _ = write_stream_target(&state.display);
 
@@ -400,7 +398,6 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
         viewer_id,
     };
 
-    let mut frames = state.display.inner.frame_tx.subscribe();
     let _ = send_meta(&mut socket, &state.display).await;
 
     loop {
@@ -1087,10 +1084,6 @@ fn runtime_dir() -> PathBuf {
     )
 }
 
-fn vizframe_sock_path() -> PathBuf {
-    runtime_dir().join(VIZFRAME_SOCK_NAME)
-}
-
 fn persist_display_toggles(display: &DisplayState) {
     let dir = display_config::state_dir();
     let mut cfg = display_config::load(&dir);
@@ -1105,7 +1098,7 @@ fn stream_target_path() -> PathBuf {
     runtime_dir().join(STREAM_TARGET_NAME)
 }
 
-fn stream_dims(res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
+pub(crate) fn stream_dims(res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
     // Until Sway reports an output, assume 1080p so native/1080p are not 1×1.
     let (src_w, src_h) = if src_w > 0 && src_h > 0 {
         (src_w, src_h)
@@ -1121,7 +1114,7 @@ fn stream_dims(res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
     }
 }
 
-fn write_stream_target(display: &DisplayState) -> std::io::Result<()> {
+pub(crate) fn write_stream_target(display: &DisplayState) -> std::io::Result<()> {
     let dir = runtime_dir();
     let _ = std::fs::create_dir_all(&dir);
     let viewers = display.inner.viewers.load(Ordering::Relaxed);
@@ -1151,6 +1144,7 @@ fn write_stream_target(display: &DisplayState) -> std::io::Result<()> {
         "resolution": res.as_str(),
         "source_width": sw,
         "source_height": sh,
+        "viz_output": display.inner.viz_output.lock().clone(),
     });
     let path = stream_target_path();
     let tmp = path.with_extension("json.tmp");
@@ -1266,155 +1260,3 @@ fn spawn_output_manager(display: DisplayState) {
     });
 }
 
-fn bind_vizframe_listener() -> anyhow::Result<UnixListener> {
-    let path = vizframe_sock_path();
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let _ = std::fs::remove_file(&path);
-    let listener = UnixListener::bind(&path)?;
-    // Allow the viz process (same runtime dir) to connect.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666));
-    }
-    tracing::info!(path = %path.display(), "vizframe socket listening");
-    Ok(listener)
-}
-
-fn vizframe_producer_gone(err: &anyhow::Error) -> bool {
-    err.chain().any(|c| {
-        c.downcast_ref::<std::io::Error>().is_some_and(|io| {
-            matches!(
-                io.kind(),
-                ErrorKind::UnexpectedEof
-                    | ErrorKind::ConnectionReset
-                    | ErrorKind::BrokenPipe
-                    | ErrorKind::ConnectionAborted
-            )
-        })
-    })
-}
-
-async fn read_framed_jpeg(stream: &mut UnixStream) -> anyhow::Result<Vec<u8>> {
-    let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).await?;
-    let len = u32::from_le_bytes(len_buf) as usize;
-    if len == 0 || len > 16 * 1024 * 1024 {
-        anyhow::bail!("invalid vizframe length {len}");
-    }
-    let mut jpeg = vec![0u8; len];
-    stream.read_exact(&mut jpeg).await?;
-    if jpeg.get(0..2) != Some(&[0xff, 0xd8]) {
-        anyhow::bail!("vizframe payload is not JPEG");
-    }
-    Ok(jpeg)
-}
-
-fn spawn_capture_loop(display: DisplayState) {
-    tokio::spawn(async move {
-        let mut gate = display.inner.capture_gate.subscribe();
-        let listener = match bind_vizframe_listener() {
-            Ok(l) => l,
-            Err(e) => {
-                tracing::error!(?e, "failed to bind vizframe socket");
-                display.set_error(Some(format!("vizframe socket: {e}")));
-                return;
-            }
-        };
-        let mut conn: Option<UnixStream> = None;
-        let mut frames: u64 = 0;
-        let mut last_frame_at = Instant::now();
-
-        loop {
-            if !*gate.borrow() {
-                conn = None;
-                let _ = write_stream_target(&display);
-                if gate.changed().await.is_err() {
-                    break;
-                }
-                continue;
-            }
-            let _ = write_stream_target(&display);
-
-            if frames % 60 == 0 {
-                if let Ok((nw, nh)) = fetch_output_size().await {
-                    *display.inner.source_size.lock() = (nw, nh);
-                    let _ = write_stream_target(&display);
-                }
-            }
-
-            // Accept a new viz connection when idle.
-            if conn.is_none() {
-                tokio::select! {
-                    acc = listener.accept() => {
-                        match acc {
-                            Ok((s, _)) => {
-                                tracing::info!("vizframe producer connected");
-                                conn = Some(s);
-                            }
-                            Err(e) => {
-                                tracing::warn!(?e, "vizframe accept failed");
-                                tokio::time::sleep(Duration::from_millis(200)).await;
-                                continue;
-                            }
-                        }
-                    }
-                    _ = gate.changed() => continue,
-                    _ = tokio::time::sleep(Duration::from_secs(2)) => {
-                        if last_frame_at.elapsed() > Duration::from_secs(3) {
-                            display.set_error(Some(
-                                "waiting for PointViz frames (is SimpleViz running?)".into(),
-                            ));
-                        }
-                        continue;
-                    }
-                }
-            }
-
-            let Some(stream) = conn.as_mut() else {
-                continue;
-            };
-            let started = Instant::now();
-            let read = tokio::time::timeout(Duration::from_secs(2), read_framed_jpeg(stream)).await;
-            match read {
-                Ok(Ok(jpeg)) => {
-                    let (dw, dh) = {
-                        let res = *display.inner.resolution.lock();
-                        let (sw, sh) = *display.inner.source_size.lock();
-                        stream_dims(res, sw, sh)
-                    };
-                    *display.inner.scaled_size.lock() = (dw, dh);
-                    display
-                        .inner
-                        .last_capture_ms
-                        .store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
-                    display.set_error(None);
-                    let _ = display.inner.frame_tx.send(Arc::new(jpeg));
-                    frames = frames.wrapping_add(1);
-                    last_frame_at = Instant::now();
-                }
-                Ok(Err(e)) => {
-                    tracing::debug!(?e, "vizframe read failed; reconnecting");
-                    // Apply rewrites source-config; viz reload is expected on socket EOF.
-                    if !vizframe_producer_gone(&e) {
-                        display.set_error(Some(e.to_string()));
-                    }
-                    conn = None;
-                }
-                Err(_) => {
-                    // Timeout: producer may be paused; keep connection.
-                    if last_frame_at.elapsed() > Duration::from_secs(3) {
-                        display.set_error(Some(
-                            "no PointViz frames (capture idle or viz stuck)".into(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        let path = vizframe_sock_path();
-        let _ = std::fs::remove_file(path);
-    });
-}
