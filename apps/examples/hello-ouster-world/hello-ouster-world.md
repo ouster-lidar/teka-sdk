@@ -47,15 +47,14 @@ Dynamo API v1 `kind=frame` events are timing-only (`ouster_dynamo_api_version` +
 
 ## Display panel
 
-- **Display** master toggle enables or disables the companion
-`hello-ouster-world-display` unit (Sway/SimpleViz). Persisted in
-`/var/lib/hello-ouster-world/display-config.json` (+ `display.enabled` flag).
+- **HDMI** / **Browser** toggles are independent; when both are on they show the
+same PointViz. Browser stream keeps working if HDMI is blanked or unplugged
+(persistent Sway `HEADLESS` home output). HDMI/browser settings persist in
+`/var/lib/hello-ouster-world/display-config.json`. Disable the Jetstream app
+to stop Sway/SimpleViz.
 - **Lidar** (Local file / Sensor) + **via ouster-dynamo** toggle + Apply.
   Direct: SimpleViz opens the OSF or sensor. Via Dynamo: SimpleViz reads
   `/run/ouster-dynamo/frameset.sock` and waits until FrameSets arrive.
-- **HDMI** / **Browser** toggles are independent; when both are on they show the
-same PointViz. Browser stream keeps working if HDMI is blanked or unplugged
-(persistent Sway `HEADLESS` home output).
 - When neither HDMI nor a browser stream consumer is active, SimpleViz pauses.
 - Hover the stream for mouse/keyboard into the viz. **Console** follows app
 stdout/stderr; Ctrl-C interrupts SimpleViz only (Sway stays up).
@@ -91,7 +90,7 @@ streamed file. Apply.
 ### 2b. Running with ouster-dynamo (optional)
 
 Install **Ouster Dynamo** on the device (proprietary app, separate from this
-repo). Turn **via ouster-dynamo** on, Display ON, **Apply**. SimpleViz reads
+repo). Turn **via ouster-dynamo** on, **Apply**. SimpleViz reads
 `/run/ouster-dynamo/frameset.sock`. Off: hello-ouster-world opens the OSF or
 sensor itself.
 

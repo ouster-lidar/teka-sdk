@@ -61,7 +61,6 @@ pub fn build_ui_state(state: &AppState) -> Value {
         "source": source_config::persisted_json(&cfg),
         "runtime": source_config::runtime_json(&runtime),
         "display": display_ui_json(state),
-        "display_output_enabled": state.display_output_enabled(),
         "record": state.record.status_json(),
     })
 }

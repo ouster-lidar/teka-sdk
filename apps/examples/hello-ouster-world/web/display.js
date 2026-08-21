@@ -46,13 +46,6 @@
     var resSelect = document.getElementById('resolution');
     var consoleCard = document.querySelector('.how-console-card');
     var reconnectBtn = document.getElementById('btn-reconnect');
-    var displayOutputToggle = document.getElementById('display-output-toggle');
-    var displayOutputLabel = document.getElementById('display-output-label');
-    var displayControls = document.getElementById('display-controls');
-    var streamPanel = document.getElementById('stream-panel');
-    var displayOutputDisabledHint = document.getElementById('display-output-disabled-hint');
-    var displayOutputEnabled = true;
-    var displayOutputBusy = false;
     // Equal visual width: "Controlling" is 11 chars; pad Watching with NBSP.
     var LABEL_WATCHING = 'Watching\u00A0\u00A0\u00A0';
     var LABEL_CONTROLLING = 'Controlling';
@@ -121,18 +114,14 @@
     }
 
     function updateIdleHint() {
-        if (displayOutputDisabledHint) {
-            displayOutputDisabledHint.hidden = displayOutputEnabled;
-        }
         if (peerSourceHint) {
-            peerSourceHint.hidden = !displayOutputEnabled || !peerSourceActive;
+            peerSourceHint.hidden = !peerSourceActive;
         }
         if (streamIdleHint) {
             var browserOff = streamToggle && !streamToggle.checked;
             var hdmiOn = hdmiToggle && hdmiToggle.checked && !hdmiToggle.disabled;
             // Peer-source waiting overlay takes precedence over the browser-off hint.
-            streamIdleHint.hidden = !displayOutputEnabled
-                || peerSourceActive
+            streamIdleHint.hidden = peerSourceActive
                 || !(browserOff && hdmiOn);
         }
     }
@@ -155,7 +144,7 @@
             peerSourceActive = waiting;
         }
         if (peerSourceHint) {
-            peerSourceHint.hidden = !displayOutputEnabled || !peerSourceActive;
+            peerSourceHint.hidden = !peerSourceActive;
         }
         if (peerSourceTitle) {
             peerSourceTitle.textContent = bridge === 'disconnected'
@@ -165,10 +154,6 @@
         if (peerSourceBody) {
             if (rt.message && String(rt.message).trim()) {
                 peerSourceBody.textContent = String(rt.message);
-            } else if (!displayOutputEnabled) {
-                peerSourceBody.textContent =
-                    'Turn Display ON to start SimpleViz, then ensure a producer '
-                    + 'is publishing on the peer socket path.';
             } else if (bridge === 'disconnected') {
                 peerSourceBody.textContent =
                     'Restart the peer producer — visualization resumes automatically.';
@@ -180,158 +165,6 @@
             }
         }
         updateIdleHint();
-    }
-
-    function setDisplayOutputUi(enabled) {
-        displayOutputEnabled = !!enabled;
-        if (displayOutputToggle) displayOutputToggle.checked = displayOutputEnabled;
-        if (displayOutputLabel) {
-            displayOutputLabel.textContent = displayOutputEnabled ? 'Display ON' : 'Display OFF';
-        }
-        if (displayControls) {
-            displayControls.classList.toggle('how-controls-disabled', !displayOutputEnabled);
-        }
-        if (streamPanel) {
-            streamPanel.classList.toggle('how-controls-disabled', !displayOutputEnabled);
-        }
-        if (!displayOutputEnabled) {
-            if (controlling) requestRelease();
-            clearStreamBlack();
-            if (ws) {
-                try { ws.close(); } catch (_) {}
-                ws = null;
-            }
-        }
-        updateIdleHint();
-    }
-
-    function findActiveDisplayPeer() {
-        return fetchAppJson('/api/v1/manager').then(function (body) {
-            if (!body || !body.apps) return null;
-            var apps = body.apps;
-            var keys = Object.keys(apps);
-            for (var i = 0; i < keys.length; i++) {
-                var row = apps[keys[i]];
-                if (!row || !row.display_active) continue;
-                var id = row.app_id || row.image || keys[i];
-                if (id === 'hello-ouster-world' || row.image === 'hello-ouster-world') continue;
-                return {
-                    app_id: id,
-                    label: row.display_name || (row.nav && row.nav.label) || id,
-                };
-            }
-            return null;
-        }).catch(function () { return null; });
-    }
-
-    function stopApp(appId) {
-        return fetch('/api/v1/manager/app/' + encodeURIComponent(appId) + '/stop', {
-            method: 'POST',
-            credentials: 'include',
-        }).then(function (r) {
-            if (!r.ok) throw new Error('stop failed (' + r.status + ')');
-            return r.json().catch(function () { return {}; });
-        });
-    }
-
-    function restartThisApp() {
-        var base = '/api/v1/manager/app/' + encodeURIComponent(appApi.appId);
-        return fetch(base + '/stop', { method: 'POST', credentials: 'include' })
-            .then(function (r) {
-                if (!r.ok && r.status !== 404) throw new Error('stop failed (' + r.status + ')');
-            })
-            .then(function () {
-                return new Promise(function (resolve) { setTimeout(resolve, 800); });
-            })
-            .then(function () {
-                return fetch(base + '/start', { method: 'POST', credentials: 'include' });
-            })
-            .then(function (r) {
-                if (!r.ok) throw new Error('start failed (' + r.status + ')');
-            });
-    }
-
-    function confirmDisplayOutputChange(wantEnabled) {
-        var prev = displayOutputEnabled;
-        if (displayOutputBusy) {
-            if (displayOutputToggle) displayOutputToggle.checked = prev;
-            return;
-        }
-        if (wantEnabled === prev) return;
-
-        var confirmFn = window.mcConfirm || function (opts) {
-            return Promise.resolve(window.confirm((opts.title || '') + '\n\n' + (opts.body || '')));
-        };
-
-        var peerP = wantEnabled ? findActiveDisplayPeer() : Promise.resolve(null);
-        peerP.then(function (peer) {
-            var body = 'This will restart hello-ouster-world so the new Display setting takes effect.';
-            if (wantEnabled && peer) {
-                body +=
-                    ' “' +
-                    peer.label +
-                    '” is currently using the display and will be stopped.';
-            }
-            return confirmFn({
-                title: wantEnabled ? 'Enable display output?' : 'Disable display output?',
-                body: body,
-                confirmLabel: wantEnabled ? 'Enable & restart' : 'Disable & restart',
-                cancelLabel: 'Cancel',
-                destructive: true,
-            }).then(function (ok) {
-                return { ok: ok, peer: peer };
-            });
-        }).then(function (result) {
-            if (!result || !result.ok) {
-                if (displayOutputToggle) displayOutputToggle.checked = prev;
-                return;
-            }
-            displayOutputBusy = true;
-            if (displayOutputToggle) displayOutputToggle.disabled = true;
-            showError('');
-            return postJson(api('/display-output'), { enabled: wantEnabled })
-                .then(function (resp) {
-                    if (!resp || resp.error) {
-                        throw new Error(
-                            (resp && resp.error && resp.error.message) || 'Failed to save setting'
-                        );
-                    }
-                    var chain = Promise.resolve();
-                    if (wantEnabled && result.peer) {
-                        chain = stopApp(result.peer.app_id).catch(function (e) {
-                            console.warn('peer stop failed', e);
-                        });
-                    }
-                    return chain.then(restartThisApp);
-                })
-                .then(function () {
-                    showError('Restarting… reloading when the app is back.');
-                    var tries = 0;
-                    function poll() {
-                        tries += 1;
-                        fetchAppJson(api('/status')).then(function (st) {
-                            if (st && st.ok) {
-                                location.reload();
-                                return;
-                            }
-                            if (tries < 40) setTimeout(poll, 500);
-                            else showError('Restart timed out — reload the page manually.');
-                        }).catch(function () {
-                            if (tries < 40) setTimeout(poll, 500);
-                            else showError('Restart timed out — reload the page manually.');
-                        });
-                    }
-                    setTimeout(poll, 1200);
-                })
-                .catch(function (e) {
-                    displayOutputBusy = false;
-                    if (displayOutputToggle) {
-                        displayOutputToggle.disabled = false;
-                        displayOutputToggle.checked = prev;
-                    }
-                    showError(e.message || String(e));
-                });
-        });
     }
 
     function setHdmiPresent(present) {
@@ -538,7 +371,6 @@
     }
 
     function connect() {
-        if (!displayOutputEnabled) return;
         showError('');
         if (ws) {
             try {
@@ -1308,9 +1140,6 @@
         if (data.source) applyPersistedSource(data.source);
         if (data.runtime) applySourceRuntime(data.runtime);
         if (data.display) applyDisplayStatus(data.display);
-        if (typeof data.display_output_enabled === 'boolean') {
-            setDisplayOutputUi(data.display_output_enabled);
-        }
         if (data.record) applyRecordStatus(data.record);
     }
 
@@ -1354,10 +1183,6 @@
         var host = cfgSensorHost ? cfgSensorHost.value.trim() : '';
         if (!stoppingAll && (wantRecord || lidarKind === 'sensor') && !host) {
             showError('Enter sensor hostname or IP');
-            return;
-        }
-        if (wantRecord && !displayOutputEnabled) {
-            showError('Turn Display output on before recording');
             return;
         }
         var body = {
@@ -1427,13 +1252,9 @@
         var preferred = loadStoredResolution();
         if (resSelect) resSelect.value = preferred;
         return fetchAppJson(api('/status')).then(function (st) {
-            if (st && typeof st.display_output_enabled === 'boolean') {
-                setDisplayOutputUi(st.display_output_enabled);
-            }
             if (st && st.source) applyPersistedSource(st.source);
             if (st && st.display) applyDisplayStatus(st.display);
             if (st && st.record) applyRecordStatus(st.record);
-            if (!displayOutputEnabled) return st;
             var dst = st && st.display;
             // Sync server to persisted dropdown so stream matches UI across restarts.
             if (dst && dst.resolution !== preferred) {
@@ -1910,13 +1731,7 @@
     if (controlStatus) controlStatus.textContent = LABEL_WATCHING;
     setHdmiLabel(!!hdmiToggle.checked);
     setStreamLabel(!!streamToggle.checked);
-    setDisplayOutputUi(true);
     updateIdleHint();
-    if (displayOutputToggle) {
-        displayOutputToggle.addEventListener('change', function () {
-            confirmDisplayOutputChange(!!displayOutputToggle.checked);
-        });
-    }
     document.querySelectorAll('.how-source-mode-seg[data-lidar]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var kind = btn.getAttribute('data-lidar');

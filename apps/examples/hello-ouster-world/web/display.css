@@ -65,26 +65,10 @@
     align-items: center;
 }
 
-.how-display-controls.how-controls-disabled {
-    opacity: 0.45;
-    pointer-events: none;
-}
-
 .how-stream-panel {
     position: relative;
     width: max-content;
     max-width: 100%;
-}
-
-.how-stream-panel.how-controls-disabled .how-stream-wrap {
-    pointer-events: none;
-    opacity: 0.45;
-}
-
-#display-output-label {
-    display: inline-block;
-    min-width: 10ch;
-    font-variant-numeric: tabular-nums;
 }
 
 .how-res-label {

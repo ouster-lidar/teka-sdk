@@ -214,7 +214,9 @@ class DemandController:
         while not self._stop.is_set():
             target = self._stream_target.read()
             # Default True so we keep playing until Rust publishes demand.
-            need = bool(target.get("need_render", True))
+            need = bool(target.get("need_render", True)) or bool(
+                target.get("hdmi_enabled")
+            )
             with self._lock:
                 simple = self._simple
             if simple is not None and need != last_need:

@@ -36,10 +36,6 @@ pub fn routes() -> Router<AppState> {
         .route("/cards/stream", get(cards_ws))
         .route("/pty", get(pty_ws))
         .route(
-            "/display-output",
-            get(get_display_output).post(post_display_output),
-        )
-        .route(
             "/source-config",
             get(get_source_config).post(post_source_config),
         )
@@ -59,45 +55,10 @@ async fn status(State(state): State<AppState>) -> Json<serde_json::Value> {
         "cwd": cwd_path(),
         "console_log": console_log_path(),
         "display": state.display.status_json(),
-        "display_output_enabled": state.display_output_enabled(),
         "source": source_config_json(&cfg),
         "record": state.record.status_json(),
         "summary": cfg.dashboard_summary(),
     }))
-}
-
-#[derive(Deserialize)]
-struct DisplayOutputBody {
-    enabled: bool,
-}
-
-async fn get_display_output(State(state): State<AppState>) -> Json<serde_json::Value> {
-    Json(json!({
-        "enabled": state.display_output_enabled(),
-    }))
-}
-
-async fn post_display_output(
-    State(state): State<AppState>,
-    Json(body): Json<DisplayOutputBody>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let state_dir = display_config::state_dir();
-    display_config::save(&state_dir, body.enabled).map_err(|e| {
-        ApiError::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            e,
-        )
-    })?;
-    state
-        .display_output_enabled
-        .store(body.enabled, std::sync::atomic::Ordering::Relaxed);
-    ui_state::publish_ui(&state);
-    Ok(Json(json!({
-        "ok": true,
-        "enabled": body.enabled,
-        "restart_required": true,
-    })))
 }
 
 #[derive(Deserialize)]
@@ -186,11 +147,6 @@ async fn post_source_config(
         tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-world save kept)");
     }
     let record = if want_record {
-        if !state.display_output_enabled() {
-            return Err(ApiError::invalid_request(
-                "display output must be enabled to record (SimpleViz runs in the display unit)",
-            ));
-        }
         if cfg.sensor_hostname.trim().is_empty() {
             return Err(ApiError::invalid_request(
                 "sensor_hostname is required when recording is enabled",
@@ -253,11 +209,6 @@ async fn post_record(
         )
     })?;
     let rec = if body.active {
-        if !state.display_output_enabled() {
-            return Err(ApiError::invalid_request(
-                "display output must be enabled to record (SimpleViz runs in the display unit)",
-            ));
-        }
         state
             .record
             .start_from_config(&state, &cfg)

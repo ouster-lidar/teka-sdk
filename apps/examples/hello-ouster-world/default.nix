@@ -349,7 +349,6 @@ let
     After=${name}.service seatd.service
     Requires=${name}.service
     Wants=seatd.service
-    ConditionPathExists=/var/lib/${name}/display.enabled
     Conflicts=getty@tty1.service display-manager.service
 
     [Service]

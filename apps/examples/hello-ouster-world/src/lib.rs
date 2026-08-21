@@ -11,7 +11,7 @@ pub mod vpointer;
 
 mc_portable_runtime::declare_mc_runtime!("hello-ouster-world");
 
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::display::DisplayState;
@@ -26,8 +26,6 @@ pub const MAX_PTY_SESSIONS: usize = 16;
 pub struct AppState {
     pub pty_sessions: Arc<AtomicUsize>,
     pub display: DisplayState,
-    /// Persisted display-output enable (Sway/SimpleViz). Soft state mirrors disk.
-    pub display_output_enabled: Arc<AtomicBool>,
     pub osf_import: ImportHandle,
     pub record: RecordHandle,
     pub ui_state: Arc<ui_state::UiStateStream>,
@@ -35,20 +33,15 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(display_output_enabled: bool) -> Self {
+    pub fn new(cfg: &display_config::PersistedDisplayConfig) -> Self {
         Self {
             pty_sessions: Arc::new(AtomicUsize::new(0)),
-            display: DisplayState::new(),
-            display_output_enabled: Arc::new(AtomicBool::new(display_output_enabled)),
+            display: DisplayState::new(cfg.hdmi, cfg.stream),
             osf_import: ImportHandle::new(),
             record: RecordHandle::new(),
             ui_state: ui_state::UiStateStream::new(),
             card_stream: SummaryStream::new(),
         }
-    }
-
-    pub fn display_output_enabled(&self) -> bool {
-        self.display_output_enabled.load(Ordering::Relaxed)
     }
 
     pub fn try_acquire_pty(&self) -> bool {

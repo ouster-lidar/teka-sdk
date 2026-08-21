@@ -21,8 +21,9 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, watch};
 
-use crate::vpointer::{VPtrButton, VPtrCmd, VirtualPointer};
+use crate::display_config;
 use crate::ui_state;
+use crate::vpointer::{VPtrButton, VPtrCmd, VirtualPointer};
 use crate::AppState;
 
 pub const MAX_DISPLAY_VIEWERS: usize = 2;
@@ -33,6 +34,9 @@ const ALLOWED_FPS: &[u64] = &[2, 5, 10];
 const VIZFRAME_SOCK_NAME: &str = "vizframe.sock";
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
+/// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
+const VIZ_APP_ID: &str = "hello-ouster-world";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Resolution {
@@ -121,7 +125,7 @@ struct DisplayInner {
 }
 
 impl DisplayState {
-    pub fn new() -> Self {
+    pub fn new(hdmi: bool, stream: bool) -> Self {
         let (frame_tx, _) = broadcast::channel(2);
         let (capture_gate, _) = watch::channel(false);
         let (fps_watch, _) = watch::channel(DEFAULT_FPS);
@@ -134,11 +138,11 @@ impl DisplayState {
                 resolution: Mutex::new(Resolution::default()),
                 max_framerate: AtomicU64::new(DEFAULT_FPS),
                 fps_watch,
-                hdmi_enabled: Mutex::new(true),
-                stream_enabled: Mutex::new(true),
+                hdmi_enabled: Mutex::new(hdmi),
+                stream_enabled: Mutex::new(stream),
                 // Optimistic until output manager places the window.
-                on_device_active: Mutex::new(true),
-                need_render: Mutex::new(true),
+                on_device_active: Mutex::new(hdmi),
+                need_render: Mutex::new(hdmi || stream),
                 viz_output: Mutex::new(None),
                 hdmi_present: Mutex::new(true),
                 source_size: Mutex::new((1920, 1080)),
@@ -231,6 +235,7 @@ async fn set_hdmi(
             tracing::warn!(?e, "hdmi toggle failed");
         }
     }
+    persist_display_toggles(&state.display);
     ui_state::publish_ui(&state);
     Json(state.display.status_json())
 }
@@ -245,7 +250,15 @@ async fn set_stream_enabled(
     Json(body): Json<StreamEnabledBody>,
 ) -> Json<serde_json::Value> {
     *state.display.inner.stream_enabled.lock() = body.enabled;
+    persist_display_toggles(&state.display);
     let _ = write_stream_target(&state.display);
+    // Browser capture is optional. HDMI-on must keep SimpleViz on the panel
+    // even when JPEG grab stops — otherwise the window stays on HEADLESS.
+    if *state.display.inner.hdmi_enabled.lock() {
+        if let Err(e) = place_viz_window(&state.display).await {
+            tracing::warn!(?e, "viz placement after stream toggle failed");
+        }
+    }
     state.display.set_error(None);
     ui_state::publish_ui(&state);
     Json(state.display.status_json())
@@ -713,13 +726,43 @@ async fn run_swaymsg(args: &[&str]) -> anyhow::Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+fn viz_selectors() -> [String; 2] {
+    [
+        format!("[title=\"{VIZ_WINDOW_TITLE}\"]"),
+        format!("[app_id=\"{VIZ_APP_ID}\"]"),
+    ]
+}
+
+async fn sway_viz(args_after_sel: &[&str]) -> anyhow::Result<()> {
+    let mut last_err = None;
+    for sel in viz_selectors() {
+        let mut args: Vec<&str> = Vec::with_capacity(1 + args_after_sel.len());
+        args.push(&sel);
+        args.extend_from_slice(args_after_sel);
+        match run_swaymsg(&args).await {
+            Ok(_) => return Ok(()),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no viz window selector matched")))
+}
+
 async fn focus_viz_window() -> anyhow::Result<()> {
-    let sel = format!("[title=\"{VIZ_WINDOW_TITLE}\"]");
-    let _ = run_swaymsg(&[&sel, "focus"]).await;
+    let _ = sway_viz(&["focus"]).await;
     Ok(())
 }
 
 /// Walk `swaymsg -t get_tree` and return the output name hosting the viz window.
+/// GLFW Wayland windows often show up as `app_id`, not the GLFW title.
+fn is_viz_con(node: &serde_json::Value) -> bool {
+    if node.get("type").and_then(|t| t.as_str()) != Some("con") {
+        return false;
+    }
+    let name = node.get("name").and_then(|n| n.as_str()).unwrap_or("");
+    let app_id = node.get("app_id").and_then(|n| n.as_str()).unwrap_or("");
+    name == VIZ_WINDOW_TITLE || app_id == VIZ_APP_ID
+}
+
 fn find_viz_output_in_tree(node: &serde_json::Value, current_output: Option<&str>) -> Option<String> {
     let output = if node.get("type").and_then(|t| t.as_str()) == Some("output") {
         node.get("name").and_then(|n| n.as_str())
@@ -727,10 +770,7 @@ fn find_viz_output_in_tree(node: &serde_json::Value, current_output: Option<&str
         current_output
     };
 
-    let name = node.get("name").and_then(|n| n.as_str()).unwrap_or("");
-    let is_window = node.get("type").and_then(|t| t.as_str()) == Some("con")
-        && node.get("pid").and_then(|p| p.as_u64()).is_some();
-    if is_window && name == VIZ_WINDOW_TITLE {
+    if is_viz_con(node) {
         return output.map(|s| s.to_string());
     }
 
@@ -819,13 +859,15 @@ async fn ensure_headless_output() -> anyhow::Result<String> {
 }
 
 async fn move_viz_to_output(output: &str) -> anyhow::Result<()> {
-    let sel = format!("[title=\"{VIZ_WINDOW_TITLE}\"]");
     let _ = run_swaymsg(&["focus", "output", output]).await;
-    let _ = run_swaymsg(&[&sel, "move", "workspace", "to", "output", output]).await;
-    let _ = run_swaymsg(&[&sel, "move", "container", "to", "output", output]).await;
-    let _ = run_swaymsg(&[&sel, "focus"]).await;
+    // Drop fullscreen before the move — sway often leaves an empty fullscreen
+    // workspace on the old output if you move a fullscreen container as-is.
+    let _ = sway_viz(&["fullscreen", "disable"]).await;
+    let _ = sway_viz(&["move", "workspace", "to", "output", output]).await;
+    let _ = sway_viz(&["move", "container", "to", "output", output]).await;
+    let _ = sway_viz(&["focus"]).await;
     // Fill the panel so HDMI is not a tiny floating window on a black desktop.
-    let _ = run_swaymsg(&[&sel, "fullscreen", "enable"]).await;
+    let _ = sway_viz(&["fullscreen", "enable"]).await;
     Ok(())
 }
 
@@ -907,6 +949,16 @@ async fn place_viz_window(display: &DisplayState) -> anyhow::Result<()> {
 
     let _ = write_stream_target(display);
     tracing::info!(%target_name, on_device, ?size, "placed Ouster Viz");
+
+    if !hdmi_want {
+        let arr = list_outputs().await.unwrap_or_default();
+        if let Some(phys) = find_physical_active(&arr) {
+            let name = output_name(phys).to_string();
+            let _ = run_swaymsg(&["output", &name, "disable"]).await;
+        }
+        let arr = list_outputs().await.unwrap_or_default();
+        *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
+    }
     Ok(())
 }
 
@@ -926,15 +978,6 @@ async fn set_hdmi_enabled(display: &DisplayState, enabled: bool) -> anyhow::Resu
     } else {
         // Move viz to HEADLESS before blanking the physical panel.
         place_viz_window(display).await?;
-        let arr = list_outputs().await?;
-        if let Some(phys) = find_physical_any(&arr) {
-            let name = output_name(phys).to_string();
-            let _ = run_swaymsg(&["output", &name, "disable"]).await?;
-        }
-        // Presence stays true while the connector remains in sway's output list.
-        let arr = list_outputs().await.unwrap_or_default();
-        *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
-        let _ = write_stream_target(display);
     }
     Ok(())
 }
@@ -1048,6 +1091,16 @@ fn vizframe_sock_path() -> PathBuf {
     runtime_dir().join(VIZFRAME_SOCK_NAME)
 }
 
+fn persist_display_toggles(display: &DisplayState) {
+    let dir = display_config::state_dir();
+    let mut cfg = display_config::load(&dir);
+    cfg.hdmi = *display.inner.hdmi_enabled.lock();
+    cfg.stream = *display.inner.stream_enabled.lock();
+    if let Err(e) = display_config::save(&dir, &cfg) {
+        tracing::warn!(%e, "failed to persist display toggles");
+    }
+}
+
 fn stream_target_path() -> PathBuf {
     runtime_dir().join(STREAM_TARGET_NAME)
 }
@@ -1077,9 +1130,10 @@ fn write_stream_target(display: &DisplayState) -> std::io::Result<()> {
     let on_device = *display.inner.on_device_active.lock();
     // Browser encode only when stream toggle is on and a viewer is connected.
     let active = stream_enabled && viewers > 0;
-    // Render when on-device is actually showing viz, or browser needs frames.
-    let need_render = on_device || active;
+    // HDMI toggle (not lagging on_device) so browser-off still plays on the panel.
+    let need_render = hdmi_enabled || active;
     *display.inner.need_render.lock() = need_render;
+    let _ = display.inner.capture_gate.send(active);
     let res = *display.inner.resolution.lock();
     let (sw, sh) = *display.inner.source_size.lock();
     let (dw, dh) = stream_dims(res, sw, sh);

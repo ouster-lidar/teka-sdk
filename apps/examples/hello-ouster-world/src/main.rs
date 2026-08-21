@@ -42,23 +42,10 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 
     let state_dir = display_config::state_dir();
     let display_cfg = display_config::load(&state_dir);
-    // Sync before sd_notify so hello-ouster-world-display (After= this unit)
-    // evaluates ConditionPathExists= against the current setting.
-    if let Err(e) = display_config::sync_enabled_flag(&state_dir, display_cfg.enabled) {
-        tracing::warn!("display.enabled flag sync failed: {e}");
-    }
-    tracing::info!(
-        display_output_enabled = display_cfg.enabled,
-        "display output config"
-    );
+    tracing::info!(hdmi = display_cfg.hdmi, stream = display_cfg.stream, "display config");
 
-    let state = AppState::new(display_cfg.enabled);
+    let state = AppState::new(&display_cfg);
     hello_ouster_world::ui_state::spawn_ui_watchers(state.clone());
-    if display_cfg.enabled {
-        tracing::info!("display output enabled (Sway via hello-ouster-world-display.service)");
-    } else {
-        tracing::info!("display output disabled; display unit will not start");
-    }
 
     let app = Router::new()
         .nest("/api/v1", api::routes())
