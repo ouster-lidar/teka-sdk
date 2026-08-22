@@ -1,8 +1,9 @@
 //! Browser JPEG capture: zwlr_screencopy wl_shm → nvvidconv/nvjpegenc → WS.
 
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom};
-use std::os::fd::AsFd;
+use std::os::fd::{AsFd, AsRawFd};
+use std::ptr;
+use std::slice;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, SyncSender};
@@ -26,6 +27,71 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 use crate::display::{write_stream_target, DisplayState};
 
 const DRM_FORMAT_XRGB8888: u32 = DrmFourcc::Xrgb8888 as u32;
+
+const PROT_READ: i32 = 1;
+const MAP_SHARED: i32 = 1;
+
+extern "C" {
+    fn mmap(
+        addr: *mut std::ffi::c_void,
+        len: usize,
+        prot: i32,
+        flags: i32,
+        fd: i32,
+        offset: i64,
+    ) -> *mut std::ffi::c_void;
+    fn munmap(addr: *mut std::ffi::c_void, len: usize) -> i32;
+}
+
+struct MappedShm {
+    ptr: *mut u8,
+    len: usize,
+}
+
+unsafe impl Send for MappedShm {}
+
+impl MappedShm {
+    fn map(file: &File, len: usize) -> anyhow::Result<Self> {
+        if len == 0 {
+            anyhow::bail!("mmap size 0");
+        }
+        let ptr = unsafe {
+            mmap(
+                ptr::null_mut(),
+                len,
+                PROT_READ,
+                MAP_SHARED,
+                file.as_raw_fd(),
+                0,
+            )
+        };
+        if ptr.is_null() || ptr == usize::MAX as *mut std::ffi::c_void {
+            anyhow::bail!("mmap screencopy shm failed");
+        }
+        Ok(Self {
+            ptr: ptr.cast(),
+            len,
+        })
+    }
+
+    fn bytes(&self, size: usize) -> anyhow::Result<&[u8]> {
+        if size > self.len {
+            anyhow::bail!("mmap slice {size} > mapping {}", self.len);
+        }
+        Ok(unsafe { slice::from_raw_parts(self.ptr, size) })
+    }
+}
+
+impl Drop for MappedShm {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe {
+                let _ = munmap(self.ptr.cast(), self.len);
+            }
+            self.ptr = ptr::null_mut();
+        }
+    }
+}
 
 pub fn spawn_capture(display: DisplayState) {
     thread::Builder::new()
@@ -490,7 +556,10 @@ struct CapturedFrame {
 }
 
 struct ShmCapturePool {
+    /// Kept alive so the mmap stays valid.
+    #[allow(dead_code)]
     file: File,
+    map: MappedShm,
     pool: wl_shm_pool::WlShmPool,
     buffer: wl_buffer::WlBuffer,
     capacity: usize,
@@ -519,6 +588,7 @@ impl ShmCapturePool {
     fn destroy(self) {
         self.buffer.destroy();
         self.pool.destroy();
+        drop(self.map);
     }
 }
 
@@ -680,6 +750,7 @@ impl WaylandCapture {
             .with_context(|| format!("shm file {}", path.display()))?;
         let _ = std::fs::remove_file(&path);
         file.set_len(size as u64)?;
+        let map = MappedShm::map(&file, size)?;
         let pool = shm.create_pool(file.as_fd(), size as i32, &self.queue.handle(), ());
         let buffer = pool.create_buffer(
             0,
@@ -692,6 +763,7 @@ impl WaylandCapture {
         );
         self.shm_pool = Some(ShmCapturePool {
             file,
+            map,
             pool,
             buffer,
             capacity: size,
@@ -744,13 +816,9 @@ impl WaylandCapture {
                     FrameEvent::Ready => {
                         let pool = self
                             .shm_pool
-                            .as_mut()
+                            .as_ref()
                             .ok_or_else(|| anyhow::anyhow!("screencopy shm pool missing"))?;
-                        pool.file.seek(SeekFrom::Start(0))?;
-                        let mut raw = vec![0u8; size];
-                        pool.file
-                            .read_exact(&mut raw)
-                            .context("read screencopy shm")?;
+                        let mapped = pool.map.bytes(size)?;
                         let swap_rb = matches!(
                             drm,
                             DrmFourcc::Bgr888 | DrmFourcc::Xbgr8888 | DrmFourcc::Abgr8888
@@ -758,10 +826,9 @@ impl WaylandCapture {
                         let row = (width as usize).saturating_mul(src_bpp);
                         let pixels = if src_bpp == 4 && !swap_rb && stride as usize == row {
                             let total = row.saturating_mul(height as usize);
-                            raw.truncate(total);
-                            raw
+                            mapped[..total].to_vec()
                         } else {
-                            pack_to_bgrx(&raw, stride, width, height, src_bpp, swap_rb)?
+                            pack_to_bgrx(mapped, stride, width, height, src_bpp, swap_rb)?
                         };
                         return Ok(CapturedFrame {
                             format: DrmFourcc::Xrgb8888,
