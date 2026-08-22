@@ -149,6 +149,7 @@ let
     export SSL_CERT_FILE="''${SSL_CERT_FILE:-${ps.caBundlePath}}"
     export GLFW_PLATFORM=wayland
     export GLFW_WAYLAND_APP_ID=hello-ouster-world
+    export __GL_SYNC_TO_VBLANK=1
     unset DISPLAY 2>/dev/null || true
     echo "hello-ouster-world: starting SimpleViz (GLFW Wayland)" >&2
     ${pythonEnv}/bin/python3 /usr/lib/${name}/hello_ouster_world.py "$@"

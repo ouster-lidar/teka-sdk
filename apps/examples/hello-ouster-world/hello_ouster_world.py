@@ -61,6 +61,29 @@ SOURCE_DEFAULTS = SourceDefaults(
 _CLEAR_SLAM_VIZ_FLAG = Path("/run/ouster-dynamo/clear_slam_viz")
 
 _active_bridge: Optional[JetstreamDisplayBridge] = None
+_record_runtime_cache: Optional[dict] = None
+_record_runtime_mtime: Optional[float] = None
+
+
+def _record_runtime_path() -> Path:
+    return Path(
+        os.environ.get("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR", "/run/hello-ouster-world")
+    ) / "record-runtime.json"
+
+
+def _get_record_runtime() -> dict:
+    global _record_runtime_cache, _record_runtime_mtime
+    path = _record_runtime_path()
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        _record_runtime_cache = {}
+        _record_runtime_mtime = None
+        return {}
+    if _record_runtime_mtime != mtime:
+        _record_runtime_cache = load_record_runtime()
+        _record_runtime_mtime = mtime
+    return _record_runtime_cache or {}
 
 
 def _source_enabled(cfg: dict) -> bool:
@@ -121,10 +144,11 @@ def main() -> FrameSetSourceType:
                                 "(Dynamo reset ego)",
                                 flush=True,
                             )
-                        for frame in frames:
-                            if frame is None:
-                                continue
-                        rec = load_record_runtime()
+                        rec = (
+                            _get_record_runtime()
+                            if src_type is FrameSetSourceType.SENSOR
+                            else {}
+                        )
                         rec_path = str(rec.get("path") or "").strip()
                         want = (
                             src_type is FrameSetSourceType.SENSOR

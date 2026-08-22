@@ -6,6 +6,8 @@ does not read back the GL swapchain.
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
 import json
 import os
 import queue
@@ -663,6 +665,18 @@ class JetstreamDisplayBridge:
         )
         watch_thread.start()
         try:
+            try:
+                viz.run_once()
+                lib_name = ctypes.util.find_library("glfw") or "libglfw.so.3"
+                glfw = ctypes.CDLL(lib_name)
+                glfw.glfwSwapInterval.argtypes = [ctypes.c_int]
+                glfw.glfwSwapInterval.restype = None
+                glfw.glfwSwapInterval(1)
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"hello-ouster-world: glfwSwapInterval failed: {exc!r}",
+                    flush=True,
+                )
             type(viz).run(viz)
         finally:
             stop.set()

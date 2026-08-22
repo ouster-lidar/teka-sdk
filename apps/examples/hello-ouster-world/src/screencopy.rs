@@ -1,8 +1,9 @@
 //! Browser JPEG capture: zwlr_screencopy wl_shm → nvvidconv/nvjpegenc → WS.
 
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom};
 use std::os::fd::AsFd;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::sync::Arc;
@@ -101,6 +102,10 @@ fn pack_to_bgrx(
         anyhow::bail!("stride {stride} < row bytes {row}");
     }
     let dst_row = (width as usize).saturating_mul(4);
+    if src_bpp == 4 && !swap_rb && stride == row {
+        let total = dst_row.saturating_mul(height as usize);
+        return Ok(src[..total].to_vec());
+    }
     let mut out = vec![0u8; dst_row.saturating_mul(height as usize)];
     for y in 0..height as usize {
         let s = y * stride;
@@ -484,10 +489,44 @@ struct CapturedFrame {
     pixels: Vec<u8>,
 }
 
+struct ShmCapturePool {
+    file: File,
+    pool: wl_shm_pool::WlShmPool,
+    buffer: wl_buffer::WlBuffer,
+    capacity: usize,
+    width: u32,
+    height: u32,
+    stride: u32,
+    wl_fmt: wl_shm::Format,
+}
+
+impl ShmCapturePool {
+    fn matches(
+        &self,
+        width: u32,
+        height: u32,
+        stride: u32,
+        wl_fmt: wl_shm::Format,
+        size: usize,
+    ) -> bool {
+        self.width == width
+            && self.height == height
+            && self.stride == stride
+            && self.wl_fmt == wl_fmt
+            && self.capacity == size
+    }
+
+    fn destroy(self) {
+        self.buffer.destroy();
+        self.pool.destroy();
+    }
+}
+
 struct WaylandCapture {
     conn: Connection,
     queue: EventQueue<WlState>,
     state: WlState,
+    shm_pool: Option<ShmCapturePool>,
 }
 
 impl WaylandCapture {
@@ -546,6 +585,7 @@ impl WaylandCapture {
             conn,
             queue,
             state,
+            shm_pool: None,
         })
     }
 
@@ -599,7 +639,7 @@ impl WaylandCapture {
                         let (format, width, height, stride) = shm_params.ok_or_else(|| {
                             anyhow::anyhow!("screencopy frame missing wl_shm buffer params")
                         })?;
-                        return self.create_and_copy_shm(
+                        return self.copy_shm_frame(
                             shm, &frame, &rx, format, width, height, stride,
                         );
                     }
@@ -610,7 +650,60 @@ impl WaylandCapture {
         }
     }
 
-    fn create_and_copy_shm(
+    fn ensure_shm_pool(
+        &mut self,
+        shm: &wl_shm::WlShm,
+        width: u32,
+        height: u32,
+        stride: u32,
+        wl_fmt: wl_shm::Format,
+        size: usize,
+    ) -> anyhow::Result<()> {
+        if self
+            .shm_pool
+            .as_ref()
+            .is_some_and(|p| p.matches(width, height, stride, wl_fmt, size))
+        {
+            return Ok(());
+        }
+        if let Some(old) = self.shm_pool.take() {
+            old.destroy();
+        }
+        let xdg = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
+        let path = PathBuf::from(&xdg).join(format!("how-scrcpy-{}", std::process::id()));
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&path)
+            .with_context(|| format!("shm file {}", path.display()))?;
+        let _ = std::fs::remove_file(&path);
+        file.set_len(size as u64)?;
+        let pool = shm.create_pool(file.as_fd(), size as i32, &self.queue.handle(), ());
+        let buffer = pool.create_buffer(
+            0,
+            width as i32,
+            height as i32,
+            stride as i32,
+            wl_fmt,
+            &self.queue.handle(),
+            (),
+        );
+        self.shm_pool = Some(ShmCapturePool {
+            file,
+            pool,
+            buffer,
+            capacity: size,
+            width,
+            height,
+            stride,
+            wl_fmt,
+        });
+        Ok(())
+    }
+
+    fn copy_shm_frame(
         &mut self,
         shm: wl_shm::WlShm,
         frame: &zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
@@ -634,34 +727,13 @@ impl WaylandCapture {
         if size > i32::MAX as usize {
             anyhow::bail!("shm buffer too large ({size})");
         }
-        let xdg = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
-        let path = std::path::PathBuf::from(&xdg).join(format!(
-            "how-scrcpy-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&path)
-            .with_context(|| format!("shm file {}", path.display()))?;
-        let _ = std::fs::remove_file(&path);
-        file.set_len(size as u64)?;
-        let pool = shm.create_pool(file.as_fd(), size as i32, &self.queue.handle(), ());
-        let wl_buffer = pool.create_buffer(
-            0,
-            width as i32,
-            height as i32,
-            stride as i32,
-            wl_fmt,
-            &self.queue.handle(),
-            (),
-        );
+        self.ensure_shm_pool(&shm, width, height, stride, wl_fmt, size)?;
+        let wl_buffer = self
+            .shm_pool
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("screencopy shm pool missing"))?
+            .buffer
+            .clone();
         frame.copy(&wl_buffer);
         self.flush()?;
 
@@ -670,28 +742,33 @@ impl WaylandCapture {
             while let Ok(ev) = rx.try_recv() {
                 match ev {
                     FrameEvent::Ready => {
-                        file.seek(SeekFrom::Start(0))?;
+                        let pool = self
+                            .shm_pool
+                            .as_mut()
+                            .ok_or_else(|| anyhow::anyhow!("screencopy shm pool missing"))?;
+                        pool.file.seek(SeekFrom::Start(0))?;
                         let mut raw = vec![0u8; size];
-                        file.read_exact(&mut raw)
+                        pool.file
+                            .read_exact(&mut raw)
                             .context("read screencopy shm")?;
-                        wl_buffer.destroy();
-                        pool.destroy();
-                        // nvvidconv only accepts BGRx (XRGB8888). DRM BGR888 is R,G,B in
-                        // memory, so swap R/B while packing; RGBx caps fail negotiation.
                         let swap_rb = matches!(
                             drm,
                             DrmFourcc::Bgr888 | DrmFourcc::Xbgr8888 | DrmFourcc::Abgr8888
                         );
-                        let pixels =
-                            pack_to_bgrx(&raw, stride, width, height, src_bpp, swap_rb)?;
-                        let format = DrmFourcc::Xrgb8888;
-                        return Ok(CapturedFrame { format, pixels });
+                        let row = (width as usize).saturating_mul(src_bpp);
+                        let pixels = if src_bpp == 4 && !swap_rb && stride as usize == row {
+                            let total = row.saturating_mul(height as usize);
+                            raw.truncate(total);
+                            raw
+                        } else {
+                            pack_to_bgrx(&raw, stride, width, height, src_bpp, swap_rb)?
+                        };
+                        return Ok(CapturedFrame {
+                            format: DrmFourcc::Xrgb8888,
+                            pixels,
+                        });
                     }
-                    FrameEvent::Failed => {
-                        wl_buffer.destroy();
-                        pool.destroy();
-                        anyhow::bail!("screencopy copy failed");
-                    }
+                    FrameEvent::Failed => anyhow::bail!("screencopy copy failed"),
                     _ => {}
                 }
             }
@@ -722,20 +799,34 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
     let mut last_size = (0u32, 0u32);
     let mut last_format = DRM_FORMAT_XRGB8888;
     let mut retry_after = Instant::now();
+    let mut last_gate_active = *gate.borrow();
+    let mut last_stream_target_write = Instant::now() - Duration::from_secs(60);
+    let stream_target_min_interval = Duration::from_millis(500);
+
+    let mut write_stream_target_throttled = |force: bool| {
+        let now = Instant::now();
+        if force || now.duration_since(last_stream_target_write) >= stream_target_min_interval {
+            let _ = write_stream_target(&display);
+            last_stream_target_write = now;
+        }
+    };
 
     loop {
-        if !*gate.borrow() {
+        let gate_active = *gate.borrow();
+        if gate_active != last_gate_active {
+            last_gate_active = gate_active;
+            write_stream_target_throttled(true);
+        }
+        if !gate_active {
             logged_ready = false;
             if let Some(p) = pipeline.take() {
                 p.set_null();
             }
             wl = None;
             last_output = None;
-            let _ = write_stream_target(&display);
             thread::sleep(Duration::from_millis(200));
             continue;
         }
-        let _ = write_stream_target(&display);
 
         if Instant::now() < retry_after {
             thread::sleep(Duration::from_millis(200));
@@ -756,6 +847,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
             src_h,
         );
         *display.inner.scaled_size.lock() = (dw, dh);
+        write_stream_target_throttled(false);
         let fps = display.max_framerate().max(1).min(20);
 
         if wl.is_none() {
@@ -844,6 +936,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                             Ordering::Relaxed,
                         );
                         display.set_error(None);
+                        write_stream_target_throttled(true);
                     }
                 }
             }

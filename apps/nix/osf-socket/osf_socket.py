@@ -10,6 +10,7 @@ Producers bind with :class:`OsfSocketPublisher`. Consumers call
 
 from __future__ import annotations
 
+import mmap
 import os
 import queue
 import socket
@@ -18,7 +19,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Iterator, List, Optional, Union
+from typing import Callable, Iterator, List, Optional, Tuple, Union
 
 from ouster.sdk._bindings.client import FrameSetSource
 from ouster.sdk.core import FrameSet, SensorInfo
@@ -28,6 +29,89 @@ _HDR = struct.Struct("<I")
 _MAX_FRAME_BYTES = 64 * 1024 * 1024
 _OSF_UNIX_PREFIX = "osf+unix://"
 _STREAM_END = object()
+
+
+def _osf_temp_dir() -> str:
+    shm = "/dev/shm"
+    if os.path.isdir(shm):
+        return shm
+    return tempfile.gettempdir()
+
+
+class _MemfdFrameBuffer:
+    """Reusable memfd (or /dev/shm fallback) backing store for socket OSF blobs."""
+
+    def __init__(self) -> None:
+        self._fd: Optional[int] = None
+        self._mmap: Optional[mmap.mmap] = None
+        self._path: Optional[str] = None
+        self._shm_path: Optional[str] = None
+        self._size = 0
+
+    @property
+    def path(self) -> Optional[str]:
+        return self._path
+
+    def ensure(self, size: int) -> mmap.mmap:
+        if self._mmap is not None and self._size == size:
+            return self._mmap
+        self._drop_mmap()
+        if self._fd is None:
+            try:
+                fd = os.memfd_create("osf-socket-frame")
+                self._path = f"/proc/self/fd/{fd}"
+                self._fd = fd
+            except (AttributeError, OSError):
+                shm_path = os.path.join(
+                    _osf_temp_dir(), f"osf-socket-frame-{os.getpid()}.osf"
+                )
+                fd = os.open(shm_path, os.O_CREAT | os.O_RDWR, 0o600)
+                self._shm_path = shm_path
+                self._path = shm_path
+                self._fd = fd
+        os.ftruncate(self._fd, size)
+        self._mmap = mmap.mmap(self._fd, size)
+        self._size = size
+        return self._mmap
+
+    def flush_for_read(self) -> None:
+        if self._mmap is not None:
+            self._mmap.flush()
+        if self._fd is not None:
+            os.lseek(self._fd, 0, os.SEEK_SET)
+
+    def _drop_mmap(self) -> None:
+        if self._mmap is not None:
+            try:
+                self._mmap.close()
+            except OSError:
+                pass
+            self._mmap = None
+        self._size = 0
+
+    def close(self) -> None:
+        self._drop_mmap()
+        if self._fd is not None:
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
+            self._fd = None
+        if self._shm_path is not None:
+            try:
+                os.unlink(self._shm_path)
+            except OSError:
+                pass
+            self._shm_path = None
+        self._path = None
+
+
+def _write_blob_to_memfd(blob: bytes) -> Tuple[str, _MemfdFrameBuffer]:
+    buf = _MemfdFrameBuffer()
+    mm = buf.ensure(len(blob))
+    mm[: len(blob)] = blob
+    assert buf.path is not None
+    return buf.path, buf
 
 
 def normalize_osf_socket_path(url: Union[str, List[str]]) -> str:
@@ -68,11 +152,9 @@ def encode_frameset_osf(frame_set: FrameSet, sensor_info) -> bytes:
 
 def decode_frameset_osf(blob: bytes):
     """Return ``(FrameSet, sensor_info)`` from a single-frame OSF blob."""
-    fd, path = tempfile.mkstemp(suffix=".osf")
-    os.close(fd)
+    path, owned_buf = _write_blob_to_memfd(blob)
     try:
-        Path(path).write_bytes(blob)
-        src = OsfFrameSetSource(path)
+        src = OsfFrameSetSource(path, index=False)
         try:
             for frame_set in src:
                 return frame_set, list(src.sensor_info)
@@ -80,10 +162,7 @@ def decode_frameset_osf(blob: bytes):
             src.close()
         raise RuntimeError("empty OSF FrameSet blob")
     finally:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
+        owned_buf.close()
 
 
 class OsfSocketPublisher:
@@ -235,10 +314,23 @@ class OsfSocketFrameSetSource(FrameSetSource):
         self._stream_ended = False
         self._reader_error: Optional[BaseException] = None
         self._on_disconnect: Optional[Callable[[], None]] = None
-        self._thread = threading.Thread(
-            target=self._reader_loop, name="osf-socket-reader", daemon=True
+        self._bufs = [_MemfdFrameBuffer(), _MemfdFrameBuffer(), _MemfdFrameBuffer()]
+        self._blob_lock = threading.Lock()
+        self._blob_cv = threading.Condition(self._blob_lock)
+        self._pending: Optional[Tuple[int, int]] = None  # (buf_index, nbytes)
+        self._decoding_i = -1
+        self._recv_thread = threading.Thread(
+            target=self._recv_loop, name="osf-socket-recv", daemon=True
         )
+        self._thread = threading.Thread(
+            target=self._reader_loop, name="osf-socket-decode", daemon=True
+        )
+        self._recv_thread.start()
         self._thread.start()
+        print(
+            "osf-socket: memfd decode (recv thread, latest-wins if consumer busy)",
+            flush=True,
+        )
         self._wait_first(timeout_s=connect_timeout_s)
 
     def set_on_disconnect(self, cb: Optional[Callable[[], None]]) -> None:
@@ -300,86 +392,50 @@ class OsfSocketFrameSetSource(FrameSetSource):
                 time.sleep(0.5)
         raise StopIteration
 
-    def _recv_exact(self, sock: socket.socket, n: int) -> bytes:
-        buf = bytearray()
-        while len(buf) < n:
+    def _recv_into(self, sock: socket.socket, dest: memoryview, n: int) -> None:
+        filled = 0
+        while filled < n:
             try:
-                chunk = sock.recv(n - len(buf))
+                got = sock.recv_into(dest[filled:n])
             except socket.timeout:
                 continue
-            if not chunk:
+            if got == 0:
                 raise ConnectionError("OSF socket peer closed")
-            buf.extend(chunk)
-        return bytes(buf)
+            filled += got
 
-    def _recv_one(self) -> FrameSet:
+    def _recv_blob_into(self, buf: _MemfdFrameBuffer) -> int:
         if self._sock is None:
             self._sock = self._connect()
         assert self._sock is not None
-        hdr = self._recv_exact(self._sock, _HDR.size)
+        hdr = bytearray(_HDR.size)
+        self._recv_into(self._sock, memoryview(hdr), _HDR.size)
         (n,) = _HDR.unpack(hdr)
         if n <= 0 or n > _MAX_FRAME_BYTES:
             raise ConnectionError(f"bad OSF socket frame length {n}")
-        blob = self._recv_exact(self._sock, n)
-        frame_set, infos = decode_frameset_osf(blob)
-        # Keep the same SensorInfo object identities so SimpleViz (which holds
-        # the list from open time) sees live extrinsic / metadata updates from
-        # each OSF blob (e.g. Dynamo live-config sensor_to_body changes).
-        if self._sensor_info and len(self._sensor_info) == len(infos):
-            for dst, src_si in zip(self._sensor_info, infos):
-                try:
-                    dst.sensor_to_body = src_si.sensor_to_body
-                except Exception:
-                    pass
-        else:
-            self._sensor_info = infos
-        return frame_set
+        mm = buf.ensure(n)
+        self._recv_into(self._sock, memoryview(mm)[:n], n)
+        return n
 
-    def _close_sock(self) -> None:
-        if self._sock is None:
-            return
-        try:
-            self._sock.close()
-        except OSError:
-            pass
-        self._sock = None
+    def _pick_recv_index(self) -> int:
+        used = set()
+        if self._pending is not None:
+            used.add(self._pending[0])
+        if self._decoding_i >= 0:
+            used.add(self._decoding_i)
+        for i in range(len(self._bufs)):
+            if i not in used:
+                return i
+        return 0
 
-    def _end_live_stream(self, reason: BaseException) -> None:
-        if self._stream_ended:
-            return
-        self._stream_ended = True
-        self._reader_error = None
-        self._close_sock()
-        try:
-            self._q.get_nowait()
-        except queue.Empty:
-            pass
-        try:
-            self._q.put_nowait(_STREAM_END)
-        except queue.Full:
-            pass
-        cb = self._on_disconnect
-        if cb is not None:
-            try:
-                cb()
-            except Exception:
-                pass
-
-    def _reader_loop(self) -> None:
+    def _recv_loop(self) -> None:
         while not self._closed:
             try:
-                frame = self._recv_one()
-                self._reader_error = None
-                self._had_live_stream = True
-                try:
-                    self._q.get_nowait()
-                except queue.Empty:
-                    pass
-                try:
-                    self._q.put_nowait(frame)
-                except queue.Full:
-                    pass
-                self._last = frame
+                with self._blob_lock:
+                    idx = self._pick_recv_index()
+                n = self._recv_blob_into(self._bufs[idx])
+                with self._blob_cv:
+                    self._pending = (idx, n)
+                    self._blob_cv.notify()
             except StopIteration:
                 break
             except socket.timeout:
@@ -407,6 +463,104 @@ class OsfSocketFrameSetSource(FrameSetSource):
                 self._close_sock()
                 time.sleep(0.5)
 
+    def _decode_from_buf(self, buf: _MemfdFrameBuffer) -> FrameSet:
+        path = buf.path
+        assert path is not None
+        buf.flush_for_read()
+        src = OsfFrameSetSource(path, index=False)
+        try:
+            frame_set = None
+            infos: List[SensorInfo] = []
+            for frame_set in src:
+                infos = list(src.sensor_info)
+                break
+            if frame_set is None:
+                raise RuntimeError("empty OSF FrameSet blob")
+        finally:
+            src.close()
+        # Keep the same SensorInfo object identities so SimpleViz (which holds
+        # the list from open time) sees live extrinsic / metadata updates from
+        # each OSF blob (e.g. Dynamo live-config sensor_to_body changes).
+        if self._sensor_info and len(self._sensor_info) == len(infos):
+            for dst, src_si in zip(self._sensor_info, infos):
+                try:
+                    dst.sensor_to_body = src_si.sensor_to_body
+                except Exception:
+                    pass
+        else:
+            self._sensor_info = infos
+        return frame_set
+
+    def _close_sock(self) -> None:
+        if self._sock is None:
+            return
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+        self._sock = None
+
+    def _end_live_stream(self, _reason: BaseException) -> None:
+        if self._stream_ended:
+            return
+        self._stream_ended = True
+        self._reader_error = None
+        self._close_sock()
+        with self._blob_cv:
+            self._blob_cv.notify_all()
+        try:
+            self._q.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            self._q.put_nowait(_STREAM_END)
+        except queue.Full:
+            pass
+        cb = self._on_disconnect
+        if cb is not None:
+            try:
+                cb()
+            except Exception:
+                pass
+
+    def _reader_loop(self) -> None:
+        while not self._closed and not self._stream_ended:
+            try:
+                with self._blob_cv:
+                    while self._pending is None and not self._closed and not self._stream_ended:
+                        self._blob_cv.wait(timeout=0.5)
+                    if self._pending is None:
+                        continue
+                    idx, _nbytes = self._pending
+                    self._pending = None
+                    if not self._q.empty():
+                        continue
+                    self._decoding_i = idx
+                frame = self._decode_from_buf(self._bufs[idx])
+                with self._blob_lock:
+                    self._decoding_i = -1
+                self._reader_error = None
+                self._had_live_stream = True
+                try:
+                    self._q.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    self._q.put_nowait(frame)
+                except queue.Full:
+                    pass
+                self._last = frame
+            except Exception as exc:  # noqa: BLE001
+                with self._blob_lock:
+                    self._decoding_i = -1
+                if self._closed:
+                    break
+                if self._had_live_stream:
+                    self._end_live_stream(exc)
+                    break
+                self._reader_error = exc
+                time.sleep(0.5)
+
     def __iter__(self) -> Iterator[FrameSet]:
         if self._last is not None:
             yield self._last
@@ -425,8 +579,13 @@ class OsfSocketFrameSetSource(FrameSetSource):
     def close(self) -> None:
         self._closed = True
         self._close_sock()
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=2.0)
+        with self._blob_cv:
+            self._blob_cv.notify_all()
+        for th in (self._recv_thread, self._thread):
+            if th is not None and th.is_alive():
+                th.join(timeout=2.0)
+        for buf in self._bufs:
+            buf.close()
 
     def __enter__(self) -> "OsfSocketFrameSetSource":
         return self
