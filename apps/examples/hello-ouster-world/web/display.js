@@ -1140,7 +1140,8 @@
             if (!d.stream) clearStreamBlack();
         }
         if (Object.prototype.hasOwnProperty.call(d, 'error')) {
-            showError(d.error || '');
+            if (d.error) showError(d.error);
+            else showError('');
         }
     }
 

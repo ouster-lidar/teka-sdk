@@ -1,4 +1,4 @@
-//! Display stream: grim JPEG → WS, HDMI toggle, resolution, remote input.
+//! Display stream: nvjpegenc JPEG → WS, HDMI toggle, resolution, remote input.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -23,10 +23,10 @@ use crate::ui_state;
 use crate::vpointer::{VPtrButton, VPtrCmd, VirtualPointer};
 use crate::AppState;
 
-/// JPEG fan-out + one control lease.
+/// JPEG frame fan-out + one control lease.
 pub const MAX_DISPLAY_VIEWERS: usize = 8;
 const DEFAULT_FPS: u64 = 5;
-const ALLOWED_FPS: &[u64] = &[2, 5, 10];
+const ALLOWED_FPS: &[u64] = &[2, 5, 10, 20];
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
 /// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
@@ -117,6 +117,9 @@ pub(crate) struct DisplayInner {
     vpointer: Mutex<VirtualPointer>,
     pub(crate) last_error: Mutex<Option<String>>,
     pub(crate) last_capture_ms: AtomicU64,
+    pub(crate) codec: Mutex<Option<String>>,
+    pub(crate) codec_description: Mutex<Option<String>>,
+    codec_watch: watch::Sender<()>,
 }
 
 impl DisplayState {
@@ -124,6 +127,7 @@ impl DisplayState {
         let (frame_tx, _) = broadcast::channel(2);
         let (capture_gate, _) = watch::channel(false);
         let (fps_watch, _) = watch::channel(DEFAULT_FPS);
+        let (codec_watch, _) = watch::channel(());
         let (inject_tx, inject_rx) = mpsc::unbounded_channel();
         let vpointer = VirtualPointer::spawn();
         let state = Self {
@@ -149,6 +153,9 @@ impl DisplayState {
                 vpointer: Mutex::new(vpointer),
                 last_error: Mutex::new(None),
                 last_capture_ms: AtomicU64::new(0),
+                codec: Mutex::new(None),
+                codec_description: Mutex::new(None),
+                codec_watch,
             }),
         };
         let _ = write_stream_target(&state);
@@ -186,11 +193,27 @@ impl DisplayState {
             "controlling": controlling,
             "error": self.inner.last_error.lock().clone(),
             "last_capture_ms": self.inner.last_capture_ms.load(Ordering::Relaxed),
+            "codec": self.inner.codec.lock().clone(),
+            "codec_description": self.inner.codec_description.lock().clone(),
         })
     }
 
     pub(crate) fn set_error(&self, msg: Option<String>) {
         *self.inner.last_error.lock() = msg;
+    }
+
+    pub(crate) fn set_codec_config(&self, codec: Option<String>, description: Option<String>) {
+        let changed = {
+            let mut c = self.inner.codec.lock();
+            let mut d = self.inner.codec_description.lock();
+            let changed = *c != codec || *d != description;
+            *c = codec;
+            *d = description;
+            changed
+        };
+        if changed {
+            let _ = self.inner.codec_watch.send(());
+        }
     }
 
     pub(crate) fn max_framerate(&self) -> u64 {
@@ -342,6 +365,10 @@ enum ServerEvent {
         height: u32,
         stream_width: u32,
         stream_height: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        codec: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        codec_description: Option<String>,
         hdmi: bool,
         hdmi_present: bool,
         stream: bool,
@@ -371,8 +398,9 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
         return;
     }
     let viewer_id = state.display.inner.next_viewer.fetch_add(1, Ordering::SeqCst);
-    // Subscribe before opening the capture gate so the first JPEG is not dropped.
+    // Subscribe before opening the capture gate so the first frame is not dropped.
     let mut frames = state.display.inner.frame_tx.subscribe();
+    let mut codec_updates = state.display.inner.codec_watch.subscribe();
     let _ = state.display.inner.capture_gate.send(true);
     let _ = write_stream_target(&state.display);
 
@@ -468,12 +496,12 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
             frame = frames.recv() => {
                 // Keep only the newest frame to cut glass-to-glass latency.
                 let mut latest = match frame {
-                    Ok(j) => j,
+                    Ok(au) => au,
                     Err(broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(broadcast::error::RecvError::Closed) => break,
                 };
-                while let Ok(j) = frames.try_recv() {
-                    latest = j;
+                while let Ok(au) = frames.try_recv() {
+                    latest = au;
                 }
                 if socket
                     .send(Message::Binary(latest.as_slice().to_vec().into()))
@@ -482,6 +510,9 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
                 {
                     break;
                 }
+            }
+            _ = codec_updates.changed() => {
+                let _ = send_meta(&mut socket, &state.display).await;
             }
         }
     }
@@ -503,6 +534,8 @@ async fn send_meta(
             height: sh,
             stream_width: dw,
             stream_height: dh,
+            codec: display.inner.codec.lock().clone(),
+            codec_description: display.inner.codec_description.lock().clone(),
             hdmi: *display.inner.hdmi_enabled.lock(),
             hdmi_present: *display.inner.hdmi_present.lock(),
             stream: stream_enabled,
@@ -864,6 +897,7 @@ async fn move_viz_to_output(output: &str) -> anyhow::Result<()> {
     let _ = sway_viz(&["move", "container", "to", "output", output]).await;
     let _ = sway_viz(&["focus"]).await;
     // Fill the panel so HDMI is not a tiny floating window on a black desktop.
+    let _ = sway_viz(&["border", "none"]).await;
     let _ = sway_viz(&["fullscreen", "enable"]).await;
     Ok(())
 }
@@ -879,14 +913,15 @@ async fn place_viz_window(display: &DisplayState) -> anyhow::Result<()> {
     *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
 
     if hdmi_want {
-        if find_physical_active(&arr).is_none() {
-            if let Some(phys) = find_physical_any(&arr) {
-                let name = output_name(phys).to_string();
-                let _ = run_swaymsg(&["output", &name, "enable"]).await;
+        if let Some(phys) = find_physical_any(&arr) {
+            let name = output_name(phys).to_string();
+            let _ = run_swaymsg(&["output", &name, "enable"]).await;
+            let _ = run_swaymsg(&["output", &name, "dpms", "on"]).await;
+            if find_physical_active(&arr).is_none() {
                 tokio::time::sleep(Duration::from_millis(250)).await;
                 arr = list_outputs().await?;
-                *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
             }
+            *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
         }
     }
 
@@ -947,11 +982,14 @@ async fn place_viz_window(display: &DisplayState) -> anyhow::Result<()> {
     let _ = write_stream_target(display);
     tracing::info!(%target_name, on_device, ?size, "placed Ouster Viz");
 
+    // DPMS off, do not `output disable`. Tegra fills a disabled CRTC with
+    // green; screencopy of that scanout is the UI flash. The connector stays
+    // listed so HDMI N/A is not tripped.
     if !hdmi_want {
         let arr = list_outputs().await.unwrap_or_default();
-        if let Some(phys) = find_physical_active(&arr) {
+        if let Some(phys) = find_physical_any(&arr) {
             let name = output_name(phys).to_string();
-            let _ = run_swaymsg(&["output", &name, "disable"]).await;
+            let _ = run_swaymsg(&["output", &name, "dpms", "off"]).await;
         }
         let arr = list_outputs().await.unwrap_or_default();
         *display.inner.hdmi_present.lock() = find_physical_any(&arr).is_some();
@@ -967,6 +1005,7 @@ async fn set_hdmi_enabled(display: &DisplayState, enabled: bool) -> anyhow::Resu
         if let Some(phys) = find_physical_any(&arr) {
             let name = output_name(phys).to_string();
             let _ = run_swaymsg(&["output", &name, "enable"]).await?;
+            let _ = run_swaymsg(&["output", &name, "dpms", "on"]).await?;
             tokio::time::sleep(Duration::from_millis(250)).await;
         } else {
             tracing::info!("hdmi enable requested but no physical output present");
@@ -1098,19 +1137,12 @@ fn stream_target_path() -> PathBuf {
     runtime_dir().join(STREAM_TARGET_NAME)
 }
 
-pub(crate) fn stream_dims(res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
-    // Until Sway reports an output, assume 1080p so native/1080p are not 1×1.
-    let (src_w, src_h) = if src_w > 0 && src_h > 0 {
+pub(crate) fn stream_dims(_res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
+    // Native compositor size only — resolution dropdown is display metadata.
+    if src_w > 0 && src_h > 0 {
         (src_w, src_h)
     } else {
         (1920, 1080)
-    };
-    match res.max_width() {
-        Some(max_w) => {
-            let h = ((f64::from(src_h) * f64::from(max_w) / f64::from(src_w)).round() as u32).max(1);
-            (max_w, h)
-        }
-        None => (src_w, src_h),
     }
 }
 
@@ -1121,7 +1153,7 @@ pub(crate) fn write_stream_target(display: &DisplayState) -> std::io::Result<()>
     let stream_enabled = *display.inner.stream_enabled.lock();
     let hdmi_enabled = *display.inner.hdmi_enabled.lock();
     let on_device = *display.inner.on_device_active.lock();
-    // Browser encode only when stream toggle is on and a viewer is connected.
+    // Browser JPEG only when stream toggle is on and a viewer is connected.
     let active = stream_enabled && viewers > 0;
     // HDMI toggle (not lagging on_device) so browser-off still plays on the panel.
     let need_render = hdmi_enabled || active;

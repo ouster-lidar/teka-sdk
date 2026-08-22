@@ -23,10 +23,11 @@ clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
 parking_lot = "0.12"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
-wayland-protocols-misc = { version = "0.3", features = ["client"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 futures-util = "0.3"
 inotify = { version = "0.11", default-features = false }
+gstreamer = "0.23"
+gstreamer-app = "0.23"
+drm-fourcc = "2.2"

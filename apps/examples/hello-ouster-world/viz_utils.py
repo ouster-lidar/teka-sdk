@@ -1,7 +1,7 @@
 """PointViz helpers: key inject, VizProxy, JetstreamDisplayBridge.
 
-Browser JPEG capture lives in the Rust backend (grim). SimpleViz does not
-read back the GL swapchain.
+Browser JPEG capture lives in the Rust backend (zwlr_screencopy). SimpleViz
+does not read back the GL swapchain.
 """
 
 from __future__ import annotations
@@ -607,6 +607,12 @@ class JetstreamDisplayBridge:
     def _build_pointviz(self) -> VizProxy:
         print("hello-ouster-world: constructing PointViz proxy", flush=True)
         real = PointViz("Ouster Viz", maximized=True, fullscreen=False)
+        # OS pointer is a second cursor on top of SimpleViz crosshairs and
+        # JPEG-smears in the browser stream. Keep the crosshairs only.
+        try:
+            real.cursor_visible(False)
+        except Exception as exc:  # noqa: BLE001
+            print(f"hello-ouster-world: cursor_visible failed: {exc!r}", flush=True)
         assert self._keys is not None
         return VizProxy(real, self._run_with_capture, self._keys)
 
@@ -646,6 +652,7 @@ class JetstreamDisplayBridge:
                     time.sleep(0.2)
 
         try:
+            viz.cursor_visible(False)
             viz.running(True)
             viz.visible(True)
         except Exception as exc:  # noqa: BLE001

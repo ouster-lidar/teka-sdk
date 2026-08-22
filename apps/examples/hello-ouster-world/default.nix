@@ -19,7 +19,6 @@
   glfw,
   libxkbcommon,
   libdecor,
-  grim,
   wtype,
   dejavu_fonts,
   python312Packages,
@@ -51,19 +50,95 @@ let
     };
   };
 
+  # CUDA, not wayland: two wayland GPU units Conflicts= each other and kill
+  # the display compositor. hello-llm uses the same split.
   jpApi = pe.mcJetstreamPortable;
 
   howSrc = pe.mcRustSrc { srcDir = ./.; };
 
-  howBin = pe.buildMcCrate2nix {
-    cargoNix = ./Cargo.nix;
-    crateName = "hello-ouster-world";
-    filteredSrc = howSrc;
-    nativeBuildInputs = pe.mcOpensslNative;
-    meta = {
-      mainProgram = "hello-ouster-world";
-    };
-  };
+  gstNative = with pkgs; [
+    pkg-config
+    gst_all_1.gstreamer
+    gst_all_1.gst-plugins-base
+    wayland
+    glib
+  ];
+
+  # DDI GStreamer. nvvidconv/nvjpegenc are L4T; NVIDIA userspace comes from
+  # X-Jetstream-PortableGPU (not BindReadOnlyPaths of host /usr).
+  gstPluginSystemPath = lib.concatStringsSep ":" [
+    "${pkgs.gst_all_1.gstreamer}/lib/gstreamer-1.0"
+    "${pkgs.gst_all_1.gst-plugins-base}/lib/gstreamer-1.0"
+    "${pkgs.gst_all_1.gst-plugins-good}/lib/gstreamer-1.0"
+    "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
+  ];
+
+  howBin =
+    let
+      crateOverridesForPkgs =
+        targetPkgs:
+        targetPkgs.defaultCrateOverrides
+        // (import ./crate-config.nix { pkgs = targetPkgs; })
+        // {
+          hello-ouster-world = attrs: {
+            src = howSrc;
+            preBuild = (attrs.preBuild or "") + ''
+              export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_world"}"
+            '';
+            nativeBuildInputs = (attrs.nativeBuildInputs or [ ]) ++ [ targetPkgs.pkg-config ];
+            buildInputs =
+              (attrs.buildInputs or [ ])
+              ++ (with targetPkgs; [
+                gst_all_1.gstreamer
+                gst_all_1.gst-plugins-base
+                glib
+                wayland
+              ]);
+          };
+        };
+      cross = import ../../nix/cross-crate2nix.nix {
+        inherit lib pkgs crateOverridesForPkgs;
+      };
+    in
+    (cross {
+      cargoNix = ./Cargo.nix;
+      packageId = "hello-ouster-world";
+    }).overrideAttrs
+      (old: {
+        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ pe.mcOpensslNative ++ gstNative;
+        meta = (old.meta or { }) // {
+          mainProgram = "hello-ouster-world";
+        };
+      });
+
+  howApiCmd = writeShellScript "${name}-api" ''
+    set -euo pipefail
+    # Nix GST (appsrc/appsink). Keep generator GST_PLUGIN_PATH
+    # (l4t-gstreamer: nvvidconv / nvjpegenc). Do not unset it.
+    export GST_PLUGIN_SYSTEM_PATH="${gstPluginSystemPath}"
+    unset GST_PLUGIN_SYSTEM_PATH_1_0 2>/dev/null || true
+    # Generator LD_LIBRARY_PATH lists Mesa libgbm before nvidia-l4t-gbm; Mesa
+    # then looks for dri_gbm.so. Prefer L4T GBM backends.
+    IFS=':' read -r -a _ldpath <<< "''${LD_LIBRARY_PATH:-}"
+    for _d in "''${_ldpath[@]}"; do
+      if [[ "$_d" == *nvidia-l4t-gbm* ]]; then
+        export LD_LIBRARY_PATH="$_d''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        if [[ -d "$_d/gbm" ]]; then
+          export GBM_BACKENDS_PATH="$_d/gbm"
+        fi
+        break
+      fi
+    done
+    # L4T nvvidconv/nvjpegenc may shell out to `lsmod | grep`. PortableGPU PATH
+    # has neither busybox applets nor kmod; keep /bin as fallback.
+    export PATH="${
+      lib.makeBinPath [
+        pkgsStatic.busybox
+        pkgs.kmod
+      ]
+    }:/bin:/usr/bin''${PATH:+:$PATH}"
+    exec ${lib.getExe howBin} "$@"
+  '';
 
   helloOusterWorldPy = ./hello_ouster_world.py;
   ousterVizUtilsPy = ./viz_utils.py;
@@ -178,8 +253,16 @@ let
 
   swayConfig = writeText "${name}-sway.conf" ''
     xwayland disable
+    # Kiosk: one client, no titlebars/split chrome.
+    font pango:monospace 1
+    default_border none
+    default_floating_border none
+    hide_edge_borders both
+    output * bg #000000 solid_color
     # Do not pin Ouster Viz to HEADLESS here — Display places it on HDMI or
     # HEADLESS based on the HDMI toggle. A for_window move would fight that.
+    for_window [app_id="hello-ouster-world"] border none, fullscreen enable
+    for_window [title="Ouster Viz"] border none, fullscreen enable
     exec ${swayStartup}
   '';
 
@@ -188,7 +271,6 @@ let
     bash
     dbus
     sway
-    grim
     wtype
     pythonEnv
     ouster-sdk
@@ -283,7 +365,6 @@ let
     Environment=HELLO_OUSTER_WORLD_PATH=${clientPath}
     Environment=HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR=/run/${name}
     Environment=HELLO_OUSTER_WORLD_WAYLAND_DISPLAY=wayland-1
-    Environment=HELLO_OUSTER_WORLD_GRIM=${lib.getExe grim}
     Environment=HELLO_OUSTER_WORLD_SWAYMSG=${sway}/bin/swaymsg
     Environment=HELLO_OUSTER_WORLD_WTYPE=${lib.getExe wtype}
     Environment=HELLO_OUSTER_WORLD_CONSOLE_LOG=/run/${name}/console.log
@@ -405,6 +486,9 @@ ps.makePortableErofsImage {
     [Unit]
     Description=hello-ouster-world (MC Console/Display API)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
+    # Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
+    # Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.
+    X-Jetstream-PortableGPU=cuda
     After=mission-control.service systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
     Wants=network-online.target time-sync.target seatd.service
     ${ps.jetstreamMcPortableBackendUnitLines}
@@ -415,12 +499,14 @@ ps.makePortableErofsImage {
     ${jpApi.serviceFragment}
     ${commonEnv}
     Environment=RUST_LOG=info
-    ExecStart=${lib.getExe howBin}
+    ExecStart=${howApiCmd}
     SyslogIdentifier=${name}
     Restart=always
     RestartSec=3
     StandardOutput=journal
     StandardError=journal
+    PrivateDevices=no
+    SupplementaryGroups=tty seat video render
     ${ps.jetstreamPortableHostEtcBindPaths}
     BindReadOnlyPaths=-/run/seatd.sock
     ${dynamoRuntimeBind}
@@ -429,7 +515,6 @@ ps.makePortableErofsImage {
     RuntimeDirectoryMode=0700
     StateDirectory=${name}
     StateDirectoryMode=0750
-    SupplementaryGroups=tty seat
     ${ps.jetstreamMcPortableBackendServiceLines}
 
     [Install]
@@ -437,13 +522,19 @@ ps.makePortableErofsImage {
   '';
   runtimeClosures = [
     howBin
+    howApiCmd
     runLoopPack
     vizCmd
     pythonEnv
     ouster-sdk
-    grim
     wtype
     sway
+    pkgs.gst_all_1.gstreamer
+    pkgs.gst_all_1.gst-plugins-base
+    pkgs.gst_all_1.gst-plugins-good
+    pkgs.gst_all_1.gst-plugins-bad
+    pkgsStatic.busybox
+    pkgs.kmod
   ]
   ++ mesaLlvmRuntimeClosure
   ++ jpDisplay.runtimeClosures;
