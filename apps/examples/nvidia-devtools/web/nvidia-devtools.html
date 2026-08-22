@@ -1,25 +1,30 @@
 <h2>NVIDIA DevTools</h2>
-<p class="config-hint">SSH shell with CUDA profiling tools on the device (port 2223). Host <code>libcuda</code> via PortableGPU.</p>
+<p class="config-hint">SSH shell with CUDA profiling tools on the device (port 2223).</p>
 
 <div class="stat-card" id="ndt-monitor-card">
     <div class="service-header">
         <div class="service-header-title">Jetson monitor</div>
         <span id="ndt-monitor-status" class="ndt-monitor-status ndt-monitor-status--idle">Connecting…</span>
     </div>
-    <p class="config-hint">Live <code>tegrastats</code> from the device — rolling 60&nbsp;s history.</p>
+    <p class="config-hint">Live <code>tegrastats</code> from the device — rolling 300&nbsp;s history.</p>
     <div class="ndt-metrics" id="ndt-metrics"></div>
+    <div class="ndt-flags" id="ndt-flags"></div>
     <div class="ndt-chart-wrap" id="ndt-chart-wrap">
-        <canvas id="ndt-chart" class="ndt-chart" width="800" height="280" aria-label="Jetson metrics chart"></canvas>
+        <canvas id="ndt-chart" class="ndt-chart" width="800" height="560" aria-label="Jetson metrics chart"></canvas>
         <div id="ndt-chart-tooltip" class="ndt-chart-tooltip" hidden></div>
+        <div id="ndt-chart-resize" class="ndt-chart-resize" role="separator" aria-orientation="horizontal" aria-label="Resize tegrastats chart" tabindex="0"></div>
     </div>
-    <pre id="ndt-tegra-raw" class="ndt-tegra-raw" aria-live="polite"></pre>
+    <div class="ndt-tegra-raw-wrap" id="ndt-tegra-raw-wrap">
+        <pre id="ndt-tegra-raw" class="ndt-tegra-raw" aria-live="polite"></pre>
+        <div id="ndt-tegra-raw-resize" class="ndt-chart-resize" role="separator" aria-orientation="horizontal" aria-label="Resize tegrastats output" tabindex="0"></div>
+    </div>
 </div>
 
 <div class="stat-card" id="ndt-ssh-card">
     <div class="service-header">
         <div class="service-header-title">SSH access</div>
     </div>
-    <p class="config-hint">Paste your public key below before connecting — nothing is authorized at first boot. Login as <code>js</code> — <code>ncu</code>, <code>nsys</code>, <code>tegrastats</code>, <code>nvidia-smi</code>, and <code>compute-sanitizer</code> are on <code>PATH</code>. Use <code>root</code> only when you need privileged host access.</p>
+    <p class="config-hint">Paste your public key below before connecting — nothing is authorized at first boot. Login as <code>js</code> — <code>ncu</code>, <code>nsys</code>, <code>tegrastats</code>, and <code>compute-sanitizer</code> are on <code>PATH</code>. Use <code>root</code> only when you need privileged host access.</p>
     <div class="ndt-ssh-cmds">
         <div class="ndt-ssh-row">
             <span class="ndt-ssh-label">js</span>
@@ -41,7 +46,6 @@
     <pre class="ndt-examples"><code>ncu --version
 nsys --version
 tegrastats --interval 1000
-nvidia-smi
 
 # Profile a new process
 nsys profile ./your-cuda-app

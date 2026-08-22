@@ -16,9 +16,50 @@
 
 .ndt-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
     gap: 0.65rem;
-    margin: 0.75rem 0 1rem;
+    margin: 0.75rem 0 0.65rem;
+}
+
+.ndt-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+}
+
+.ndt-flags:empty {
+    display: none;
+}
+
+.ndt-flag {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 999px;
+    padding: 0.28rem 0.7rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+}
+
+.ndt-flag-label {
+    color: #94a3b8;
+    letter-spacing: 0.02em;
+}
+
+.ndt-flag-value {
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+.ndt-flag-value--on {
+    color: #4ade80;
+}
+
+.ndt-flag-value--off {
+    color: #64748b;
 }
 
 .ndt-metric {
@@ -51,6 +92,10 @@
     font-size: 0.72rem;
     color: #64748b;
     margin-top: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
 }
 
 .ndt-chart-wrap {
@@ -58,16 +103,41 @@
     background: #0b1220;
     border: 1px solid #334155;
     border-radius: 8px;
-    padding: 0.5rem;
+    padding: 0.5rem 0.5rem 0;
     margin-bottom: 0.75rem;
     overflow: hidden;
+}
+
+.ndt-chart-wrap.is-resizing {
+    user-select: none;
 }
 
 .ndt-chart {
     display: block;
     width: 100%;
-    height: auto;
+    height: 35rem;
     cursor: crosshair;
+}
+
+.ndt-chart-resize {
+    height: 0.7rem;
+    cursor: ns-resize;
+    touch-action: none;
+}
+
+.ndt-chart-resize::after {
+    content: '';
+    display: block;
+    width: 2.25rem;
+    height: 3px;
+    margin: 0.2rem auto 0;
+    border-radius: 99px;
+    background: #475569;
+}
+
+.ndt-chart-resize:hover::after,
+.ndt-chart-resize:focus-visible::after {
+    background: #94a3b8;
 }
 
 .ndt-chart-tooltip {
@@ -103,19 +173,33 @@
     font-variant-numeric: tabular-nums;
 }
 
-.ndt-tegra-raw {
-    margin: 0;
-    padding: 0.65rem 0.75rem;
+.ndt-tegra-raw-wrap {
     background: #0f172a;
     border: 1px solid #334155;
     border-radius: 6px;
+    padding: 0 0 0;
+    overflow: hidden;
+}
+
+.ndt-tegra-raw-wrap.is-resizing {
+    user-select: none;
+}
+
+.ndt-tegra-raw {
+    margin: 0;
+    padding: 0.65rem 0.75rem 0.35rem;
+    min-height: 4.5rem;
+    height: 4.5rem;
+    max-height: none;
+    overflow: auto;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     font-size: 0.75rem;
     line-height: 1.35;
     color: #cbd5e1;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 4.5rem;
-    overflow: auto;
 }
 
 .ndt-ssh-cmds {

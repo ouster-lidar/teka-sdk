@@ -3,8 +3,36 @@
 
     var mc = mcAppApi('nvidia-devtools');
     var SSH_PORT = 2223;
-    var WINDOW_SEC = 60;
-    var SMOOTH_FACTOR = 0.16;
+    var WINDOW_SEC = 300;
+    var RAW_WINDOW_SEC = 30;
+    var CHART_HEIGHT_MIN = 240;
+    var CHART_HEIGHT_MAX = 960;
+    var CHART_HEIGHT_DEFAULT = 560;
+    var CHART_HEIGHT_KEY = 'ndt-chart-height';
+    var RAW_HEIGHT_MIN = 72;
+    var RAW_HEIGHT_MAX = 2400;
+    var RAW_HEIGHT_DEFAULT = 72;
+    var RAW_HEIGHT_KEY = 'ndt-raw-height';
+
+    function watts(mw) {
+        return ((mw || 0) / 1000).toFixed(1);
+    }
+
+    function coreSummary(s) {
+        if (!s.cpu_cores || !s.cpu_cores.length) return 'avg active cores';
+        var on = [];
+        var off = 0;
+        s.cpu_cores.forEach(function (c) {
+            if (c === 'off') {
+                off += 1;
+                return;
+            }
+            on.push(String(Math.round(parseFloat(c))));
+        });
+        var text = on.join('/');
+        if (off) text += ' · ' + off + ' off';
+        return text;
+    }
 
     var METRICS = [
         {
@@ -13,7 +41,10 @@
             color: '#f59e0b',
             value: function (s) { return s.ram_pct; },
             text: function (s) { return s.ram_pct.toFixed(1) + '%'; },
-            sub: function (s) { return s.ram_used_mb + ' / ' + s.ram_total_mb + ' MB'; },
+            sub: function (s) {
+                var ram = s.ram_used_mb + '/' + s.ram_total_mb + ' MB';
+                return s.lfb ? ram + ' · ' + s.lfb : ram;
+            },
             min: 0,
             max: 100
         },
@@ -23,7 +54,7 @@
             color: '#38bdf8',
             value: function (s) { return s.cpu_pct; },
             text: function (s) { return s.cpu_pct.toFixed(1) + '%'; },
-            sub: function () { return 'avg active cores'; },
+            sub: coreSummary,
             min: 0,
             max: 100
         },
@@ -33,7 +64,17 @@
             color: '#4ade80',
             value: function (s) { return s.gpu_pct; },
             text: function (s) { return s.gpu_pct.toFixed(1) + '%'; },
-            sub: function () { return 'GR3D_FREQ'; },
+            sub: function (s) { return s.gpu_mhz ? s.gpu_mhz + ' MHz' : 'GR3D_FREQ'; },
+            min: 0,
+            max: 100
+        },
+        {
+            id: 'emc_pct',
+            label: 'EMC',
+            color: '#22d3ee',
+            value: function (s) { return s.emc_pct || 0; },
+            text: function (s) { return (s.emc_pct || 0).toFixed(1) + '%'; },
+            sub: function (s) { return s.emc_mhz ? s.emc_mhz + ' MHz mem' : 'memory'; },
             min: 0,
             max: 100
         },
@@ -43,7 +84,9 @@
             color: '#f87171',
             value: function (s) { return s.gpu_temp_c; },
             text: function (s) { return s.gpu_temp_c.toFixed(1) + '°C'; },
-            sub: function () { return 'gpu@ sensor'; },
+            sub: function (s) {
+                return s.tj_temp_c ? 'tj ' + s.tj_temp_c.toFixed(1) + '°C' : 'gpu@ sensor';
+            },
             min: 30,
             max: 90
         },
@@ -53,11 +96,146 @@
             color: '#a78bfa',
             value: function (s) { return s.power_mw / 1000; },
             text: function (s) { return (s.power_mw / 1000).toFixed(2) + ' W'; },
-            sub: function (s) { return s.power_mw + ' mW VDD_IN'; },
+            sub: function (s) {
+                return 'CV ' + watts(s.vdd_cpu_gpu_cv_mw) +
+                    ' · SOC ' + watts(s.vdd_soc_mw);
+            },
             min: 0,
             max: 30
         }
     ];
+
+    var ENGINE_ORDER = ['NVENC0', 'NVDEC0', 'NVJPG0', 'NVJPG1', 'VIC', 'OFA', 'NVDLA0', 'NVDLA1', 'PVA0'];
+    var ENGINE_KEYS = [
+        'NVENC0', 'NVENC1', 'NVDEC0', 'NVDEC1',
+        'NVJPG0', 'NVJPG1', 'VIC', 'OFA',
+        'NVDLA0', 'NVDLA1', 'PVA0_FREQ', 'PVA1_FREQ'
+    ];
+
+    function afterKey(line, key) {
+        var idx = line.indexOf(key);
+        if (idx < 0) return null;
+        return line.slice(idx + key.length);
+    }
+
+    function parseRam(line) {
+        var rest = afterKey(line, 'RAM ');
+        if (!rest) return null;
+        var mb = rest.indexOf('MB');
+        if (mb < 0) return null;
+        var pair = rest.slice(0, mb).split('/');
+        var used = parseInt(pair[0], 10);
+        var total = parseInt(pair[1], 10);
+        if (!isFinite(used) || !isFinite(total)) return null;
+        return { used: used, total: total };
+    }
+
+    function parseLfb(line) {
+        var rest = afterKey(line, '(lfb ');
+        if (!rest) return '';
+        var end = rest.indexOf(')');
+        return end < 0 ? '' : rest.slice(0, end);
+    }
+
+    function parseCpuCores(line) {
+        var rest = afterKey(line, 'CPU [');
+        if (!rest) return null;
+        var end = rest.indexOf(']');
+        if (end < 0) return null;
+        return rest.slice(0, end).split(',').map(function (p) {
+            return p.trim();
+        }).filter(Boolean);
+    }
+
+    function cpuAvg(cores) {
+        var sum = 0;
+        var count = 0;
+        cores.forEach(function (part) {
+            if (part === 'off') return;
+            var pct = parseFloat(part);
+            if (!isFinite(pct)) return;
+            sum += pct;
+            count += 1;
+        });
+        return count ? sum / count : 0;
+    }
+
+    function parseMhzSuffix(after) {
+        var t = String(after || '').replace(/^\s+/, '').replace(/^@/, '').replace(/^\[/, '');
+        var m = t.match(/^\d+/);
+        return m ? parseInt(m[0], 10) : 0;
+    }
+
+    function parseFreqToken(line, key) {
+        var rest = afterKey(line, key);
+        if (!rest) return null;
+        var pctEnd = rest.indexOf('%');
+        if (pctEnd < 0) return null;
+        var pct = parseFloat(rest.slice(0, pctEnd));
+        if (!isFinite(pct)) return null;
+        return { pct: pct, mhz: parseMhzSuffix(rest.slice(pctEnd + 1)) };
+    }
+
+    function parseTemp(line, key) {
+        var rest = afterKey(line, key);
+        if (!rest) return null;
+        var end = rest.indexOf('C');
+        if (end < 0) return null;
+        var n = parseFloat(rest.slice(0, end));
+        return isFinite(n) ? n : null;
+    }
+
+    function parseRailMw(line, key) {
+        var rest = afterKey(line, key);
+        if (!rest) return null;
+        var end = rest.indexOf('m');
+        if (end < 0) return null;
+        var n = parseInt(rest.slice(0, end), 10);
+        return isFinite(n) ? n : null;
+    }
+
+    function parseEngines(line) {
+        var out = [];
+        ENGINE_KEYS.forEach(function (key) {
+            var rest = afterKey(line, key + ' ');
+            if (rest === null) return;
+            var token = rest.trim().split(/\s+/)[0] || 'off';
+            out.push({ id: key.replace(/_FREQ$/, ''), on: token !== 'off' });
+        });
+        return out;
+    }
+
+    function parseTegraLine(raw, tsMs) {
+        if (!raw) return null;
+        var ram = parseRam(raw);
+        var cpuCores = parseCpuCores(raw);
+        var gpu = parseFreqToken(raw, 'GR3D_FREQ ');
+        var gpuTemp = parseTemp(raw, 'gpu@');
+        var power = parseRailMw(raw, 'VDD_IN ');
+        if (!ram || !cpuCores || !gpu || gpuTemp === null || power === null) return null;
+        var emc = parseFreqToken(raw, 'EMC_FREQ ') || { pct: 0, mhz: 0 };
+        var tj = parseTemp(raw, 'tj@');
+        return {
+            ts_ms: Number(tsMs) || Date.now(),
+            raw: raw,
+            ram_used_mb: ram.used,
+            ram_total_mb: ram.total,
+            ram_pct: ram.total > 0 ? (ram.used / ram.total) * 100 : 0,
+            lfb: parseLfb(raw),
+            cpu_pct: cpuAvg(cpuCores),
+            cpu_cores: cpuCores,
+            gpu_pct: gpu.pct,
+            gpu_mhz: gpu.mhz,
+            gpu_temp_c: gpuTemp,
+            tj_temp_c: tj || 0,
+            emc_pct: emc.pct,
+            emc_mhz: emc.mhz,
+            power_mw: power,
+            vdd_cpu_gpu_cv_mw: parseRailMw(raw, 'VDD_CPU_GPU_CV ') || 0,
+            vdd_soc_mw: parseRailMw(raw, 'VDD_SOC ') || 0,
+            engines: parseEngines(raw)
+        };
+    }
 
     function api(path) {
         return mc.api(path);
@@ -183,6 +361,32 @@
         }).join('');
     }
 
+    function flagMarkup(id, on) {
+        return '<div class="ndt-flag" id="ndt-flag-' + id + '">' +
+            '<span class="ndt-flag-label">' + id + '</span>' +
+            '<span class="ndt-flag-value ndt-flag-value--' + (on ? 'on' : 'off') + '">' +
+            (on ? 'on' : 'off') + '</span></div>';
+    }
+
+    function buildFlagPills() {
+        document.getElementById('ndt-flags').innerHTML = '';
+    }
+
+    function updateFlags(sample) {
+        var engines = sample.engines || [];
+        var byId = {};
+        engines.forEach(function (e) {
+            byId[e.id] = !!e.on;
+        });
+        var ids = ENGINE_ORDER.filter(function (id) { return Object.prototype.hasOwnProperty.call(byId, id); });
+        engines.forEach(function (e) {
+            if (ids.indexOf(e.id) === -1) ids.push(e.id);
+        });
+        document.getElementById('ndt-flags').innerHTML = ids.map(function (id) {
+            return flagMarkup(id, byId[id]);
+        }).join('');
+    }
+
     function setMonitorStatus(state, text) {
         var el = document.getElementById('ndt-monitor-status');
         el.textContent = text;
@@ -201,53 +405,51 @@
         var tooltip = document.getElementById('ndt-chart-tooltip');
         var ctx = canvas.getContext('2d');
         var samples = [];
-        var smooth = {};
-        var layout = { padL: 42, padR: 10, padT: 8, padB: 18, width: 0, height: 0, rowH: 0, rowGap: 6 };
+        var rawLog = [];
+        var rawEl = document.getElementById('ndt-tegra-raw');
+        var layout = { padL: 42, padR: 10, padT: 8, padB: 18, width: 0, height: 0, rowH: 0, rowGap: 10 };
         var hoverIndex = null;
-        var rafId = 0;
+        var chartHeight = loadChartHeight();
+        var handle = document.getElementById('ndt-chart-resize');
 
-        METRICS.forEach(function (m) {
-            smooth[m.id] = [];
-        });
-
-        function syncSmoothLengths() {
-            METRICS.forEach(function (m) {
-                var arr = smooth[m.id];
-                while (arr.length > samples.length) arr.pop();
-                while (arr.length < samples.length) {
-                    var idx = arr.length;
-                    var v = m.value(samples[idx]);
-                    arr.push(arr.length ? arr[arr.length - 1] : v);
-                }
-            });
+        function windowEndMs() {
+            return samples.length ? samples[samples.length - 1].ts_ms : Date.now();
         }
 
-        function tweenSmooth() {
-            var dirty = false;
-            METRICS.forEach(function (m) {
-                var arr = smooth[m.id];
-                for (var i = 0; i < samples.length; i++) {
-                    var target = m.value(samples[i]);
-                    var cur = arr[i];
-                    var next = cur + (target - cur) * SMOOTH_FACTOR;
-                    if (Math.abs(next - cur) > 0.02) dirty = true;
-                    arr[i] = next;
-                }
-            });
-            return dirty;
+        function trimSamples(endMs) {
+            var cutoff = endMs - WINDOW_SEC * 1000;
+            var dropped = 0;
+            while (samples.length && samples[0].ts_ms < cutoff) {
+                samples.shift();
+                dropped += 1;
+            }
+            if (hoverIndex !== null && dropped) {
+                hoverIndex -= dropped;
+                if (hoverIndex < 0) hoverIndex = null;
+            }
         }
 
         function push(sample) {
             samples.push(sample);
-            while (samples.length > WINDOW_SEC) {
-                samples.shift();
-            }
-            syncSmoothLengths();
+            trimSamples(sample.ts_ms || Date.now());
             updateCards(sample);
-            document.getElementById('ndt-tegra-raw').textContent = sample.raw || '';
+            updateFlags(sample);
+            appendRawLog(sample);
             if (hoverIndex !== null && hoverIndex >= samples.length) {
                 hoverIndex = samples.length - 1;
             }
+            draw();
+        }
+
+        function appendRawLog(sample) {
+            if (!sample.raw) return;
+            rawLog.push({ ts_ms: sample.ts_ms, raw: sample.raw });
+            var cutoff = (sample.ts_ms || Date.now()) - RAW_WINDOW_SEC * 1000;
+            while (rawLog.length && rawLog[0].ts_ms < cutoff) {
+                rawLog.shift();
+            }
+            rawEl.textContent = rawLog.map(function (e) { return e.raw; }).join('\n');
+            rawEl.scrollTop = rawEl.scrollHeight;
         }
 
         function updateCards(sample) {
@@ -259,9 +461,9 @@
             });
         }
 
-        function plotX(idx, plotW) {
-            if (samples.length <= 1) return layout.padL;
-            return layout.padL + (idx / (samples.length - 1)) * plotW;
+        function plotXAt(tsMs, plotW, nowMs) {
+            var u = (tsMs - (nowMs - WINDOW_SEC * 1000)) / (WINDOW_SEC * 1000);
+            return layout.padL + u * plotW;
         }
 
         function plotY(value, y0, rowH, minV, maxV) {
@@ -270,23 +472,19 @@
             return y0 + rowH - norm * (rowH - 4) - 2;
         }
 
-        function strokeSmoothLine(xAt, yAt, color) {
+        function strokeSeries(m, y0, rowH, plotW, nowMs) {
             var n = samples.length;
             if (n < 2) return;
 
             ctx.beginPath();
-            ctx.moveTo(xAt(0), yAt(0));
-            for (var i = 0; i < n - 1; i++) {
-                var x0 = xAt(i);
-                var y0 = yAt(i);
-                var x1 = xAt(i + 1);
-                var y1 = yAt(i + 1);
-                var mx = (x0 + x1) / 2;
-                var my = (y0 + y1) / 2;
-                ctx.quadraticCurveTo(x0, y0, mx, my);
+            ctx.moveTo(plotXAt(samples[0].ts_ms, plotW, nowMs), plotY(m.value(samples[0]), y0, rowH, m.min, m.max));
+            for (var i = 1; i < n; i++) {
+                ctx.lineTo(
+                    plotXAt(samples[i].ts_ms, plotW, nowMs),
+                    plotY(m.value(samples[i]), y0, rowH, m.min, m.max)
+                );
             }
-            ctx.lineTo(xAt(n - 1), yAt(n - 1));
-            ctx.strokeStyle = color;
+            ctx.strokeStyle = m.color;
             ctx.lineWidth = 1.75;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
@@ -298,6 +496,9 @@
             var height = canvas.clientHeight;
             if (!width || !height) return;
 
+            var nowMs = windowEndMs();
+            trimSamples(nowMs);
+
             layout.width = width;
             layout.height = height;
             var plotW = width - layout.padL - layout.padR;
@@ -308,7 +509,6 @@
 
             METRICS.forEach(function (m, i) {
                 var y0 = layout.padT + i * (rowH + layout.rowGap);
-                var vals = smooth[m.id];
 
                 ctx.fillStyle = '#64748b';
                 ctx.font = '11px ui-monospace, monospace';
@@ -320,17 +520,18 @@
                 ctx.lineWidth = 1;
                 ctx.strokeRect(layout.padL, y0, plotW, rowH);
 
-                if (vals.length < 2) return;
+                if (samples.length < 2) return;
 
-                strokeSmoothLine(
-                    function (idx) { return plotX(idx, plotW); },
-                    function (idx) { return plotY(vals[idx], y0, rowH, m.min, m.max); },
-                    m.color
-                );
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(layout.padL, y0, plotW, rowH);
+                ctx.clip();
+                strokeSeries(m, y0, rowH, plotW, nowMs);
+                ctx.restore();
 
-                if (hoverIndex !== null && hoverIndex < vals.length) {
-                    var hx = plotX(hoverIndex, plotW);
-                    var hy = plotY(vals[hoverIndex], y0, rowH, m.min, m.max);
+                if (hoverIndex !== null && hoverIndex < samples.length) {
+                    var hx = plotXAt(samples[hoverIndex].ts_ms, plotW, nowMs);
+                    var hy = plotY(m.value(samples[hoverIndex]), y0, rowH, m.min, m.max);
                     ctx.fillStyle = m.color;
                     ctx.beginPath();
                     ctx.arc(hx, hy, 3.5, 0, Math.PI * 2);
@@ -342,7 +543,7 @@
             });
 
             if (hoverIndex !== null && samples.length > 0) {
-                var cx = plotX(hoverIndex, plotW);
+                var cx = plotXAt(samples[hoverIndex].ts_ms, plotW, nowMs);
                 ctx.save();
                 ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
                 ctx.lineWidth = 1;
@@ -358,7 +559,7 @@
             ctx.font = '10px ui-monospace, monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText('−60s', layout.padL, height - layout.padB + 2);
+            ctx.fillText('−300s', layout.padL, height - layout.padB + 2);
             ctx.fillText('now', width - layout.padR, height - layout.padB + 2);
         }
 
@@ -395,7 +596,9 @@
 
         function hideTooltip() {
             tooltip.hidden = true;
+            if (hoverIndex === null) return;
             hoverIndex = null;
+            draw();
         }
 
         function indexAtClientX(clientX) {
@@ -403,28 +606,55 @@
             var rect = canvas.getBoundingClientRect();
             var x = clientX - rect.left;
             var plotW = layout.width - layout.padL - layout.padR;
-            if (x < layout.padL - 6 || x > layout.padL + plotW + 6) return null;
-            var ratio = (x - layout.padL) / Math.max(1, plotW);
-            var idx = Math.round(ratio * (samples.length - 1));
-            return Math.max(0, Math.min(samples.length - 1, idx));
+            var nowMs = windowEndMs();
+            var best = null;
+            var bestD = Infinity;
+            for (var i = 0; i < samples.length; i++) {
+                var px = plotXAt(samples[i].ts_ms, plotW, nowMs);
+                if (px < layout.padL - 6 || px > layout.padL + plotW + 6) continue;
+                var d = Math.abs(px - x);
+                if (d < bestD) {
+                    bestD = d;
+                    best = i;
+                }
+            }
+            if (best === null || bestD > 14) return null;
+            return best;
         }
 
         function onPointerMove(ev) {
             var idx = indexAtClientX(ev.clientX);
             if (idx === null) {
-                if (hoverIndex !== null) {
-                    hoverIndex = null;
-                    tooltip.hidden = true;
-                }
+                hideTooltip();
                 return;
             }
+            var moved = hoverIndex !== idx;
             hoverIndex = idx;
             showTooltip(idx, ev.clientX, ev.clientY);
+            if (moved) draw();
+        }
+
+        function clampChartHeight(h) {
+            return Math.max(CHART_HEIGHT_MIN, Math.min(CHART_HEIGHT_MAX, Math.round(h)));
+        }
+
+        function loadChartHeight() {
+            try {
+                var stored = parseInt(window.localStorage.getItem(CHART_HEIGHT_KEY), 10);
+                if (stored) return clampChartHeight(stored);
+            } catch (e) { /* ignore */ }
+            return CHART_HEIGHT_DEFAULT;
+        }
+
+        function saveChartHeight() {
+            try {
+                window.localStorage.setItem(CHART_HEIGHT_KEY, String(chartHeight));
+            } catch (e) { /* ignore */ }
         }
 
         function resizeCanvas() {
             var width = wrap.clientWidth - 16;
-            var height = Math.max(220, Math.min(320, width * 0.38));
+            var height = chartHeight;
             var dpr = window.devicePixelRatio || 1;
             canvas.width = Math.floor(width * dpr);
             canvas.height = Math.floor(height * dpr);
@@ -434,23 +664,53 @@
             if (samples.length) draw();
         }
 
-        function frame() {
-            tweenSmooth();
-            if (samples.length) draw();
-            rafId = window.requestAnimationFrame(frame);
+        function startHeightDrag(ev) {
+            ev.preventDefault();
+            var startY = ev.clientY;
+            var startH = chartHeight;
+            wrap.classList.add('is-resizing');
+
+            function onMove(e) {
+                chartHeight = clampChartHeight(startH + (e.clientY - startY));
+                resizeCanvas();
+            }
+
+            function onUp() {
+                wrap.classList.remove('is-resizing');
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                saveChartHeight();
+            }
+
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
         }
 
         canvas.addEventListener('mousemove', onPointerMove);
         canvas.addEventListener('mouseleave', hideTooltip);
+        if (handle) {
+            handle.addEventListener('pointerdown', startHeightDrag);
+            handle.addEventListener('keydown', function (ev) {
+                var step = ev.shiftKey ? 48 : 16;
+                if (ev.key === 'ArrowUp') {
+                    ev.preventDefault();
+                    chartHeight = clampChartHeight(chartHeight - step);
+                    resizeCanvas();
+                    saveChartHeight();
+                } else if (ev.key === 'ArrowDown') {
+                    ev.preventDefault();
+                    chartHeight = clampChartHeight(chartHeight + step);
+                    resizeCanvas();
+                    saveChartHeight();
+                }
+            });
+        }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
-        rafId = window.requestAnimationFrame(frame);
 
         return {
             push: push,
-            destroy: function () {
-                window.cancelAnimationFrame(rafId);
-            }
+            destroy: function () { }
         };
     }
 
@@ -466,9 +726,13 @@
             if (!d || String(d.type).toLowerCase() !== 'snapshot' || !d.data) {
                 return;
             }
+            var payload = d.data;
+            var raw = typeof payload === 'string' ? payload : payload.raw;
+            var sample = parseTegraLine(raw, payload && payload.ts_ms);
+            if (!sample) return;
             gotSample = true;
             setMonitorStatus('live', 'Live');
-            charts.push(d.data);
+            charts.push(sample);
         }, { reconnectDelay: 2000 });
 
         setTimeout(function () {
@@ -478,12 +742,80 @@
         }, 5000);
     }
 
+    function clampRawHeight(h) {
+        return Math.max(RAW_HEIGHT_MIN, Math.min(RAW_HEIGHT_MAX, Math.round(h)));
+    }
+
+    function wireRawResize() {
+        var wrap = document.getElementById('ndt-tegra-raw-wrap');
+        var pre = document.getElementById('ndt-tegra-raw');
+        var handle = document.getElementById('ndt-tegra-raw-resize');
+        if (!wrap || !pre || !handle) return;
+
+        var height = RAW_HEIGHT_DEFAULT;
+        try {
+            var stored = parseInt(window.localStorage.getItem(RAW_HEIGHT_KEY), 10);
+            if (stored) height = clampRawHeight(stored);
+        } catch (e) { /* ignore */ }
+
+        function apply() {
+            pre.style.height = height + 'px';
+        }
+
+        function save() {
+            try {
+                window.localStorage.setItem(RAW_HEIGHT_KEY, String(height));
+            } catch (e) { /* ignore */ }
+        }
+
+        handle.addEventListener('pointerdown', function (ev) {
+            ev.preventDefault();
+            var startY = ev.clientY;
+            var startH = height;
+            wrap.classList.add('is-resizing');
+
+            function onMove(e) {
+                height = clampRawHeight(startH + (e.clientY - startY));
+                apply();
+            }
+
+            function onUp() {
+                wrap.classList.remove('is-resizing');
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                save();
+            }
+
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
+        });
+
+        handle.addEventListener('keydown', function (ev) {
+            var step = ev.shiftKey ? 48 : 16;
+            if (ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                height = clampRawHeight(height - step);
+                apply();
+                save();
+            } else if (ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                height = clampRawHeight(height + step);
+                apply();
+                save();
+            }
+        });
+
+        apply();
+    }
+
     wireCopyButton('ndt-copy-js', 'js');
     wireCopyButton('ndt-copy-root', 'root');
     document.getElementById('ndt-save').addEventListener('click', saveKeys);
 
     buildMetricCards();
+    buildFlagPills();
     fillSshCommands();
     loadKeys();
+    wireRawResize();
     startTegraStream(TegraCharts());
 })();
