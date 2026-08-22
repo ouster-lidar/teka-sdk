@@ -1,4 +1,4 @@
-//! Display stream: nvjpegenc JPEG → WS, HDMI toggle, resolution, remote input.
+//! Display stream: nvjpegenc JPEG → WS, HDMI toggle, remote input.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -32,45 +32,6 @@ const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
 /// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
 const VIZ_APP_ID: &str = "hello-ouster-world";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Resolution {
-    #[serde(rename = "480")]
-    P480,
-    #[serde(rename = "720")]
-    P720,
-    #[serde(rename = "1080")]
-    P1080,
-    #[serde(rename = "max", alias = "native")]
-    Max,
-}
-
-impl Resolution {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::P480 => "480",
-            Self::P720 => "720",
-            Self::P1080 => "1080",
-            Self::Max => "max",
-        }
-    }
-
-    pub fn max_width(self) -> Option<u32> {
-        match self {
-            Self::P480 => Some(854),
-            Self::P720 => Some(1280),
-            Self::P1080 => Some(1920),
-            Self::Max => None,
-        }
-    }
-}
-
-impl Default for Resolution {
-    fn default() -> Self {
-        Self::Max
-    }
-}
-
 #[derive(Debug)]
 enum InjectCmd {
     Move { x: i32, y: i32 },
@@ -97,7 +58,6 @@ pub struct DisplayState {
 pub(crate) struct DisplayInner {
     viewers: AtomicUsize,
     next_viewer: AtomicU64,
-    pub(crate) resolution: Mutex<Resolution>,
     pub(crate) max_framerate: AtomicU64,
     fps_watch: watch::Sender<u64>,
     hdmi_enabled: Mutex<bool>,
@@ -134,7 +94,6 @@ impl DisplayState {
             inner: Arc::new(DisplayInner {
                 viewers: AtomicUsize::new(0),
                 next_viewer: AtomicU64::new(1),
-                resolution: Mutex::new(Resolution::default()),
                 max_framerate: AtomicU64::new(DEFAULT_FPS),
                 fps_watch,
                 hdmi_enabled: Mutex::new(hdmi),
@@ -181,7 +140,6 @@ impl DisplayState {
             "on_device": *self.inner.on_device_active.lock(),
             "need_render": *self.inner.need_render.lock(),
             "viz_output": self.inner.viz_output.lock().clone(),
-            "resolution": self.inner.resolution.lock().as_str(),
             "width": sw,
             "height": sh,
             "stream_width": dw,
@@ -227,7 +185,6 @@ pub fn routes() -> Router<AppState> {
         .route("/display/stream", get(display_stream))
         .route("/display/stream-enabled", post(set_stream_enabled))
         .route("/display/hdmi", post(set_hdmi))
-        .route("/display/resolution", post(set_resolution))
         .route("/display/fps", post(set_fps))
 }
 
@@ -278,21 +235,6 @@ async fn set_stream_enabled(
         }
     }
     state.display.set_error(None);
-    ui_state::publish_ui(&state);
-    Json(state.display.status_json())
-}
-
-#[derive(Debug, Deserialize)]
-struct ResolutionBody {
-    resolution: Resolution,
-}
-
-async fn set_resolution(
-    State(state): State<AppState>,
-    Json(body): Json<ResolutionBody>,
-) -> Json<serde_json::Value> {
-    *state.display.inner.resolution.lock() = body.resolution;
-    let _ = write_stream_target(&state.display);
     ui_state::publish_ui(&state);
     Json(state.display.status_json())
 }
@@ -360,7 +302,6 @@ enum ClientEvent {
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ServerEvent {
     Meta {
-        resolution: String,
         width: u32,
         height: u32,
         stream_width: u32,
@@ -529,7 +470,6 @@ async fn send_meta(
         let stream_enabled = *display.inner.stream_enabled.lock();
         let viewers = display.inner.viewers.load(Ordering::Relaxed);
         ServerEvent::Meta {
-            resolution: display.inner.resolution.lock().as_str().to_string(),
             width: sw,
             height: sh,
             stream_width: dw,
@@ -1137,8 +1077,7 @@ fn stream_target_path() -> PathBuf {
     runtime_dir().join(STREAM_TARGET_NAME)
 }
 
-pub(crate) fn stream_dims(_res: Resolution, src_w: u32, src_h: u32) -> (u32, u32) {
-    // Native compositor size only — resolution dropdown is display metadata.
+pub(crate) fn native_stream_size(src_w: u32, src_h: u32) -> (u32, u32) {
     if src_w > 0 && src_h > 0 {
         (src_w, src_h)
     } else {
@@ -1159,9 +1098,8 @@ pub(crate) fn write_stream_target(display: &DisplayState) -> std::io::Result<()>
     let need_render = hdmi_enabled || active;
     *display.inner.need_render.lock() = need_render;
     let _ = display.inner.capture_gate.send(active);
-    let res = *display.inner.resolution.lock();
     let (sw, sh) = *display.inner.source_size.lock();
-    let (dw, dh) = stream_dims(res, sw, sh);
+    let (dw, dh) = native_stream_size(sw, sh);
     *display.inner.scaled_size.lock() = (dw, dh);
     let fps = display.max_framerate();
     let body = json!({
@@ -1173,7 +1111,6 @@ pub(crate) fn write_stream_target(display: &DisplayState) -> std::io::Result<()>
         "max_framerate": fps,
         "width": dw,
         "height": dh,
-        "resolution": res.as_str(),
         "source_width": sw,
         "source_height": sh,
         "viz_output": display.inner.viz_output.lock().clone(),

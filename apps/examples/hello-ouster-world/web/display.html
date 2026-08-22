@@ -17,15 +17,6 @@
                         <span class="mc-switch-track" aria-hidden="true"></span>
                         <span id="stream-label">Show in Browser</span>
                     </label>
-                    <label class="how-res-label" title="Browser stream scale (HDMI stays at panel mode)">
-                        <span>Resolution</span>
-                        <select id="resolution" class="mc-input how-res-select">
-                            <option value="480">480p</option>
-                            <option value="720">720p</option>
-                            <option value="1080">1080p</option>
-                            <option value="max" selected>Max</option>
-                        </select>
-                    </label>
                     <span id="control-status" class="how-control-status" aria-live="polite">Watching&nbsp;&nbsp;&nbsp;</span>
                 </div>
             </div>
@@ -77,7 +68,7 @@
                 <div id="cfg-sensor-wrap" class="how-source-field" style="display: none;">
                     <label class="form-label" for="cfg-sensor-host">Sensor host</label>
                     <div class="how-osf-row how-sensor-row">
-                        <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input how-sensor-host-input" placeholder="os1-… / IP" autocomplete="off" spellcheck="false">
+                        <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input how-sensor-host-input" placeholder="os-… / IP" autocomplete="off" spellcheck="false">
                         <div class="how-record-controls">
                             <label class="mc-switch service-auto-enable how-record-toggle" title="Record sensor to OSF on Apply (same flow as source changes)">
                                 <input type="checkbox" class="mc-switch-cb" id="record-enabled-toggle">

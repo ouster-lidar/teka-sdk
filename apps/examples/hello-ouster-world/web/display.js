@@ -45,33 +45,11 @@
     var streamToggle = document.getElementById('stream-toggle');
     var streamLabel = document.getElementById('stream-label');
     var controlStatus = document.getElementById('control-status');
-    var resSelect = document.getElementById('resolution');
     var consoleCard = document.querySelector('.how-console-card');
     var reconnectBtn = document.getElementById('btn-reconnect');
     // Equal visual width: "Controlling" is 11 chars; pad Watching with NBSP.
     var LABEL_WATCHING = 'Watching\u00A0\u00A0\u00A0';
     var LABEL_CONTROLLING = 'Controlling';
-    var RES_STORAGE_KEY = 'hello-ouster-world.display.resolution';
-    var RES_ALLOWED = { '480': true, '720': true, '1080': true, 'max': true };
-
-    function loadStoredResolution() {
-        try {
-            var v = localStorage.getItem(RES_STORAGE_KEY);
-            if (v === 'native') {
-                v = 'max';
-                try { localStorage.setItem(RES_STORAGE_KEY, 'max'); } catch (_) {}
-            }
-            if (v && RES_ALLOWED[v]) return v;
-        } catch (_) {}
-        return 'max';
-    }
-
-    function storeResolution(v) {
-        if (!RES_ALLOWED[v]) return;
-        try {
-            localStorage.setItem(RES_STORAGE_KEY, v);
-        } catch (_) {}
-    }
 
     function showError(msg) {
         window.showInlineError('display-error', msg || '');
@@ -254,11 +232,8 @@
         }
         if (meta.stream_width && meta.stream_height) {
             document.getElementById('meta-stream').textContent =
-                meta.stream_width + '×' + meta.stream_height + ' (' + (meta.resolution || '?') + ')';
+                meta.stream_width + '×' + meta.stream_height;
         }
-        // Keep the dropdown on the persisted choice across status/meta updates.
-        var preferred = loadStoredResolution();
-        if (resSelect && preferred) resSelect.value = preferred;
         if (typeof meta.hdmi_present === 'boolean') {
             setHdmiPresent(meta.hdmi_present);
         }
@@ -1276,22 +1251,10 @@
     }
 
     function hydrateStatus() {
-        var preferred = loadStoredResolution();
-        if (resSelect) resSelect.value = preferred;
         return fetchAppJson(api('/status')).then(function (st) {
             if (st && st.source) applyPersistedSource(st.source);
             if (st && st.display) applyDisplayStatus(st.display);
             if (st && st.record) applyRecordStatus(st.record);
-            var dst = st && st.display;
-            // Sync server to persisted dropdown so stream matches UI across restarts.
-            if (dst && dst.resolution !== preferred) {
-                return postJson(api('/display/resolution'), { resolution: preferred }).then(function (st2) {
-                    if (st2) updateMeta(st2);
-                    if (resSelect) resSelect.value = preferred;
-                    return st2 || dst;
-                });
-            }
-            if (resSelect) resSelect.value = preferred;
             return st;
         });
     }
@@ -1347,18 +1310,6 @@
             if (!enabled) clearStreamBlack();
         }).catch(function () {
             showError('Stream toggle failed');
-        });
-    });
-
-    resSelect.addEventListener('change', function () {
-        var value = resSelect.value;
-        storeResolution(value);
-        postJson(api('/display/resolution'), { resolution: value }).then(function (st) {
-            updateMeta(st);
-            if (st && st.error) showError(st.error);
-            else showError('');
-        }).catch(function () {
-            showError('Resolution change failed');
         });
     });
 

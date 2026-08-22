@@ -841,11 +841,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
         };
 
         let (src_w, src_h) = *display.inner.source_size.lock();
-        let (dw, dh) = crate::display::stream_dims(
-            *display.inner.resolution.lock(),
-            src_w,
-            src_h,
-        );
+        let (dw, dh) = crate::display::native_stream_size(src_w, src_h);
         *display.inner.scaled_size.lock() = (dw, dh);
         write_stream_target_throttled(false);
         let fps = display.max_framerate().max(1).min(20);
