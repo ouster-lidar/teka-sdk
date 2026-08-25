@@ -3,7 +3,7 @@
 Portable images in `apps/` ship as **DDI** `.raw` files. The default format is
 **erofs** with lz4hc level 9, fragments, and 16 KiB clusters.
 
-Runtime (`systemd-dissect`, `portablectl`, Mission Control) accepts erofs (and
+Runtime (`systemd-dissect`, `portablectl`, Jetstream) accepts erofs (and
 squashfs, unused by these demos).
 
 ## Decision
@@ -12,7 +12,7 @@ squashfs, unused by these demos).
 |--------|-----------|
 | **erofs** (default) | Better random-access IO than squashfs for Nix store trees |
 | **lz4hc level 9** | Fast decode on current Jetson kernels |
-| **`-Efragments`** | Deduplicates identical 4 KiB blocks across the staged tree |
+| **`-Efragments`** | Packs tail-end file fragments to reduce wasted space |
 | **`-C 16384`** | 16 KiB compression clusters; kernel ≥6.6 |
 | **`--all-root`** | Portable images are single-owner trees |
 | **`-T0`** | Reproducible inode timestamps |

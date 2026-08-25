@@ -13,7 +13,7 @@ Supports **remote** publishers by pointing at other hosts’ Jetstream feature U
 | Rust package / binary | `hello-sub` |
 | Source dir | `apps/examples/hello-sub/` |
 
-## MC integration
+## Jetstream integration
 
 | Env | Default |
 |-----|---------|
@@ -165,7 +165,7 @@ Dashboard STATUS/HEARTBEAT from `status.summary`. Card updates follow the status
 
 Local loopback peers keep today’s behavior (`kind=service` when enforcement is on). Password-protected remote Jetstream hosts are out of scope for this demo.
 
-Publisher process restart or MC proxy blips must not crash the subscriber.
+Publisher process restart or Jetstream proxy blips must not crash the subscriber.
 
 ## UI
 

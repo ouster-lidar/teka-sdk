@@ -11,7 +11,7 @@ Renders lidar FrameSets in SimpleViz on the HDMI panel and/or the web
 
 
 Selection is persisted in `/var/lib/hello-ouster-world/source-config.json` and
-exposed at `GET/POST /api/v1/app/hello-ouster-world/source-config` (MC app proxy). **Lidar** is OSF vs sensor.
+exposed at `GET/POST /api/v1/app/hello-ouster-world/source-config` (Jetstream app proxy). **Lidar** is OSF vs sensor.
 **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo**
 is proprietary Ouster software, installed separately (not built from this repo).
 Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet
@@ -73,12 +73,11 @@ Output: `result/` (erofs DDI image)
 ### 1. Deploy to device
 
 ```bash
-export JETSTREAM_MC_PASSWORD='…'
+export JETSTREAM_MC_PASSWORD='…'   # when the device requires Jetstream authentication
 ./scripts/jsd-app-deploy.sh hello-ouster-world http://HOST/
 ```
 
-The deploy script nix-builds the image for the device, then uploads it.
-Skip that and install a `.raw` from `nix build` if you already built it.
+See the [Developer Guide](../../../docs/developer-guide.md) for the normal build and deploy workflow.
 
 ### 2a. Running on local-file OSF
 

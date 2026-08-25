@@ -48,7 +48,7 @@ Consumers usually listen for the Channel 1 heartbeat, then read the matching
 FrameSet for that frame’s objects.
 
 Live tracking/viz/extrinsics knobs are **not** part of this API. They are adjusted
-only inside ouster-dynamo’s Mission Control Configs panel via a local
+only inside ouster-dynamo’s Jetstream Configs panel via a local
 `/live-config` HTTP endpoint (pending file → once-per-frame apply).
 
 ### Channel 1: Heartbeat & telemetry

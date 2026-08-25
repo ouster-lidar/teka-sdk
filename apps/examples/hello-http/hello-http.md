@@ -18,4 +18,4 @@ Portable **Python 3** HTTP server on **0.0.0.0:8000** returning a small HTML pag
 
 ## App UI
 
-The image ships `usr/lib/jetstream/mission-control/manifest.json`. After install, open **Hello HTTP** in the nav (`/app/hello-http`) or the installed card on `/apps`.
+The image ships a Jetstream app manifest. After install, open **Hello HTTP** in the nav (`/app/hello-http`) or the installed card on `/apps`.

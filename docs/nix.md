@@ -1,6 +1,6 @@
 # Nix
 
-This repo uses Nix as the **build system** for portable app images. **Running** an image requires a Jetstream host (for example a ZedBox with Mission Control).
+This repo uses Nix as the **build system** for portable app images. **Running** an image requires a Jetstream device (for example a ZedBox).
 
 Install Nix with flakes enabled: [https://nixos.org/download/](https://nixos.org/download/)
 
