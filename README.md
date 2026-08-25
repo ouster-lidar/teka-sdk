@@ -4,22 +4,28 @@ Customer-facing **Jetstream** demo apps. Build portable app images from `apps/`,
 
 `hello-ouster-world` is the lidar viz demo (SimpleViz, OSF / live sensor / a peer FrameSet socket). The other `hello-*` apps are smaller examples of the same packaging: HTTP, GPU, Firefox, Ouster CLI viz, pub/sub, and so on.
 
+## Documentation
+
+- `README.md` and `docs/` — human and agent usage documentation.
+- `specs/` — implementation intent and repo-wide conventions, primarily for agents.
+- Subdirectories may add local specs when they deviate from the global conventions.
+
 ## Apps
 
 | App | Role |
 |-----|------|
-| `hello-world` | Minimal oneshot |
-| `hello-http` | Python HTTP on 8000 |
-| `hello-wayland-gpu` | Sway + vkcube / glmark2 |
 | `hello-firefox` | Sway + Firefox |
 | `hello-firefox-kiosk` | Cage + Firefox kiosk |
+| `hello-http` | Python HTTP on 8000 |
+| `hello-llm` | Chat UI + Ollama (host CUDA via PortableGPU) |
 | `hello-ouster-terminal` | Sway + foot + ouster-cli viz |
 | `hello-ouster-world` | SimpleViz + Display; FrameSet / OSF / sensor sources |
-| `hello-llm` | Chat UI + Ollama (host CUDA via PortableGPU) |
-| `nvidia-devtools` | Nsight / CUDA profiling and debug tools (host libcuda) |
-| `hello-webui` | Static web UI demo |
 | `hello-pub` | Event publisher demo |
 | `hello-sub` | Event subscriber demo |
+| `hello-wayland-gpu` | Sway + vkcube / glmark2 |
+| `hello-webui` | Static web UI demo |
+| `hello-world` | Minimal oneshot |
+| `nvidia-devtools` | Nsight / CUDA profiling and debug tools (host libcuda) |
 
 ### hello-ouster-world
 
@@ -44,7 +50,3 @@ matching target for the device, then uploads it:
 ```
 
 Same pattern for the other apps.
-
-## Specs
-
-Layout and packaging: [specs/](specs/). SDK/viz details: [specs/sdk.md](specs/sdk.md).
