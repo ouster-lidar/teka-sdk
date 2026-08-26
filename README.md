@@ -2,7 +2,7 @@
 
 Build portable app images from `apps/`, deploy to a Jetstream device (for example a ZedBox), and run them alongside other appliance apps.
 
-`hello-ouster-terminal` is the simplest lidar app: a terminal-based Ouster CLI viewer. The remaining examples cover HTTP, GPU, Firefox, pub/sub, web UI, LLM, and profiling tools.
+`hello-ouster-terminal` is the simplest lidar app: a terminal-based Ouster CLI viewer. The remaining examples cover HTTP, GPU, Firefox, pub/sub, web UI, Slidev, LLM, and profiling tools.
 
 | App                     | Description                                          |
 | ----------------------- | ---------------------------------------------------- |
@@ -14,6 +14,7 @@ Build portable app images from `apps/`, deploy to a Jetstream device (for exampl
 | `hello-ouster-world`    | SimpleViz + Display; FrameSet / OSF / sensor sources |
 | `hello-pub`             | Event publisher demo                                 |
 | `hello-sub`             | Event subscriber demo                                |
+| `hello-slidev`          | Slidev presentation demo                             |
 | `hello-wayland-gpu`     | Vulkan / OpenGL GPU demos                            |
 | `hello-webui`           | Static web UI demo                                   |
 | `hello-world`           | Minimal oneshot                                      |

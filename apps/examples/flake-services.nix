@@ -10,5 +10,6 @@
   hello-pub = ./hello-pub;
   hello-sub = ./hello-sub;
   hello-llm = ./hello-llm;
+  hello-slidev = ./hello-slidev;
   nvidia-devtools = ./nvidia-devtools;
 }

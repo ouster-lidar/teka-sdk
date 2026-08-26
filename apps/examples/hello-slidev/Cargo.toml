@@ -1,0 +1,24 @@
+[package]
+name = "hello-slidev"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "hello_slidev"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hello-slidev"
+path = "src/main.rs"
+
+[dependencies]
+mc-portable-runtime = { path = "../../lib/mc-portable-runtime" }
+axum = { version = "0.8", features = ["json"] }
+tower-http = { version = "0.6", features = ["cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"

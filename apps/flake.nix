@@ -68,6 +68,7 @@
       cargoNixDirs = [
         "examples/hello-pub"
         "examples/hello-sub"
+        "examples/hello-slidev"
         "examples/hello-ouster-world"
         "examples/nvidia-devtools"
       ];

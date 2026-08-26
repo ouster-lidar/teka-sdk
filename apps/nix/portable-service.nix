@@ -544,7 +544,7 @@ let
             ${lib.concatStringsSep "\n" (
               map (f: ''
                 mkdir -p "tree/$(dirname ${f.path})"
-                cp ${f.source} "tree/${f.path}"
+                cp -a ${f.source} "tree/${f.path}"
               '') copyFiles
             )}
             mkdir -p tree/nix/store

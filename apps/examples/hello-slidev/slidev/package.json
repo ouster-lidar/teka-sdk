@@ -1,0 +1,12 @@
+{
+  "name": "hello-slidev",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "slidev build slides.md --base /api/v1/app/hello-slidev/deck/"
+  },
+  "devDependencies": {
+    "@slidev/cli": "^52.19.0",
+    "@slidev/theme-seriph": "^0.25.0"
+  }
+}
