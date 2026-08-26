@@ -1,5 +1,7 @@
 # nvidia-devtools
 
+> **This app does not work yet.** Do not treat it as a supported example until it is fixed.
+
 NVIDIA CUDA profiling tools with SSH shell and a web UI.
 
 ## Access
