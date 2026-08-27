@@ -35,10 +35,10 @@ let
     {
       "id": "hello-webui",
       "version": "1.0.0",
-      "displayName": "Hello WebUI",
+      "display_name": "Hello WebUI",
       "nav": {
         "label": "Hello WebUI",
-        "path": "/ext/hello-webui",
+        "path": "/app/hello-webui",
         "section": "apps",
         "order": 15,
         "panels": [
@@ -49,6 +49,7 @@ let
       "ui": {
         "mode": "static",
         "title": "Hello WebUI",
+        "template": "demo.html",
         "styles": ["hello-webui.css"]
       },
       "backend": { "mode": "none" },
