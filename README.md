@@ -52,4 +52,4 @@ Full procedures: [Developer Guide](docs/developer-guide.md).
 | [Developer Guide](docs/developer-guide.md)   | Build, deploy, and auth workflows                |
 | [Linux host setup](docs/linux.md)            | Packages and Nix                                 |
 | [WSL 2 host setup](docs/wsl2.md)             | Windows development host, networking             |
-| [Nix install and flake outputs](docs/nix.md) | `nix.conf`, flake outputs, cache troubleshooting |
+| [Nix install and flake outputs](docs/nix.md) | Nix install and flake outputs                    |

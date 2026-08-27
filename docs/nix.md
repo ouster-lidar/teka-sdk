@@ -4,30 +4,13 @@ This repository uses Nix as the **build system** for portable app images and ass
 
 ## Install
 
-Follow the [official Nix install guide](https://nixos.org/download/) and choose a **multi-user** install.
-
-Alternative one-line installer (same multi-user daemon install):
+Install Nix using the [Determinate Nix documentation](https://docs.determinate.systems/determinate-nix/):
 
 ```bash
-curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install | sh -s -- --daemon
+curl -fsSL https://install.determinate.systems/nix | sh -s -- install
 ```
 
-## nix.conf
-
-Enable flakes and add the nix-community cache. **Append** these lines to `/etc/nix/nix.conf` (do not replace the whole file):
-
-```ini
-extra-experimental-features = nix-command flakes
-
-extra-substituters = https://nix-community.cachix.org
-extra-trusted-public-keys = nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=
-```
-
-Restart the Nix daemon after editing `nix.conf`:
-
-```bash
-sudo systemctl restart nix-daemon
-```
+Determinate Nix handles configuration for you, including flakes. See [Configuring Determinate Nix](https://docs.determinate.systems/determinate-nix/#configuration) for `/etc/nix/nix.conf` and `/etc/nix/nix.custom.conf`.
 
 ## Verify
 
@@ -58,6 +41,4 @@ $ nix build .#hello-world-cross-aarch64-linux
 
 | Issue | Fix |
 |-------|-----|
-| `experimental feature 'flakes' is disabled` | Review `nix.conf` configuration above. |
-| Untrusted substituters / missing binary cache | Review `nix.conf` configuration above. |
-| Slow builds after cache miss | Review `nix.conf` configuration above. |
+| Slow builds after cache miss | Expected without extra binary caches; add substituters to `/etc/nix/nix.custom.conf` if needed. |
