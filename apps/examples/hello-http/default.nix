@@ -29,7 +29,7 @@ let
         b'<div class="main" style="padding:1.5rem">'
         b'<div class="stat-card">'
         b"<h2>Hello world</h2>"
-        b"<p>Proxy example app using Mission Control shared styles.</p>"
+        b"<p>Proxy example app using Jetstream shared styles.</p>"
         b"</div></div></body></html>\n"
     )
 
@@ -60,15 +60,19 @@ let
     {
       "id": "hello-http",
       "version": "1.0.0",
-      "displayName": "Hello HTTP",
+      "display_name": "Hello HTTP",
       "nav": {
         "label": "Hello HTTP",
-        "path": "/ext/hello-http",
+        "path": "/app/hello-http",
         "section": "apps",
         "order": 10
       },
       "ui": { "mode": "proxy", "title": "Hello HTTP" },
-      "backend": { "mode": "proxy", "upstream": "http://127.0.0.1:${toString port}" }
+      "backend": { "mode": "proxy", "upstream": "http://127.0.0.1:${toString port}" },
+      "auth": {
+        "scheme": "ojs-proxy-identity",
+        "version": "0.1.0"
+      }
     }
   '';
 in
