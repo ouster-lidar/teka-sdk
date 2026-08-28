@@ -17,7 +17,7 @@ trap 'rm -f "${tmp:-}" "${log_tmp:-}" "${cookiejar:-}"' EXIT
 # Per-app log success patterns (extended grep). Empty = skip success probe.
 declare -A APP_LOG_EXPECT=()
 APP_LOG_EXPECT+=(['hello-world']='hello world')
-APP_LOG_EXPECT+=(['hello-http']='Hello world')
+APP_LOG_EXPECT+=(['hello-http']='Started hello-http|hello-http.*success')
 APP_LOG_EXPECT+=(['hello-webui']='hello-webui')
 APP_LOG_EXPECT+=(['hello-wayland-gpu']='hello-wayland-gpu:|vkcube')
 APP_LOG_EXPECT+=(['hello-firefox']='hello-firefox')
@@ -26,7 +26,9 @@ APP_LOG_EXPECT+=(['hello-ouster-terminal']='hello-ouster-terminal|ouster-cli')
 APP_LOG_EXPECT+=(['hello-ouster-world']='hello-ouster-world|PointViz|SimpleViz|open_source|missing OSF')
 APP_LOG_EXPECT+=(['hello-pub']='hello-pub listening')
 APP_LOG_EXPECT+=(['hello-sub']='hello-sub listening')
+APP_LOG_EXPECT+=(['hello-slidev']='hello-slidev listening')
 APP_LOG_EXPECT+=(['hello-llm']='hello-llm|Open WebUI|ollama|nemotron')
+APP_LOG_EXPECT+=(['nvidia-devtools']='nvidia-devtools listening')
 
 # Known-bad patterns for GPU/X11/Wayland app images.
 BAD_PAT='Failed to initialize the GLX module|libnvidia-glcore\.so\..*cannot open shared object file|eglGetDisplay failed|glXQueryVersion failed|Failed at step NAMESPACE|Failed to set up mount namespacing|status=226/NAMESPACE|status=203/EXEC'
