@@ -5,6 +5,7 @@
   stdenv,
   writeText,
   writeShellScript,
+  runCommand,
   firewalld,
   curl,
   coreutils,
@@ -12,6 +13,15 @@
 }:
 
 let
+  pe = import ../../nix/portable-app.nix {
+    inherit
+      ps
+      pkgs
+      lib
+      runCommand
+      ;
+  };
+
   inherit (ps.callPortableFirewalld firewalld) firewallCmd firewalldCli;
 
   name = "hello-llm";
@@ -174,15 +184,48 @@ let
     else
       null;
 
+  webTree = pe.mcWebTree {
+    inherit name;
+    webSrc = ./web;
+    webFiles = [
+      "index.html"
+      "hello-llm.html"
+      "hello-llm.js"
+      "hello-llm.css"
+    ];
+  };
+
+  mcManifest = writeText "mission-control-manifest.json" ''
+    {
+      "id": "hello-llm",
+      "version": "1.0.0",
+      "display_name": "Hello LLM",
+      "nav": {
+        "label": "Hello LLM",
+        "path": "/app/hello-llm",
+        "section": "apps",
+        "order": 17,
+        "panels": [{ "label": "Guide", "panel": "hello-llm" }]
+      },
+      "ui": {
+        "mode": "static",
+        "title": "Hello LLM",
+        "template": "hello-llm.html",
+        "styles": ["hello-llm.css"]
+      },
+      "backend": { "mode": "none" },
+      "auth": {
+        "scheme": "ojs-proxy-identity",
+        "version": "0.1.0"
+      }
+    }
+  '';
+
   copyFiles =
     ps.caBundleCopyFiles
-    ++ [
-      {
-        # Mount point for StateDirectory=hello-llm on read-only portable root.
-        path = "var/lib/${name}/.keep";
-        source = builtins.toFile "${name}-state-stub" "";
-      }
-    ]
+    ++ pe.mcManifestCopyFiles {
+      inherit name mcManifest webTree;
+    }
     ++ lib.optionals (nvTegraReleaseStub != null) [
       {
         path = "etc/nv_tegra_release";

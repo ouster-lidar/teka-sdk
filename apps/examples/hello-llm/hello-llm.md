@@ -65,7 +65,10 @@ nix build .#hello-llm-cross-aarch64-linux   # from x86_64 → ZED Box Mini
 ./scripts/jsd-app-deploy.sh hello-llm http://HOST/
 ```
 
-UI: `http://<host>:8080/`
+## App UI
+
+Guide panel at `/app/hello-llm` in Jetstream (how it works, first-boot tips).
+Chat UI: `http://<host>:8080/` (firewalld opens the port while the unit runs).
 
 First boot downloads the model (network required; `TimeoutStartSec=900`). Open WebUI data
 lives under `/var/lib/hello-llm/open-webui`.
@@ -77,6 +80,8 @@ journalctl -u hello-llm -f
 curl -sS -o /dev/null -w '%{http_code}\n' http://<host>:8080/
 curl -sS http://127.0.0.1:11434/api/tags
 ```
+
+In Jetstream, open **Apps** → **Hello LLM** → **Logs**.
 
 On Jetson, logs should show `Ollama CUDA (JETSON_JETPACK=6, …)` and inference with GPU layers (`size_vram` > 0 in `/api/ps`). No `/etc/nv_tegra_release` in the DDI — `start.sh` sets `JETSON_JETPACK=6` and `OLLAMA_LLM_LIBRARY=cuda_jetpack6`. The unit uses `X-Jetstream-PortableGPU=cuda` so the host GPU generator binds CUDA store roots without claiming a display connector. Do not `BindReadOnlyPaths=/run/opengl-driver` (symlink breaks namespace setup).
 

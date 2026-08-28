@@ -9,7 +9,7 @@ Build portable app images from `apps/`, deploy to a Jetstream device (for exampl
 | `hello-firefox`         | Firefox on Wayland                                   |
 | `hello-firefox-kiosk`   | Firefox kiosk                                        |
 | `hello-http`            | Python HTTP on 8000                                  |
-| `hello-llm`             | Chat UI + Ollama (host CUDA via PortableGPU)         |
+| `hello-llm`             | LLM guide in Jetstream; chat on host `:8080`         |
 | `hello-ouster-terminal` | Terminal lidar viewer (ouster-cli viz)               |
 | `hello-ouster-world`    | SimpleViz + Display; FrameSet / OSF / sensor sources |
 | `hello-pub`             | Event publisher demo                                 |

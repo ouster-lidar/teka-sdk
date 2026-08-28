@@ -1,0 +1,144 @@
+/* hello-llm guide panel — content-sized, no stretched cards */
+
+main.hllm {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+}
+
+.hllm-hero,
+.hllm-card {
+    box-sizing: border-box;
+    padding: 0.9rem 1.1rem;
+    border-radius: 10px;
+    border: 1px solid #2a3a4a;
+    background: #12121a;
+    min-height: 0;
+    height: auto;
+}
+
+.hllm-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0a0a0f 100%);
+}
+
+.hllm-kicker {
+    margin: 0 0 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7dd3fc;
+}
+
+.hllm-title {
+    margin: 0 0 0.35rem;
+    font-size: 1.55rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #f8fafc;
+}
+
+.hllm-h {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #f1f5f9;
+}
+
+.hllm-copy,
+.hllm-step-text,
+.hllm-status {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    color: #cbd5e1;
+}
+
+.hllm-copy strong,
+.hllm-step-text strong,
+.hllm-model {
+    color: #f8fafc;
+    font-weight: 600;
+}
+
+.hllm-steps {
+    list-style: none;
+    margin: 0.55rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.hllm-steps li {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.hllm-n {
+    flex: 0 0 auto;
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 999px;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.1rem;
+    text-align: center;
+}
+
+.hllm-step-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.hllm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    align-items: start;
+    grid-auto-rows: min-content;
+}
+
+.hllm-card--action {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.hllm-action-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.hllm-status--ok {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.hllm-status--warn {
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.hllm-card--action .btn {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+@media (max-width: 40rem) {
+    .hllm-actions {
+        grid-template-columns: 1fr;
+    }
+}

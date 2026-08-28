@@ -1,0 +1,45 @@
+<main class="hllm">
+    <section class="hllm-hero">
+        <p class="hllm-kicker">On-device chat</p>
+        <h2 class="hllm-title">Hello LLM</h2>
+        <p class="hllm-copy">
+            Open WebUI and Ollama, model <span class="hllm-model">nemotron-3-nano:4b</span>.
+            GPU on Jetson when available.
+        </p>
+    </section>
+
+    <section class="hllm-card">
+        <h3 class="hllm-h">How it works</h3>
+        <ol class="hllm-steps">
+            <li>
+                <span class="hllm-n">1</span>
+                <span class="hllm-step-text"><strong>Ollama</strong> loads the model (~2.8&nbsp;GB on first boot only).</span>
+            </li>
+            <li>
+                <span class="hllm-n">2</span>
+                <span class="hllm-step-text"><strong>Open WebUI</strong> is the chat UI on port 8080.</span>
+            </li>
+            <li>
+                <span class="hllm-n">3</span>
+                <span class="hllm-step-text">Pick the model and send a message.</span>
+            </li>
+        </ol>
+    </section>
+
+    <div class="hllm-actions">
+        <section class="hllm-card hllm-card--action">
+            <div class="hllm-action-copy">
+                <h3 class="hllm-h">Chat</h3>
+                <p id="hllm-status" class="hllm-status">Checking…</p>
+            </div>
+            <a id="hllm-chat-link" class="btn btn-primary" href="#" target="_blank" rel="noopener">Open chat</a>
+        </section>
+        <section class="hllm-card hllm-card--action">
+            <div class="hllm-action-copy">
+                <h3 class="hllm-h">Logs</h3>
+                <p class="hllm-copy">Hello LLM → Logs</p>
+            </div>
+            <a class="btn btn-primary" href="/apps">Open Apps</a>
+        </section>
+    </div>
+</main>
