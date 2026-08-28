@@ -1,7 +1,6 @@
 # Portable DDI: Sway Wayland kiosk + foot, running ouster-cli viz against nixpkgs
-# GLFW / python3Packages.glfw on native Wayland. Includes former hello-ouster-debug
-# bits (GL prefix resolver, MESA shader cache, /bin bash+busybox, systemd-run README).
-# Keep hello-ouster-terminal-x11 for hosts that need native Xorg + GLX.
+# GLFW / python3Packages.glfw on native Wayland (GL prefix resolver, MESA shader
+# cache, /bin bash+busybox, systemd-run README).
 {
   ps,
   lib,

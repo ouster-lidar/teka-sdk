@@ -130,8 +130,7 @@ layout: default
 <div class="border border-white/20 rounded-lg p-4">
 
 ### Ouster & sensors
-- **hello-ouster-terminal** — sensor viz
-- **hello-ouster-terminal-x11** — X11 viz
+- **hello-ouster-terminal** — sensor viz (Wayland)
 - **mc-sensors** — platform telemetry
 
 </div>

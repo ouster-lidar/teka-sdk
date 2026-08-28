@@ -36,7 +36,3 @@ host; do not document `nsenter`):
     systemd-run -tp JoinsNamespaceOf=hello-ouster-terminal.service bash
 
 The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that shell.
-
-## Non-goals
-
-Native X11 + GLX (`hello-ouster-terminal-x11`).
