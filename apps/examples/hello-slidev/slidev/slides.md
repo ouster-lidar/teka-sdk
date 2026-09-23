@@ -131,7 +131,7 @@ layout: default
 
 ### Ouster & sensors
 - **hello-ouster-terminal** — sensor viz (Wayland)
-- **mc-sensors** — platform telemetry
+- **Platform sensors** — appliance telemetry
 
 </div>
 

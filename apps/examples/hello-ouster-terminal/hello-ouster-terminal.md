@@ -18,7 +18,7 @@ Point viz at a sensor hostname/IP after attach. `./scripts/jsd-app-deploy.sh hel
 
 ## In-kiosk docs
 
-Bundled under `~/docs` in the portable image (`README.md`, `sway.md`, `viz.md`), shown on
+Bundled under `~/docs` in the app image (`README.md`, `sway.md`, `viz.md`), shown on
 first foot launch via `bat -p`.
 
 Plain-terminal friendly for foot/bat:
@@ -30,7 +30,7 @@ Plain-terminal friendly for foot/bat:
 
 ## Debug shell (host)
 
-From the host as root, join the portable unit namespace with `systemd-run` (always on the
+From the host as root, join the app unit namespace with `systemd-run` (always on the
 host; do not document `nsenter`):
 
     systemd-run -tp JoinsNamespaceOf=hello-ouster-terminal.service bash

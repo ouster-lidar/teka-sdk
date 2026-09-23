@@ -59,7 +59,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-http",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "Hello HTTP",
       "nav": {
         "label": "Hello HTTP",

@@ -7,14 +7,7 @@
 }:
 
 let
-  app = import ../../nix/app-crate.nix {
-    inherit
-      ps
-      pkgs
-      lib
-      runCommand
-      ;
-  };
+  app = ps.appCrate;
 
   name = "hello-slidev";
 
@@ -94,7 +87,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-slidev",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "Hello Slidev",
       "nav": {
         "label": "Hello Slidev",

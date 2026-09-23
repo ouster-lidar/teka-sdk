@@ -1,6 +1,6 @@
-# Thin `firewall-cmd` for systemd portables: full `firewalld` pulls NetworkManager (and
+# Thin `firewall-cmd` for app images: full `firewalld` pulls NetworkManager (and
 # cross builds then die in modemmanager/libqmi). Bind `/run/dbus/system_bus_socket` in the
-# unit (portable images stub that path).
+# unit (app images stub that path).
 #
 # Keep the firewall open/close directly in the unit so `ExecStartPre` and `ExecStopPost`
 # stay symmetrical. Non-root `User=` units still need a leading `+` so those commands run

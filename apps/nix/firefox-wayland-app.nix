@@ -29,6 +29,7 @@ let
 
   jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
+      enable = true;
       gbmBackends = true;
     };
   };

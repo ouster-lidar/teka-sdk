@@ -1,6 +1,12 @@
 let
   mkApp =
-    pkgs: ousterSdkSrc:
+    {
+      pkgs,
+      version,
+      ousterSdkSrc ? null,
+      ousterSdkNix ? ./ouster-sdk.nix,
+      exampleAppsPkgs ? null,
+    }:
     let
       inherit (pkgs)
         lib
@@ -14,7 +20,13 @@ let
 
       callAppFirewalld = firewalld: import ./app-firewalld-cmd.nix { inherit lib firewalld; };
 
-      ousterSdk = pkgs.callPackage ./ouster-sdk.nix { src = ousterSdkSrc; };
+      ousterSdk =
+        if ousterSdkSrc != null then
+          pkgs.callPackage ousterSdkNix {
+            src = ousterSdkSrc;
+          }
+        else
+          null;
 
       callOusterCommon =
         args:
@@ -149,6 +161,10 @@ let
         "BindReadOnlyPaths=-/run/seatd.sock"
       ];
 
+      # Shared PATH / client LD append / wlroots stderr filter for app Sway and
+      # Cage+wlroots run loops. Host GPU defaults (WLR_*, LD_LIBRARY_PATH, …) come from
+      # `EnvironmentFile=/etc/jetstream/wlroots.env` on the unit; this snippet only adds
+      # closure-specific bits and per-service XDG paths.
       wlrootsSwayEnvShSubst =
         {
           clientPath,
@@ -290,28 +306,13 @@ let
         BindReadOnlyPaths=-/etc/group:/etc/group
       '';
 
-      # MC proxy backends reach the host loopback; readiness is in-process (activate + sd_notify).
-      appBackendUnitLines = ''
-        Wants=mission-control.service
-      '';
-
-      appNotifyServiceLines = ''
-        Type=notify
-        NotifyAccess=main
-      '';
-
-      appBackendServiceLines = ''
-        PrivateNetwork=no
-        NetworkNamespacePath=/proc/1/ns/net
-      '';
-
       appGpuManifestJson =
         {
           id,
           gpu,
         }:
         writeText "app-manifest.json" ''
-          {"id":"${id}","version":"1.0.0","portable":{"displayService":true,"gpu":"${gpu}"}}
+          {"id":"${id}","version":"${version.imageVersion}","portable":{"displayService":true,"gpu":"${gpu}"}}
         '';
 
       appGpuManifestCopyFiles =
@@ -379,10 +380,24 @@ let
           WantedBy=jetstream-apps.target
         '';
 
-      # Jetstream appliance conveniences for portable unit snippets: optional
+      # Proxy backends reach the host loopback; readiness is in-process (activate + sd_notify).
+      appBackendUnitLines = ''
+        Wants=mission-control.service
+      '';
+
+      appNotifyServiceLines = ''
+        Type=notify
+        NotifyAccess=main
+      '';
+
+      appBackendServiceLines = ''
+        PrivateNetwork=no
+        NetworkNamespacePath=/proc/1/ns/net
+      '';
+
+      # Jetstream appliance conveniences for app unit snippets: optional
       # `EnvironmentFile=/etc/jetstream/wlroots.env` and fail-fast host GPU path
-      # checks (see `nix/host-gpu-checks.nix`). Booleans use `? true`
-      # / `or true` so callers can override individual knobs.
+      # checks (see `nix/host-gpu-checks.nix`). GPU checks are opt-in.
       hostUnitDefaults =
         {
           environmentFileWlroots ? true,
@@ -390,7 +405,7 @@ let
         }:
         let
           hc = {
-            enable = hostGpuChecksCfg.enable or true;
+            enable = hostGpuChecksCfg.enable or false;
             vulkanIcds = hostGpuChecksCfg.vulkanIcds or true;
             glvndEglVendors = hostGpuChecksCfg.glvndEglVendors or true;
             seatdSocket = hostGpuChecksCfg.seatdSocket or true;
@@ -422,39 +437,58 @@ let
           pkgsStatic
           closureInfo
           ;
+        inherit version;
         erofs-utils = pkgs.buildPackages.erofs-utils;
       };
     in
-    imageBuilder
-    // {
-      inherit
-        hostGpuChecks
-        callAppFirewalld
-        ousterSdk
-        callOusterCommon
-        hostUnitDefaults
-        dbusSessionConf
-        etcHostsStub
-        nsswitchConf
-        seatdSockStub
-        caBundlePath
-        caBundleCopyFiles
-        mkPasswdGroupStubCopyFiles
-        mkRestartLoop
-        mkAppRunWrapper
-        mkFontconfigConf
-        waylandAppBaseCopyFiles
-        passwdGroupBindPaths
-        appGpuManifestCopyFiles
-        mkGpuWaylandUnit
-        mkFirefoxBin
-        mkFirefoxClientLoop
-        wlrootsSwayEnvShSubst
-        hostEtcBindPaths
-        appBackendUnitLines
-        appBackendServiceLines
-        appNotifyServiceLines
-        ;
+    let
+      psBase =
+        imageBuilder
+        // {
+          inherit
+            hostGpuChecks
+            callAppFirewalld
+            ousterSdk
+            callOusterCommon
+            hostUnitDefaults
+            dbusSessionConf
+            etcHostsStub
+            nsswitchConf
+            seatdSockStub
+            caBundlePath
+            caBundleCopyFiles
+            mkPasswdGroupStubCopyFiles
+            mkRestartLoop
+            mkAppRunWrapper
+            mkFontconfigConf
+            waylandAppBaseCopyFiles
+            passwdGroupBindPaths
+            appGpuManifestCopyFiles
+            mkGpuWaylandUnit
+            mkFirefoxBin
+            mkFirefoxClientLoop
+            wlrootsSwayEnvShSubst
+            hostEtcBindPaths
+            appBackendUnitLines
+            appBackendServiceLines
+            appNotifyServiceLines
+            ;
+        };
+      appCrate = import ./app-crate.nix (
+        {
+          ps = psBase;
+          inherit pkgs runCommand;
+          lib = pkgs.lib;
+        }
+        // lib.optionalAttrs (exampleAppsPkgs != null) {
+          appApiJs = exampleAppsPkgs.app-api-js;
+          appRuntimeSrc = exampleAppsPkgs.app-runtime-src;
+        }
+      );
+    in
+    psBase // {
+      inherit appCrate;
+      inherit (version) imageVersion;
     };
 
   mkImageBuilder =
@@ -465,16 +499,26 @@ let
       erofs-utils,
       pkgsStatic,
       closureInfo,
+      version,
     }:
     let
+      inherit (version) imageVersion buildId appArtifactRawName;
       mkCanonicalErofs = import ./erofs-mkfs.nix;
+      # IMAGE_VERSION / VERSION / BUILD_ID follow the app release scheme. ID stays
+      # the portable name. VERSION_ID=1 is the current GPU compatibility generation
+      # shared with the host portable-gl-extension (not host or app SemVer).
       mkOsRelease =
         name:
         builtins.toFile "os-release" ''
           NAME="${name} portable"
           ID=${name}
           ID_LIKE=jetstream-portable
+          IMAGE_ID=${name}
+          IMAGE_VERSION="${imageVersion}"
+          VERSION="${imageVersion}"
           VERSION_ID=1
+          BUILD_ID="${buildId}"
+          PRETTY_NAME="${name} portable ${imageVersion}"
           PORTABLE_PREFIXES=${name}
         '';
 
@@ -482,7 +526,7 @@ let
         {
           name,
           osRelease ? mkOsRelease name,
-          # App image *base* trees (library-only extension with no unit) omit a unit; upper
+          # Portable *base* images (library-only extension with no unit) omit a unit; upper
           # extension images must supply matching `.service` files for the attach prefix.
           unit ? null,
           copyFiles ? [ ],
@@ -494,19 +538,21 @@ let
         }:
         let
           inherit (stdenv.hostPlatform) system;
+          artifactRaw = appArtifactRawName name system;
           busybox = pkgsStatic.busybox;
           closureDrv = if runtimeClosures == [ ] then null else closureInfo { rootPaths = runtimeClosures; };
-          nativeInputs = [ erofs-utils ];
           packImage = mkCanonicalErofs {
             inherit lib erofs-utils;
-            output = "$out/${name}.raw";
+            output = "$out/${artifactRaw}";
             sourceDir = "tree";
           };
         in
 
         runCommand "${name}-${system}"
           {
-            nativeBuildInputs = nativeInputs;
+            # Avoid shipping large .raw DDIs to/from remote x86 builders when inputs are already local.
+            preferLocalBuild = true;
+            nativeBuildInputs = [ erofs-utils ];
           }
           ''
             mkdir -p tree/{etc,dev,proc,sys,tmp,var,var/empty,var/tmp,run/dbus,run/systemd/journal,usr/lib/systemd/system,usr/bin,etc/systemd/system,bin}
@@ -526,7 +572,7 @@ let
               chmod -R u+w tree/bin
               cp -a ${rootInteractiveBin}/bin/. tree/bin/
             ''}
-            # App image / extension validation: upper `ExtensionImages=` layers must not ship
+            # Portable / extension validation: upper `ExtensionImages=` layers must not ship
             # `/usr/lib/os-release` (systemd `extension_has_forbidden_content()`), or dissect
             # returns `-ENOMEDIUM` ("No medium found"). `/etc/os-release` is enough for OS and
             # extension trees — see systemd `extension-util.c` / PORTABLE_SERVICES.md.
@@ -554,7 +600,7 @@ let
                 cp -a "$path" tree/nix/store/
               done < ${closureDrv}/store-paths
               # systemd(-minimal) ships hundreds of demo units under example/systemd/system/.
-              # They are unused in portable DDIs but inflate systemd-dissect --list when MC
+              # They are unused in app images but inflate systemd-dissect --list when host
               # display detection falls through to a unit scan.
               chmod -R u+w tree/nix/store
               find tree/nix/store -type d -path '*/example/systemd/system' -exec rm -rf {} +
@@ -574,7 +620,10 @@ let
       nixpkgs,
       systems,
       services,
-      ousterSdkSrc,
+      version,
+      ousterSdkSrc ? null,
+      ousterSdkNix ? ./ouster-sdk.nix,
+      exampleAppsPkgsFor ? null,
       # hello-world/hello-http cross builds use a plain nixpkgs import; the rest
       # need heavyCrossOverlay (PipeWire, onnxruntime, openblas quirks).
       simpleCrossServices ? [
@@ -587,10 +636,11 @@ let
     }:
     let
       inherit (nixpkgs) lib;
+      inherit (version) appArtifactRawName imageVersion buildId;
 
       allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
       heavyCrossServices = lib.filter (n: !(lib.elem n simpleCrossServices)) allServiceNames;
-      # App images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
+      # Portable images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
       linuxSystems = lib.filter (lib.hasSuffix "-linux") systems;
 
       hostCpu =
@@ -611,7 +661,7 @@ let
 
       # Cross builds: PipeWire + ModemManager cross quirk — see
       # nix/pipewire-cross-no-modemmanager-overlay.nix (shared with any separate
-      # nixpkgs import that must match this flake's cross package set).
+      # nixpkgs import that must match this flake’s cross package set).
       heavyCrossOverlay =
         final: prev:
         (import ./pipewire-cross-no-modemmanager-overlay.nix) final prev
@@ -665,7 +715,16 @@ let
               lib.genAttrs allServiceNames (
                 n:
                 callService services.${n} {
-                  ps = mkApp pkgs ousterSdkSrc;
+                  ps = mkApp {
+                    inherit
+                      pkgs
+                      version
+                      ousterSdkSrc
+                      ousterSdkNix
+                      ;
+                    exampleAppsPkgs =
+                      if exampleAppsPkgsFor != null then exampleAppsPkgsFor host else null;
+                  };
                 }
               )
             else
@@ -694,7 +753,18 @@ let
                         };
                   in
                   crossPkgs.callPackage services.${n} {
-                    ps = mkApp crossPkgs ousterSdkSrc;
+                    ps = mkApp {
+                      pkgs = crossPkgs;
+                      inherit
+                        version
+                        ousterSdkSrc
+                        ousterSdkNix
+                        ;
+                      # Shared infra pkgs from exampleAppsPkgsFor are build-time
+                      # inputs; use the build host system, not the cross target.
+                      exampleAppsPkgs =
+                        if exampleAppsPkgsFor != null then exampleAppsPkgsFor host else null;
+                    };
                   };
               }) crossTargets
             ) allServiceNames
@@ -714,10 +784,16 @@ let
                 lib.genAttrs allServiceNames (n: crossPackages."${n}-cross-${target}");
 
           # bundleMembers/defaultBundle are lazy; only referenced for Linux hosts below.
-          bundleMembers = lib.map (n: {
-            name = "${n}-${host}.raw";
-            path = "${nativeByName.${n}}/${n}.raw";
-          }) allServiceNames;
+          bundleMembers = lib.map (
+            n:
+            let
+              artifact = appArtifactRawName n host;
+            in
+            {
+              name = artifact;
+              path = "${nativeByName.${n}}/${artifact}";
+            }
+          ) allServiceNames;
 
           defaultBundle = pkgs.linkFarm "app-image-bundle" bundleMembers;
         in
@@ -729,23 +805,26 @@ let
         };
 
       mkRawCheck =
-        pkgs: checkName: serviceName: drv:
+        pkgs: checkName: serviceName: drv: artifactRaw:
         pkgs.runCommand checkName { } ''
-          raw=${drv}/${serviceName}.raw
+          raw="${drv}/${artifactRaw}"
           test -f "$raw"
-          if ${pkgs.erofs-utils}/bin/fsck.erofs "$raw" >/dev/null 2>&1; then
-            ${pkgs.erofs-utils}/bin/dump.erofs --path=etc/os-release "$raw" >/dev/null
-            ${pkgs.erofs-utils}/bin/dump.erofs --path=usr/lib/systemd/system/${serviceName}.service "$raw" >/dev/null
-          elif ${pkgs.squashfsTools}/bin/unsquashfs -s "$raw" >/dev/null 2>&1; then
-            listing=$(mktemp)
-            ${pkgs.squashfsTools}/bin/unsquashfs -l "$raw" >"$listing"
-            ${pkgs.gnugrep}/bin/grep -q "etc/os-release" "$listing"
-            ${pkgs.gnugrep}/bin/grep -q "usr/lib/systemd/system/${serviceName}.service" "$listing"
-            rm -f "$listing"
-          else
-            echo "portable DDI check ${serviceName}: unsupported image format (want erofs or squashfs): $raw" >&2
-            exit 1
-          fi
+          ${pkgs.erofs-utils}/bin/fsck.erofs "$raw" >/dev/null
+          ${pkgs.erofs-utils}/bin/dump.erofs --cat --path=etc/os-release "$raw" >os-release
+          ${pkgs.erofs-utils}/bin/dump.erofs --path=usr/lib/systemd/system/${serviceName}.service "$raw" >/dev/null
+          expect_line() {
+            ${pkgs.gnugrep}/bin/grep -qxF "$1" os-release || {
+              echo "app image check ${serviceName}: missing os-release line: $1" >&2
+              cat os-release >&2
+              exit 1
+            }
+          }
+          expect_line "ID=${serviceName}"
+          expect_line "IMAGE_ID=${serviceName}"
+          expect_line 'IMAGE_VERSION="${imageVersion}"'
+          expect_line 'VERSION="${imageVersion}"'
+          expect_line 'VERSION_ID=1'
+          expect_line 'BUILD_ID="${buildId}"'
           touch "$out"
         '';
 
@@ -755,9 +834,14 @@ let
           pkgs = nixpkgs.legacyPackages.${system};
           hostPkgs = perHostPackages system;
           crossTargets = lib.filter (t: t != system) linuxSystems;
+          # Non-Linux hosts expose Linux cross builds via crossAliases; name artifacts for that target.
+          artifactSystem = defaultLinuxTarget system;
 
           nativeChecks = lib.genAttrs allServiceNames (
-            n: mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n}
+            n:
+            mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n} (
+              appArtifactRawName n artifactSystem
+            )
           );
 
           crossChecks = lib.listToAttrs (
@@ -770,7 +854,9 @@ let
                 in
                 {
                   name = attr;
-                  value = mkRawCheck pkgs "app-image-check-${attr}" n hostPkgs.${attr};
+                  value = mkRawCheck pkgs "app-image-check-${attr}" n hostPkgs.${attr} (
+                    appArtifactRawName n target
+                  );
                 }
               ) crossTargets
             ) allServiceNames
@@ -779,7 +865,7 @@ let
         lib.optionalAttrs (lib.hasSuffix "-linux" system) {
           default = pkgs.runCommand "app-image-check-default" { } ''
             ${lib.concatMapStringsSep "\n" (n: ''
-              test -f ${hostPkgs.${n}}/${n}.raw
+              test -f "${hostPkgs.${n}}/${appArtifactRawName n system}"
             '') allServiceNames}
             touch "$out"
           '';
@@ -794,5 +880,5 @@ let
     };
 in
 {
-  inherit mkImageBuilder flakeOutputs;
+  inherit mkApp mkImageBuilder flakeOutputs;
 }

@@ -1619,7 +1619,7 @@
         }
 
         if (ptyReconnectAttempt === 0) {
-            term.writeln('\r\n\x1b[90mConnecting to portable console…\x1b[0m');
+            term.writeln('\r\n\x1b[90mConnecting to app console…\x1b[0m');
         }
         ptyWs = new WebSocket(ptyUrl());
 

@@ -19,6 +19,7 @@ let
   name = "hello-wayland-gpu";
   jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
+      enable = true;
       gbmBackends = true;
     };
   };

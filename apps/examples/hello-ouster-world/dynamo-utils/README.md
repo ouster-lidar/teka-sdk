@@ -15,7 +15,7 @@ peer on `/run/ouster-dynamo/frameset.sock`):
 | `configs/` | Viz overlay defaults (`viz_configs.json`, etc.) |
 
 Installed under `/usr/lib/hello-ouster-world/dynamo-utils` on `PYTHONPATH`
-when the portable runs.
+when the app runs.
 
 ## Ownership
 

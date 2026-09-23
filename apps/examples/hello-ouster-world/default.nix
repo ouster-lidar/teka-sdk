@@ -25,14 +25,7 @@
 }:
 
 let
-  app = import ../../nix/app-crate.nix {
-    inherit
-      ps
-      pkgs
-      lib
-      runCommand
-      ;
-  };
+  app = ps.appCrate;
 
   name = "hello-ouster-world";
 
@@ -46,6 +39,7 @@ let
 
   jpDisplay = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
+      enable = true;
       gbmBackends = true;
     };
   };
@@ -156,7 +150,7 @@ let
   '';
 
   # HACK (x86 Mesa): same gallium/LLVM preload as hello-ouster-terminal — SimpleViz is
-  # the second GLFW Wayland GL context where host RUNPATH can fail in the portable unit.
+  # the second GLFW Wayland GL context where host RUNPATH can fail in the app unit.
   mesaLlvmRuntimeClosure = lib.optionals stdenv.hostPlatform.isx86_64 [
     (runCommand "${name}-libllvm-preload" { } ''
       mkdir -p "$out/lib"
@@ -309,7 +303,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-ouster-world",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "hello-ouster-world",
       "nav": {
         "label": "hello-ouster-world",

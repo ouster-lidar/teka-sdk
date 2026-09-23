@@ -4,7 +4,10 @@
   inputs = {
     # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).
     nixpkgs.url = "github:NixOS/nixpkgs/a50de1b7d8a586adc18d2395c19de7d6058e6030";
-    crate2nix.url = "github:nix-community/crate2nix/5e1ecfd2d15b34ec90c2e51fdffbe8116595a767";
+    crate2nix = {
+      url = "github:nix-community/crate2nix/5e1ecfd2d15b34ec90c2e51fdffbe8116595a767";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
     # apps/nix/ouster-sdk.nix against nixpkgs GLFW.
     ouster-sdk = {
@@ -59,9 +62,28 @@
 
       exampleServices = import ./examples/flake-services.nix;
       services = exampleServices;
-      appOutputs = (import ./nix/app-image.nix).flakeOutputs {
+
+      appLib = import ./nix/app-lib.nix;
+
+      version = appLib.mkVersion {
+        inherit self;
+        inherit (nixpkgs) lib;
+      };
+
+      infraPkgsFor =
+        system:
+        let
+          pkgs = nixpkgsPkgs.legacyPackages.${system};
+        in
+        {
+          app-runtime = pkgs.callPackage ./nix/app-runtime.nix { };
+          app-api-js = pkgs.callPackage ./nix/app-api-js.nix { };
+          app-runtime-src = pkgs.callPackage ./nix/app-runtime-src.nix { };
+        };
+
+      appOutputs = appLib.flakeOutputs {
         nixpkgs = nixpkgsPkgs;
-        inherit systems services appOverlays;
+        inherit systems services appOverlays version;
         ousterSdkSrc = ouster-sdk;
       };
 
@@ -73,8 +95,18 @@
         "examples/nvidia-devtools"
       ];
     in
+    let
+      infraPackages = nixpkgs.lib.mapAttrs (
+        system: attrs:
+        attrs // infraPkgsFor system
+      ) appOutputs.packages;
+    in
     appOutputs
     // {
+      packages = infraPackages;
+      lib = appLib // {
+        inherit (version) appArtifactRawName imageVersion buildId compose;
+      };
       apps = nixpkgs.lib.genAttrs systems (
         system:
         let

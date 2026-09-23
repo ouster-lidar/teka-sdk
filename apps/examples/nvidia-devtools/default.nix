@@ -9,9 +9,7 @@
 }:
 
 let
-  app = import ../../nix/app-crate.nix {
-    inherit ps pkgs lib runCommand;
-  };
+  app = ps.appCrate;
 
   name = "nvidia-devtools";
   displayName = "NVIDIA DevTools";
@@ -23,7 +21,6 @@ let
 
   jp = ps.hostUnitDefaults {
     environmentFileWlroots = false;
-    hostGpuChecksCfg.enable = false;
   };
 
   nvidiaDevtoolsSrc = app.appRustSrc { srcDir = ./.; };
@@ -194,7 +191,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "${name}",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "${displayName}",
       "nav": {
         "label": "${displayName}",

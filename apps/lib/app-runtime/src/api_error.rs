@@ -6,7 +6,7 @@ use axum::Json;
 use serde::Serialize;
 use serde_json::Value;
 
-/// Closed catalog — shared portable runtime (error-codes.md).
+/// Closed catalog — shared app runtime (error-codes.md).
 pub mod code {
     pub const UNAUTHORIZED: &str = "unauthorized";
     pub const IDENTITY_UNVERIFIED: &str = "identity_unverified";

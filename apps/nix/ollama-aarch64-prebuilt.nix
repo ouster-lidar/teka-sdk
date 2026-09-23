@@ -55,7 +55,7 @@ stdenv.mkDerivation {
     done
     cp -a jp6/lib/ollama/cuda_jetpack6 "$out/lib/ollama/"
 
-    # Upstream uses /lib/ld-linux-aarch64.so.1; portables only see host libs via bind + nix store.
+    # Upstream uses /lib/ld-linux-aarch64.so.1; app images only see host libs via bind + nix store.
     patchelf --set-interpreter "${stdenv.cc.bintools.dynamicLinker}" "$out/bin/ollama"
     patchelf --set-rpath "${
       lib.makeLibraryPath [

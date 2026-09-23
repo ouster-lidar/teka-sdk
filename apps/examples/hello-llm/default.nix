@@ -13,14 +13,7 @@
 }:
 
 let
-  app = import ../../nix/app-crate.nix {
-    inherit
-      ps
-      pkgs
-      lib
-      runCommand
-      ;
-  };
+  app = ps.appCrate;
 
   inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
 
@@ -198,7 +191,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-llm",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "Hello LLM",
       "nav": {
         "label": "Hello LLM",

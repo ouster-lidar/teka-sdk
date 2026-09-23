@@ -6,14 +6,14 @@ Slidev presentation demo packaged as a Jetstream app. Builds a static SPA with [
 
 - **Slidev** deck with Jetstream + example-apps overview
 - **Integrated panel** at `/app/hello-slidev` (Slidev deck in an iframe)
-- **Guest access toggle** (signed-in users) stored in app `StateDirectory`; the Rust backend enforces deck access from the toggle + `X-MC-Principal-Id` (MC forwards session identity, does not gate the deck)
-- **Deck** at `/api/v1/app/hello-slidev/deck/…` (feature API proxy — app backend enforces guest-access; avoids MC HTML login redirect on `/app/…/deck/`)
+- **Guest access toggle** (signed-in users) stored in app `StateDirectory`; the Rust backend enforces deck access from the toggle + `X-MC-Principal-Id` (host forwards session identity, does not gate the deck)
+- **Deck** at `/api/v1/app/hello-slidev/deck/…` (feature API proxy — app backend enforces guest-access; avoids host HTML login redirect on `/app/…/deck/`)
 
 ## Auth model
 
 | Surface | Who decides |
 |---------|-------------|
-| `/app/hello-slidev` shell + panel static assets | MC page-session; manifest `ui.anonymous: true` so guests can load the panel |
+| `/app/hello-slidev` shell + panel static assets | Host page-session; manifest `ui.anonymous: true` so guests can load the panel |
 | `/api/v1/app/hello-slidev/guest-access` | App backend: public GET, PUT requires principal |
 | `/api/v1/app/hello-slidev/deck/…` | App backend: allow when guest access is on **or** request has `X-MC-Principal-Id` |
 

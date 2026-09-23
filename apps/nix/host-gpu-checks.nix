@@ -1,4 +1,4 @@
-# Small fail-fast helpers for portable GPU services: host generator paths under
+# Small fail-fast helpers for app GPU services: host generator paths under
 # $JETSTREAM_OPENGL_DRIVER (default /run/opengl-driver) and seatd for Wayland.
 # Units invoke these from ExecStartPre= before ExecStart=.
 {
@@ -68,7 +68,7 @@ symlinkJoin {
     checkGbmBackends
   ];
   meta = with lib; {
-    description = "Host GPU path assertions for Jetstream portable DDIs";
+    description = "Host GPU path assertions for Jetstream app images";
     license = licenses.mit;
   };
 }

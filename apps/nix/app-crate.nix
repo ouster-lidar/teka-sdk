@@ -4,18 +4,26 @@
   lib,
   runCommand,
   appApiJs ? ../web/app-api.js,
+  appRuntimeSrc ? ../lib/app-runtime,
 }:
 
 let
-  appApiJsSrc = builtins.path {
-    path = appApiJs;
-    name = "app-api.js";
-  };
+  appApiJsSrc =
+    if lib.isDerivation appApiJs then
+      "${appApiJs}/mc-app-api.js"
+    else
+      builtins.path {
+        path = appApiJs;
+        name = "app-api.js";
+      };
 
   appOpensslNative = with pkgs; [
     pkg-config
     openssl
   ];
+
+  appRuntimeSrcFilter =
+    if lib.isDerivation appRuntimeSrc then appRuntimeSrc else lib.cleanSource appRuntimeSrc;
 
   appCrateOverridesFor =
     {
@@ -25,6 +33,9 @@ let
     }:
     targetPkgs.defaultCrateOverrides
     // {
+      app-runtime = attrs: {
+        src = appRuntimeSrcFilter;
+      };
       ${crateName} = attrs: {
         src = if filteredSrc != null then filteredSrc else attrs.src;
         preBuild = (attrs.preBuild or "") + ''
@@ -44,11 +55,12 @@ let
       cargoNix,
       packageId,
       crateOverridesForPkgs,
+      rootFeatures ? [ "default" ],
       nativeBuildInputs ? [ ],
       meta ? { },
     }:
     (rootCrateBuildFor crateOverridesForPkgs {
-      inherit cargoNix packageId;
+      inherit cargoNix packageId rootFeatures;
     }).overrideAttrs
       (old: {
         nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ nativeBuildInputs;
@@ -60,11 +72,17 @@ let
       cargoNix,
       crateName,
       filteredSrc ? null,
+      rootFeatures ? [ "default" ],
       nativeBuildInputs ? [ ],
       meta ? { },
     }:
     buildCrate2nix {
-      inherit cargoNix nativeBuildInputs meta;
+      inherit
+        cargoNix
+        nativeBuildInputs
+        meta
+        rootFeatures
+        ;
       packageId = crateName;
       crateOverridesForPkgs =
         targetPkgs:

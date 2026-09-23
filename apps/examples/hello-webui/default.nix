@@ -7,14 +7,7 @@
 }:
 
 let
-  app = import ../../nix/app-crate.nix {
-    inherit
-      ps
-      pkgs
-      lib
-      runCommand
-      ;
-  };
+  app = ps.appCrate;
 
   name = "hello-webui";
   jp = app.appHostUnitDefaults;
@@ -34,7 +27,7 @@ let
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-webui",
-      "version": "1.0.0",
+      "version": "${ps.imageVersion}",
       "display_name": "Hello WebUI",
       "nav": {
         "label": "Hello WebUI",
@@ -65,7 +58,7 @@ ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
-    Description=hello-webui (Mission Control static web UI demo)
+    Description=hello-webui (static web UI demo)
 
     [Service]
     Type=oneshot
