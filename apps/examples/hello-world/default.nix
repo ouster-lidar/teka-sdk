@@ -2,18 +2,18 @@
 
 let
   name = "hello-world";
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       enable = false;
     };
   };
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
-    Description=hello-world portable
+    Description=hello-world app
 
     [Service]
     Type=oneshot

@@ -1,4 +1,4 @@
-//! Hostname resolution for PTP clock identities (Mission Control sensors + DHCP leases).
+//! Hostname resolution for PTP clock identities (host sensors API + DHCP leases).
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -11,7 +11,7 @@ pub trait MacHostnameResolver: Send + Sync {
 }
 
 /// Poll MC sensors and DHCP lease APIs and cache MAC → hostname.
-pub struct McHostnameResolver {
+pub struct AppHostnameResolver {
     client: Option<reqwest::blocking::Client>,
     sensors_url: String,
     dhcp_leases_url: String,
@@ -19,7 +19,7 @@ pub struct McHostnameResolver {
     last_fetch: Mutex<Option<Instant>>,
 }
 
-impl McHostnameResolver {
+impl AppHostnameResolver {
     pub fn from_env() -> Self {
         let sensors_url = runtime::sensors_list_url().unwrap_or_default();
         let dhcp_leases_url = runtime::dhcp_leases_url().unwrap_or_default();
@@ -95,7 +95,7 @@ impl McHostnameResolver {
     }
 }
 
-impl MacHostnameResolver for McHostnameResolver {
+impl MacHostnameResolver for AppHostnameResolver {
     fn hostname_for_mac(&self, mac: &[u8]) -> Option<String> {
         if mac.len() < 6 {
             return None;

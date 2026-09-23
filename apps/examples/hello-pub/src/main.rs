@@ -6,8 +6,8 @@ use axum::Router;
 use clap::Parser;
 use hello_pub::api::{self, spawn_card_bridge, spawn_generator};
 use hello_pub::store::EventStore;
-use hello_pub::{mc_runtime, AppState};
-use mc_portable_runtime::status_stream::SummaryStream;
+use hello_pub::AppState;
+use ::app_runtime::status_stream::SummaryStream;
 use tower_http::cors::CorsLayer;
 
 #[derive(Parser)]
@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let bind = mc_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind = hello_pub::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -45,10 +45,10 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = mc_runtime::bind_listener(bind).await?;
+    let listener = hello_pub::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("hello-pub listening on http://{local}");
-    mc_runtime::notify_systemd_ready();
+    hello_pub::app_runtime::notify_systemd_ready();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -56,7 +56,7 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 }
 
 async fn shutdown_signal() {
-    mc_runtime::wait_shutdown().await;
+    hello_pub::app_runtime::wait_shutdown().await;
     tracing::info!("hello-pub shutting down");
-    mc_runtime::release_async().await;
+    hello_pub::app_runtime::release_async().await;
 }

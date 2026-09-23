@@ -7,7 +7,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -18,21 +18,21 @@ let
 
   name = "hello-pub";
 
-  helloPubSrc = pe.mcRustSrc { srcDir = ./.; };
+  helloPubSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloPubBin = pe.buildMcCrate2nix {
+  helloPubBin = app.buildAppCrate2nix {
     cargoNix = ./Cargo.nix;
     crateName = "hello-pub";
     filteredSrc = helloPubSrc;
-    nativeBuildInputs = pe.mcOpensslNative;
+    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-pub";
     };
   };
 
-  jp = pe.mcJetstreamPortable;
+  jp = app.appHostUnitDefaults;
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -43,7 +43,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-pub",
       "version": "1.0.0",
@@ -87,24 +87,24 @@ let
   '';
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-pub (Jetstream hello pub-sub publisher demo)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
     After=mission-control.service network.target
-    ${ps.jetstreamMcPortableBackendUnitLines}
+    ${ps.appBackendUnitLines}
     Wants=network.target
 
     [Service]
-    ${ps.mcPortableNotifyServiceLines}
+    ${ps.appNotifyServiceLines}
     ProtectSystem=no
     ProtectHome=no
     Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
     Environment=APP_ID=hello-pub
     Environment=PATH=${lib.makeBinPath [ helloPubBin ]}
-    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${ps.appBackendServiceLines}
     ${jp.serviceFragment}
     ExecStart=${lib.getExe helloPubBin}
     SyslogIdentifier=${name}
@@ -115,8 +115,8 @@ ps.makePortableErofsImage {
     [Install]
     WantedBy=jetstream-apps.target
   '';
-  copyFiles = pe.mcManifestCopyFiles {
-    inherit name mcManifest webTree;
+  copyFiles = app.appManifestCopyFiles {
+    inherit name appManifest webTree;
   };
   runtimeClosures = [ helloPubBin ];
 }

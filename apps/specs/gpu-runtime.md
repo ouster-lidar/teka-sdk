@@ -1,6 +1,6 @@
 # GPU runtime integration
 
-Portable GPU apps get host GPU libraries through `X-Jetstream-PortableGPU`; the DDI does not include the L4T BSP.
+GPU app images get host GPU libraries through `X-Jetstream-PortableGPU`; the DDI does not include the L4T BSP.
 
 ## Wayland GPU apps
 

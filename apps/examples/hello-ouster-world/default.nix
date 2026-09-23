@@ -1,4 +1,4 @@
-# Portable DDI: Sway Wayland + SimpleViz (ps.ousterSdk source build, native GLFW Wayland) + MC UI.
+# App image DDI: Sway Wayland + SimpleViz (ps.ousterSdk source build, native GLFW Wayland) + MC UI.
 # OSF lives at /srv/recordings (host bind), not in this image or StateDirectory.
 {
   ps,
@@ -25,7 +25,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -44,7 +44,7 @@ let
     ouster-sdk
   ]);
 
-  jpDisplay = ps.jetstreamPortableService {
+  jpDisplay = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       gbmBackends = true;
     };
@@ -52,9 +52,9 @@ let
 
   # CUDA, not wayland: two wayland GPU units Conflicts= each other and kill
   # the display compositor. hello-llm uses the same split.
-  jpApi = pe.mcJetstreamPortable;
+  jpApi = app.appHostUnitDefaults;
 
-  howSrc = pe.mcRustSrc { srcDir = ./.; };
+  howSrc = app.appRustSrc { srcDir = ./.; };
 
   gstNative = with pkgs; [
     pkg-config
@@ -105,7 +105,7 @@ let
       packageId = "hello-ouster-world";
     }).overrideAttrs
       (old: {
-        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ pe.mcOpensslNative ++ gstNative;
+        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ app.appOpensslNative ++ gstNative;
         meta = (old.meta or { }) // {
           mainProgram = "hello-ouster-world";
         };
@@ -285,12 +285,12 @@ let
     inherit swayConfig;
   };
 
-  runLoopPack = ps.mkPortableRunWrapper {
+  runLoopPack = ps.mkAppRunWrapper {
     inherit name innerRun bash;
   };
   runLoop = "${runLoopPack}/run";
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -306,7 +306,7 @@ let
     '';
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-ouster-world",
       "version": "1.0.0",
@@ -448,7 +448,7 @@ let
     RestartSec=3
     StandardOutput=journal
     StandardError=journal
-    ${ps.jetstreamPortableHostEtcBindPaths}
+    ${ps.hostEtcBindPaths}
     BindReadOnlyPaths=-/run/seatd.sock
     ${dynamoRuntimeBind}
     ${demoOsfBind}
@@ -464,13 +464,13 @@ let
     WantedBy=jetstream-apps.target
   '';
 in
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "how"
-    ++ ps.waylandPortableBaseCopyFiles
-    ++ pe.mcManifestCopyFiles {
-      inherit name mcManifest webTree;
+    ++ ps.waylandAppBaseCopyFiles
+    ++ app.appManifestCopyFiles {
+      inherit name appManifest webTree;
     }
     ++ libPyFiles
     ++ [
@@ -492,10 +492,10 @@ ps.makePortableErofsImage {
     X-Jetstream-PortableGPU=cuda
     After=mission-control.service systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
     Wants=network-online.target time-sync.target seatd.service
-    ${ps.jetstreamMcPortableBackendUnitLines}
+    ${ps.appBackendUnitLines}
 
     [Service]
-    ${ps.mcPortableNotifyServiceLines}
+    ${ps.appNotifyServiceLines}
     User=root
     ${jpApi.serviceFragment}
     ${commonEnv}
@@ -508,7 +508,7 @@ ps.makePortableErofsImage {
     StandardError=journal
     PrivateDevices=no
     SupplementaryGroups=tty seat video render
-    ${ps.jetstreamPortableHostEtcBindPaths}
+    ${ps.hostEtcBindPaths}
     BindReadOnlyPaths=-/run/seatd.sock
     ${dynamoRuntimeBind}
     ${demoOsfBind}
@@ -516,7 +516,7 @@ ps.makePortableErofsImage {
     RuntimeDirectoryMode=0700
     StateDirectory=${name}
     StateDirectoryMode=0750
-    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${ps.appBackendServiceLines}
 
     [Install]
     WantedBy=jetstream-apps.target

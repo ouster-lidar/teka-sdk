@@ -1,4 +1,4 @@
-# Portable DDI: Sway Wayland kiosk + foot, running ouster-cli viz against nixpkgs
+# App image DDI: Sway Wayland kiosk + foot, running ouster-cli viz against nixpkgs
 # GLFW / python3Packages.glfw on native Wayland (GL prefix resolver, MESA shader
 # cache, /bin bash+busybox, systemd-run README).
 {
@@ -30,7 +30,7 @@
 let
   name = "hello-ouster-terminal";
 
-  inherit (ps.callPortableFirewalld firewalld) firewallCmd firewalldCli;
+  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
 
   ousterCommon = ps.callOusterCommon {
     logTag = name;
@@ -73,7 +73,7 @@ let
     fi
   '';
 
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       gbmBackends = true;
     };
@@ -168,7 +168,7 @@ let
     Viz exits → short delay → picker again. Logs: journalctl, unit ${name}.
   '';
 
-  portableBashrc = writeText "${name}-bashrc" ''
+  appBashrc = writeText "${name}-bashrc" ''
     case $- in *i*) ;; *) return ;; esac
     PS1='\[\033[38;5;214m\]\u\[\033[38;5;242m\]@\[\033[38;5;80m\]kiosk\[\033[0m\] \[\033[38;5;153m\]\W\[\033[0m\] \[\033[38;5;114m\]>\[\033[0m\] '
     [[ -d "$HOME/docs" ]] && cd "$HOME/docs"
@@ -251,7 +251,7 @@ let
   '';
 
   # RootImage `/bin` for debug shell via systemd-run JoinsNamespaceOf (rootInteractiveBin).
-  # Busybox applets are seeded by portable-service; list full tools only here.
+  # Busybox applets are seeded by app-image.nix; list full tools only here.
   rootInteractiveBin = symlinkJoin {
     name = "${name}-root-interactive-bin";
     paths = [
@@ -278,10 +278,10 @@ let
     clientPath = serviceBinPath;
     fontsConf = "${fontsConf}";
     swayConfig = "${swayConfig}";
-    bashrc = "${portableBashrc}";
+    bashrc = "${appBashrc}";
   };
 
-  runLoopPack = ps.mkPortableRunWrapper {
+  runLoopPack = ps.mkAppRunWrapper {
     inherit name innerRun bash;
     extraInstall = ''
       mkdir -p "$out/docs"
@@ -297,12 +297,12 @@ let
     VERSION_ID=1
   '';
 in
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name rootInteractiveBin;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "hot"
-    ++ ps.waylandPortableBaseCopyFiles
-    ++ ps.mcGpuManifestCopyFiles {
+    ++ ps.waylandAppBaseCopyFiles
+    ++ ps.appGpuManifestCopyFiles {
       inherit name;
       gpu = "wayland";
     }

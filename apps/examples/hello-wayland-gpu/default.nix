@@ -17,7 +17,7 @@
 
 let
   name = "hello-wayland-gpu";
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       gbmBackends = true;
     };
@@ -68,24 +68,24 @@ let
   ];
   innerRun = replaceVars ./run.sh.in {
     bash = "${bash}";
-    wlrootsPortableWaylandEnv = ps.wlrootsSwayEnvShSubst {
+    wlrootsAppWaylandEnv = ps.wlrootsSwayEnvShSubst {
       bash = "${bash}";
       inherit clientLd clientPath;
       xdgRuntimeDir = "/run/hello-wayland-gpu";
     };
     inherit swayConfig;
   };
-  runLoopPack = ps.mkPortableRunWrapper {
+  runLoopPack = ps.mkAppRunWrapper {
     inherit name innerRun bash;
   };
   runLoop = "${runLoopPack}/run";
 in
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "hwl"
-    ++ ps.waylandPortableBaseCopyFiles
-    ++ ps.mcGpuManifestCopyFiles {
+    ++ ps.waylandAppBaseCopyFiles
+    ++ ps.appGpuManifestCopyFiles {
       inherit name;
       gpu = "wayland";
     };

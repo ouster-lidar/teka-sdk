@@ -1,4 +1,4 @@
-# Shared Sway/Cage + Firefox portable image builder.
+# Shared Sway/Cage + Firefox app image builder.
 {
   ps,
   lib,
@@ -27,7 +27,7 @@
 let
   inherit (ps.mkFirefoxBin { inherit lib stdenv path; }) firefox-bin;
 
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       gbmBackends = true;
     };
@@ -72,7 +72,7 @@ let
 
   innerRun = replaceVars ./snippets/firefox-wayland-run.sh.in {
     bash = "${bash}";
-    wlrootsPortableWaylandEnv = ps.wlrootsSwayEnvShSubst {
+    wlrootsAppWaylandEnv = ps.wlrootsSwayEnvShSubst {
       bash = "${bash}";
       inherit clientLd clientPath;
       xdgRuntimeDir = "/run/${name}";
@@ -83,17 +83,17 @@ let
     inherit compositorCmd;
   };
 
-  runLoopPack = ps.mkPortableRunWrapper {
+  runLoopPack = ps.mkAppRunWrapper {
     inherit name innerRun bash;
   };
   runLoop = "${runLoopPack}/run";
 in
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles stubId
-    ++ ps.waylandPortableBaseCopyFiles
-    ++ ps.mcGpuManifestCopyFiles {
+    ++ ps.waylandAppBaseCopyFiles
+    ++ ps.appGpuManifestCopyFiles {
       inherit name;
       gpu = "wayland";
     };

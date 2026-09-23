@@ -7,7 +7,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -18,21 +18,21 @@ let
 
   name = "hello-sub";
 
-  helloSubSrc = pe.mcRustSrc { srcDir = ./.; };
+  helloSubSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloSubBin = pe.buildMcCrate2nix {
+  helloSubBin = app.buildAppCrate2nix {
     cargoNix = ./Cargo.nix;
     crateName = "hello-sub";
     filteredSrc = helloSubSrc;
-    nativeBuildInputs = pe.mcOpensslNative;
+    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-sub";
     };
   };
 
-  jp = pe.mcJetstreamPortable;
+  jp = app.appHostUnitDefaults;
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -43,7 +43,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-sub",
       "version": "1.0.0",
@@ -87,18 +87,18 @@ let
   '';
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-sub (Jetstream hello pub-sub subscriber demo)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
     After=mission-control.service network.target
-    ${ps.jetstreamMcPortableBackendUnitLines}
+    ${ps.appBackendUnitLines}
     Wants=network.target
 
     [Service]
-    ${ps.mcPortableNotifyServiceLines}
+    ${ps.appNotifyServiceLines}
     ProtectSystem=no
     ProtectHome=no
     StateDirectory=${name}
@@ -107,7 +107,7 @@ ps.makePortableErofsImage {
     Environment=APP_ID=hello-sub
     Environment=MC_HELLO_PUB_APP_ID=hello-pub
     Environment=PATH=${lib.makeBinPath [ helloSubBin ]}
-    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${ps.appBackendServiceLines}
     ${jp.serviceFragment}
     ExecStart=${lib.getExe helloSubBin}
     SyslogIdentifier=${name}
@@ -118,8 +118,8 @@ ps.makePortableErofsImage {
     [Install]
     WantedBy=jetstream-apps.target
   '';
-  copyFiles = pe.mcManifestCopyFiles {
-    inherit name mcManifest webTree;
+  copyFiles = app.appManifestCopyFiles {
+    inherit name appManifest webTree;
   };
   runtimeClosures = [ helloSubBin ];
 }

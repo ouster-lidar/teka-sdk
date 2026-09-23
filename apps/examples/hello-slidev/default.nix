@@ -7,7 +7,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -18,13 +18,13 @@ let
 
   name = "hello-slidev";
 
-  helloSlidevSrc = pe.mcRustSrc { srcDir = ./.; };
+  helloSlidevSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloSlidevBin = pe.buildMcCrate2nix {
+  helloSlidevBin = app.buildAppCrate2nix {
     cargoNix = ./Cargo.nix;
     crateName = "hello-slidev";
     filteredSrc = helloSlidevSrc;
-    nativeBuildInputs = pe.mcOpensslNative;
+    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-slidev";
     };
@@ -79,9 +79,9 @@ let
     preferLocalBuild = true;
   };
 
-  jp = pe.mcJetstreamPortable;
+  jp = app.appHostUnitDefaults;
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -91,7 +91,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-slidev",
       "version": "1.0.0",
@@ -123,24 +123,24 @@ let
   '';
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-slidev (Slidev presentation demo)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
     After=mission-control.service network.target
-    ${ps.jetstreamMcPortableBackendUnitLines}
+    ${ps.appBackendUnitLines}
     Wants=network.target
 
     [Service]
-    ${ps.mcPortableNotifyServiceLines}
+    ${ps.appNotifyServiceLines}
     ProtectSystem=no
     ProtectHome=no
     Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
     Environment=DECK_ROOT=/usr/lib/hello-slidev/deck
     Environment=PATH=${lib.makeBinPath [ helloSlidevBin ]}
-    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${ps.appBackendServiceLines}
     StateDirectory=${name}
     StateDirectoryMode=0750
     ${jp.serviceFragment}
@@ -154,8 +154,8 @@ ps.makePortableErofsImage {
     WantedBy=jetstream-apps.target
   '';
   copyFiles =
-    pe.mcManifestCopyFiles {
-      inherit name mcManifest webTree;
+    app.appManifestCopyFiles {
+      inherit name appManifest webTree;
     }
     ++ [
       {

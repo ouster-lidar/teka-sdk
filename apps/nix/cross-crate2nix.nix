@@ -45,11 +45,13 @@ in
 {
   cargoNix,
   packageId,
+  rootFeatures ? [ "default" ],
 }:
 let
   cargoNixPkg = pkgs.callPackage cargoNix (
     {
       defaultCrateOverrides = crateOverridesForPkgs pkgs;
+      inherit rootFeatures;
     }
     // lib.optionalAttrs isCross {
       inherit buildRustCrateForPkgs;
@@ -59,6 +61,7 @@ in
 if isCross then
   cargoNixPkg.internal.buildRustCrateWithFeatures {
     inherit packageId;
+    features = rootFeatures;
     buildRustCrateForPkgsFunc = buildRustCrateForPkgs;
   }
 else if cargoNixPkg ? rootCrate then

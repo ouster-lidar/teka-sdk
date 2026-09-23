@@ -1,6 +1,6 @@
 # Developer Guide
 
-Task-oriented workflow for building portable app images from `apps/` and deploying them to a Jetstream device.
+Task-oriented workflow for building app images from `apps/` and deploying them to a Jetstream device.
 
 ## Workflows
 

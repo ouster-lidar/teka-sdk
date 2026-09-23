@@ -1,6 +1,6 @@
 # hello-slidev
 
-Slidev presentation demo packaged as a Jetstream portable app. Builds a static SPA with [Slidev](https://sli.dev/) and serves it through the Jetstream app shell.
+Slidev presentation demo packaged as a Jetstream app. Builds a static SPA with [Slidev](https://sli.dev/) and serves it through the Jetstream app shell.
 
 ## What it demonstrates
 
@@ -24,7 +24,7 @@ cd apps
 nix build .#hello-slidev
 ```
 
-Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the portable image ships the `dist/` tree under `usr/lib/hello-slidev/deck/`. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`hello-slidev-cross-aarch64-linux`) do not compile Node on the target architecture.
+Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the app image ships the `dist/` tree under `usr/lib/hello-slidev/deck/`. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`hello-slidev-cross-aarch64-linux`) do not compile Node on the target architecture.
 
 ## Deploy
 

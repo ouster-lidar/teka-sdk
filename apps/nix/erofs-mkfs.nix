@@ -1,7 +1,7 @@
-# Canonical mkfs.erofs flags for portable app DDIs.
+# Canonical mkfs.erofs flags for app image DDIs.
 #
-# Same tuning as the appliance rootfs (lz4hc-9 + fragments + 16 KiB clusters,
-# kernel ≥6.6).
+# Same tuning as Jetstream appliance rootfs (lz4hc-9 + fragments + 16 KiB clusters,
+# kernel ≥6.6). Canonical home is apps/nix; keep appliance mkfs flags aligned manually.
 #
 # `output` and `sourceDir` are raw shell fragments (e.g. "$out/foo.raw", tree).
 {

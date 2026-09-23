@@ -1,7 +1,7 @@
 #!@bash@/bin/bash
 set -euo pipefail
 
-@wlrootsPortableWaylandEnv@
+@wlrootsAppWaylandEnv@
 
 export FONTCONFIG_FILE=@fontsConf@
 

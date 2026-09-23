@@ -13,8 +13,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use mc_portable_runtime::resource_stream::send_snapshot;
-use mc_portable_runtime::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
+use ::app_runtime::resource_stream::send_snapshot;
+use ::app_runtime::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
 use serde::Deserialize;
 
 use crate::store::{Event, EventStore, State as PubState};

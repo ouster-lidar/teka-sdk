@@ -2,7 +2,7 @@
 
 ## Goal
 
-Minimal portable smoke test: a **oneshot** unit that logs `hello world` to the journal. No GPU, no network listeners.
+Minimal app smoke test: a **oneshot** unit that logs `hello world` to the journal. No GPU, no network listeners.
 
 ## Build
 
@@ -10,7 +10,7 @@ Minimal portable smoke test: a **oneshot** unit that logs `hello world` to the j
 
 ## Deploy
 
-Attach like any other app portable image (`portablectl`, or `./scripts/jsd-app-deploy.sh hello-world http://HOST/`).
+Attach like any other app image (`portablectl`, or `./scripts/jsd-app-deploy.sh hello-world http://HOST/`).
 
 ## Verify
 

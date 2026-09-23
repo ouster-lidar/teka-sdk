@@ -3,21 +3,21 @@
   pkgs,
   lib,
   runCommand,
-  mcAppApiJs ? ../web/mc-app-api.js,
+  appApiJs ? ../web/app-api.js,
 }:
 
 let
-  mcAppApiJsSrc = builtins.path {
-    path = mcAppApiJs;
-    name = "mc-app-api.js";
+  appApiJsSrc = builtins.path {
+    path = appApiJs;
+    name = "app-api.js";
   };
 
-  mcOpensslNative = with pkgs; [
+  appOpensslNative = with pkgs; [
     pkg-config
     openssl
   ];
 
-  mcCrateOverridesFor =
+  appCrateOverridesFor =
     {
       crateName,
       filteredSrc ? null,
@@ -55,7 +55,7 @@ let
         meta = (old.meta or { }) // meta;
       });
 
-  buildMcCrate2nix =
+  buildAppCrate2nix =
     {
       cargoNix,
       crateName,
@@ -68,12 +68,12 @@ let
       packageId = crateName;
       crateOverridesForPkgs =
         targetPkgs:
-        mcCrateOverridesFor {
+        appCrateOverridesFor {
           inherit crateName filteredSrc targetPkgs;
         };
     };
 
-  mcRustSrc =
+  appRustSrc =
     {
       srcDir,
       extra ? [ ],
@@ -89,14 +89,14 @@ let
       ++ extra
     );
 
-  mcJetstreamPortable = ps.jetstreamPortableService {
+  appHostUnitDefaults = ps.hostUnitDefaults {
     environmentFileWlroots = false;
     hostGpuChecksCfg = {
       enable = false;
     };
   };
 
-  mcWebTree =
+  appWebTree =
     {
       name,
       webSrc,
@@ -105,11 +105,11 @@ let
     }:
     runCommand "${name}-web" { } ''
       mkdir -p "$out/web"
-      install -m644 ${mcAppApiJsSrc} "$out/web/mc-app-api.js"
+      install -m644 ${appApiJsSrc} "$out/web/mc-app-api.js"
       for f in ${lib.concatStringsSep " " webFiles}; do
         case "$f" in
           *.js)
-            cat ${mcAppApiJsSrc} ${webSrc}/"$f" > "$out/web/$f"
+            cat ${appApiJsSrc} ${webSrc}/"$f" > "$out/web/$f"
             ;;
           *)
             install -m644 ${webSrc}/"$f" "$out/web/$f"
@@ -119,44 +119,44 @@ let
       ${extraInstall}
     '';
 
-  mcWebCopyFiles =
+  appWebCopyFiles =
     webTree:
     lib.map (f: {
       path = "usr/lib/jetstream/mission-control/web/${f}";
       source = "${webTree}/web/${f}";
     }) (lib.attrNames (builtins.readDir "${webTree}/web"));
 
-  mcStateStub = name: builtins.toFile "${name}-state-stub" "";
+  appStateStub = name: builtins.toFile "${name}-state-stub" "";
 
-  mcManifestCopyFiles =
+  appManifestCopyFiles =
     {
       name,
-      mcManifest,
+      appManifest,
       webTree,
     }:
     [
       {
         path = "usr/lib/jetstream/mission-control/manifest.json";
-        source = mcManifest;
+        source = appManifest;
       }
       {
         path = "var/lib/${name}/.keep";
-        source = mcStateStub name;
+        source = appStateStub name;
       }
     ]
-    ++ mcWebCopyFiles webTree;
+    ++ appWebCopyFiles webTree;
 
 in
 {
   inherit
-    mcAppApiJsSrc
-    mcOpensslNative
-    buildMcCrate2nix
-    mcRustSrc
-    mcJetstreamPortable
-    mcWebTree
-    mcWebCopyFiles
-    mcStateStub
-    mcManifestCopyFiles
+    appApiJsSrc
+    appOpensslNative
+    buildAppCrate2nix
+    appRustSrc
+    appHostUnitDefaults
+    appWebTree
+    appWebCopyFiles
+    appStateStub
+    appManifestCopyFiles
     ;
 }

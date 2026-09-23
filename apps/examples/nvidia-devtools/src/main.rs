@@ -1,4 +1,4 @@
-//! NVIDIA devtools portable — SSH on :2223 plus MC web UI for authorized_keys.
+//! NVIDIA devtools app — SSH on :2223 plus MC web UI for authorized_keys.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -10,7 +10,7 @@ use clap::Parser;
 use nvidia_devtools::api;
 use nvidia_devtools::keys::KeyStore;
 use nvidia_devtools::tegrastats::TegraMonitor;
-use nvidia_devtools::{mc_runtime, AppState, SSH_PORT};
+use nvidia_devtools::{AppState, SSH_PORT};
 use tokio::process::Command;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     setup_sshd()?;
 
-    let bind = mc_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind = nvidia_devtools::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -85,11 +85,11 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = mc_runtime::bind_listener(bind).await?;
+    let listener = nvidia_devtools::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("nvidia-devtools listening on http://{local}");
-    mc_runtime::sync_tcp_ports(&[SSH_PORT]);
-    mc_runtime::notify_systemd_ready();
+    nvidia_devtools::app_runtime::sync_tcp_ports(&[SSH_PORT]);
+    nvidia_devtools::app_runtime::notify_systemd_ready();
 
     tokio::select! {
         res = axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()) => {
@@ -109,7 +109,7 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 }
 
 async fn shutdown_signal() {
-    mc_runtime::wait_shutdown().await;
+    nvidia_devtools::app_runtime::wait_shutdown().await;
     tracing::info!("nvidia-devtools shutting down");
-    mc_runtime::release_async().await;
+    nvidia_devtools::app_runtime::release_async().await;
 }

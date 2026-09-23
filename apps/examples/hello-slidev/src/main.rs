@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use mc_portable_runtime::api_error::ApiError;
+use ::app_runtime::api_error::ApiError;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
@@ -213,7 +213,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let bind = hello_slidev::mc_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind = hello_slidev::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -232,10 +232,10 @@ async fn run(bind: SocketAddr, state_path: PathBuf, deck_root: PathBuf) -> anyho
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = hello_slidev::mc_runtime::bind_listener(bind).await?;
+    let listener = hello_slidev::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("hello-slidev listening on http://{local}");
-    hello_slidev::mc_runtime::notify_systemd_ready();
+    hello_slidev::app_runtime::notify_systemd_ready();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -243,7 +243,7 @@ async fn run(bind: SocketAddr, state_path: PathBuf, deck_root: PathBuf) -> anyho
 }
 
 async fn shutdown_signal() {
-    hello_slidev::mc_runtime::wait_shutdown().await;
+    hello_slidev::app_runtime::wait_shutdown().await;
     tracing::info!("hello-slidev shutting down");
-    hello_slidev::mc_runtime::release_async().await;
+    hello_slidev::app_runtime::release_async().await;
 }

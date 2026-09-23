@@ -1,4 +1,4 @@
-//! NVIDIA devtools portable — SSH dev environment and MC web UI backend.
+//! NVIDIA devtools app — SSH dev environment and MC web UI backend.
 
 pub mod api;
 pub mod keys;
@@ -6,7 +6,7 @@ pub mod tegrastats;
 
 pub const SSH_PORT: u16 = 2223;
 
-mc_portable_runtime::declare_mc_runtime!("nvidia-devtools");
+::app_runtime::declare_app_runtime!("nvidia-devtools");
 
 use std::sync::Arc;
 

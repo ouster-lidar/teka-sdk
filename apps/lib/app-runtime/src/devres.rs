@@ -1,7 +1,7 @@
-//! Loopback devres HTTP client — specs/app-devres.md
+//! Loopback devres HTTP client.
 //!
-//! Portable backends must reach Mission Control through this module (via
-//! [`declare_mc_runtime`](crate::declare_mc_runtime)). Do not reimplement activate,
+//! Portable backends must reach the host app runtime through this module (via
+//! [`declare_app_runtime`](crate::declare_app_runtime)). Do not reimplement activate,
 //! register, ports sync, or release in app crates.
 
 use std::net::SocketAddr;
@@ -26,7 +26,7 @@ struct HttpListen {
 
 /// JSON body for `POST …/runtime/{id}/activate`.
 ///
-/// Mission Control accepts an empty body for compatibility, but every client
+/// The host accepts an empty body for compatibility, but every client
 /// must send at least `{}` so `Content-Type: application/json` is always set.
 #[derive(Debug, Serialize)]
 pub(crate) struct ActivateRequest {

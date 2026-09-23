@@ -3,11 +3,11 @@
 pub mod api;
 pub mod store;
 
-mc_portable_runtime::declare_mc_runtime!("hello-pub");
+::app_runtime::declare_app_runtime!("hello-pub");
 
 use std::sync::Arc;
 
-use mc_portable_runtime::status_stream::SummaryStream;
+use ::app_runtime::status_stream::SummaryStream;
 
 use crate::store::EventStore;
 

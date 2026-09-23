@@ -5,11 +5,11 @@ pub mod peer;
 pub mod peer_config;
 pub mod store;
 
-mc_portable_runtime::declare_mc_runtime!("hello-sub");
+::app_runtime::declare_app_runtime!("hello-sub");
 
 use std::sync::Arc;
 
-use mc_portable_runtime::status_stream::SummaryStream;
+use ::app_runtime::status_stream::SummaryStream;
 
 use crate::store::FeedStore;
 

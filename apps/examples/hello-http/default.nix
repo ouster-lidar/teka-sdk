@@ -6,12 +6,12 @@
 }:
 
 let
-  inherit (ps.callPortableFirewalld firewalld) firewallCmd firewalldCli;
+  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
 
   name = "hello-http";
   port = 8000;
 
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
       enable = false;
     };
@@ -56,7 +56,7 @@ let
     HTTPServer(("0.0.0.0", ${toString port}), Handler).serve_forever()
   '';
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-http",
       "version": "1.0.0",
@@ -77,7 +77,7 @@ let
   '';
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
@@ -107,7 +107,7 @@ ps.makePortableErofsImage {
     }
     {
       path = "usr/lib/jetstream/mission-control/manifest.json";
-      source = mcManifest;
+      source = appManifest;
     }
   ];
   runtimeClosures = [

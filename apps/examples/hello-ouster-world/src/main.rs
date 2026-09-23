@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use axum::Router;
 use clap::Parser;
 use hello_ouster_world::api;
-use hello_ouster_world::{display_config, mc_runtime, AppState};
+use hello_ouster_world::{display_config, AppState};
 use tower_http::cors::CorsLayer;
 
 #[derive(Parser)]
@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let bind = mc_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind = hello_ouster_world::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -52,13 +52,13 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = mc_runtime::bind_listener(bind).await?;
+    let listener = hello_ouster_world::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("hello-ouster-world listening on http://{local}");
     // Lidar / IMU (MC default sensor dest). Manifest lists the same ports;
     // firewalld opens via PUT …/runtime/hello-ouster-world/ports, not the JSON.
-    mc_runtime::sync_udp_ports(&[7502, 7503]);
-    mc_runtime::notify_systemd_ready();
+    hello_ouster_world::app_runtime::sync_udp_ports(&[7502, 7503]);
+    hello_ouster_world::app_runtime::notify_systemd_ready();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
@@ -66,7 +66,7 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 }
 
 async fn shutdown_signal() {
-    mc_runtime::wait_shutdown().await;
+    hello_ouster_world::app_runtime::wait_shutdown().await;
     tracing::info!("hello-ouster-world shutting down");
-    mc_runtime::release_async().await;
+    hello_ouster_world::app_runtime::release_async().await;
 }

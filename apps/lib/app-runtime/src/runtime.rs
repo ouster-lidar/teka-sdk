@@ -1,4 +1,4 @@
-//! Mission Control app devres client — specs/app-devres.md
+//! Host app devres client.
 
 use std::io;
 use std::net::SocketAddr;
@@ -9,15 +9,15 @@ use tracing::{info, warn};
 
 use crate::devres::{self, PortBody, SyncBody};
 
-const MC_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
-const MC_WAIT_POLL: Duration = Duration::from_secs(2);
+const HOST_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
+const HOST_WAIT_POLL: Duration = Duration::from_secs(2);
 
 const RUNTIME_URL_PATH: &str = "/var/lib/mission-control/runtime_url";
 
 static PENDING_SUPERVISOR: Mutex<Option<(String, SocketAddr)>> = Mutex::new(None);
 
 enum RegisterHold {
-    /// Stream ended while MC was up (control plane lost).
+    /// Stream ended while the host was up (control plane lost).
     Disconnected,
     /// Could not open the register stream; retry without releasing devres.
     Retry,
@@ -26,33 +26,33 @@ enum RegisterHold {
 static UDP_PORTS: Mutex<Vec<u16>> = Mutex::new(Vec::new());
 static TCP_PORTS: Mutex<Vec<u16>> = Mutex::new(Vec::new());
 
-fn wait_for_mission_control() -> Result<(), String> {
-    let deadline = std::time::Instant::now() + MC_WAIT_TIMEOUT;
+fn wait_for_host_runtime() -> Result<(), String> {
+    let deadline = std::time::Instant::now() + HOST_WAIT_TIMEOUT;
     while std::time::Instant::now() < deadline {
-        if mc_ready_ping() {
+        if app_ready_ping() {
             return Ok(());
         }
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
         if remaining.is_zero() {
             break;
         }
-        std::thread::sleep(remaining.min(MC_WAIT_POLL));
+        std::thread::sleep(remaining.min(HOST_WAIT_POLL));
     }
     Err(format!(
-        "timed out after {}s waiting for Mission Control at {}",
-        MC_WAIT_TIMEOUT.as_secs(),
-        mc_base_url()
+        "timed out after {}s waiting for host app runtime at {}",
+        HOST_WAIT_TIMEOUT.as_secs(),
+        app_base_url()
     ))
 }
 
-fn wait_for_mission_control_recovery() {
-    while !mc_ready_ping() {
-        std::thread::sleep(MC_WAIT_POLL);
+fn wait_for_host_runtime_recovery() {
+    while !app_ready_ping() {
+        std::thread::sleep(HOST_WAIT_POLL);
     }
 }
 
-fn mc_ready_ping() -> bool {
-    let base = mc_base_url();
+fn app_ready_ping() -> bool {
+    let base = app_base_url();
     let url = format!("{}/api/v1/auth/status", base.trim_end_matches('/'));
     let Ok(client) = client() else {
         return false;
@@ -64,7 +64,7 @@ fn mc_ready_ping() -> bool {
         .is_some_and(|r| r.status().is_success())
 }
 
-pub fn mc_base_url() -> String {
+pub fn app_base_url() -> String {
     if let Ok(v) = std::env::var("MC_RUNTIME_URL") {
         let u = v.trim();
         if !u.is_empty() {
@@ -102,7 +102,7 @@ pub fn sensors_list_url() -> Option<String> {
     }
     Some(format!(
         "{}/api/v1/app/{peer}/devices",
-        mc_base_url().trim_end_matches('/')
+        app_base_url().trim_end_matches('/')
     ))
 }
 
@@ -120,7 +120,7 @@ pub fn dhcp_leases_url() -> Option<String> {
         if !peer.is_empty() {
             return Some(format!(
                 "{}/api/v1/app/{peer}/leases",
-                mc_base_url().trim_end_matches('/')
+                app_base_url().trim_end_matches('/')
             ));
         }
     }
@@ -134,7 +134,7 @@ pub fn dhcp_leases_url() -> Option<String> {
     } else {
         format!("/{path}")
     };
-    Some(format!("{}{}", mc_base_url().trim_end_matches('/'), path))
+    Some(format!("{}{}", app_base_url().trim_end_matches('/'), path))
 }
 
 fn resolve_app_id(default_id: &str) -> String {
@@ -166,21 +166,21 @@ pub fn notify_ready() {
         .ok()
         .and_then(|mut g| g.take());
     if let Some((id, listen)) = pending {
-        info!(target: "mc_runtime", app_id = %id, %listen, "control plane supervisor starting");
+        info!(target: "app-runtime", app_id = %id, %listen, "control plane supervisor starting");
         spawn_control_plane_supervisor(id, listen);
     }
 }
 
 fn activate_with_hint(app_id: &str, hint: Option<SocketAddr>) -> Result<SocketAddr, String> {
     let client = client()?;
-    devres::post_activate(&client, &mc_base_url(), app_id, hint)
+    devres::post_activate(&client, &app_base_url(), app_id, hint)
 }
 
 pub fn activate_http_listen(default_app_id: &str) -> Result<SocketAddr, String> {
-    let base = mc_base_url();
-    eprintln!("mc-runtime: waiting for Mission Control at {base}...");
-    wait_for_mission_control()?;
-    eprintln!("mc-runtime: Mission Control ready at {base}");
+    let base = app_base_url();
+    eprintln!("app-runtime: waiting for host app runtime at {base}...");
+    wait_for_host_runtime()?;
+    eprintln!("app-runtime: host app runtime ready at {base}");
     let id = resolve_app_id(default_app_id);
     let addr = activate_with_hint(&id, None)?;
     if let Ok(mut g) = PENDING_SUPERVISOR.lock() {
@@ -192,7 +192,7 @@ pub fn activate_http_listen(default_app_id: &str) -> Result<SocketAddr, String> 
 fn spawn_control_plane_supervisor(app_id: String, listen: SocketAddr) {
     let id_for_err = app_id.clone();
     if std::thread::Builder::new()
-        .name("mc-control-plane".into())
+        .name("app-control-plane".into())
         .spawn(move || control_plane_supervisor(&app_id, listen))
         .is_err()
     {
@@ -205,15 +205,15 @@ fn control_plane_supervisor(app_id: &str, listen: SocketAddr) {
         match hold_register_stream(app_id) {
             RegisterHold::Retry => {
                 warn!(app_id = %app_id, "register stream retry");
-                std::thread::sleep(MC_WAIT_POLL);
+                std::thread::sleep(HOST_WAIT_POLL);
                 continue;
             }
             RegisterHold::Disconnected => {
-                if mc_ready_ping() {
+                if app_ready_ping() {
                     info!(
                         app_id = %app_id,
                         %listen,
-                        "register stream ended; re-activating devres with Mission Control"
+                        "register stream ended; re-activating devres with host"
                     );
                     loop {
                         match activate_with_hint(app_id, Some(listen)) {
@@ -224,23 +224,23 @@ fn control_plane_supervisor(app_id: &str, listen: SocketAddr) {
                                     error = %e,
                                     "re-activate after register disconnect failed"
                                 );
-                                std::thread::sleep(MC_WAIT_POLL);
+                                std::thread::sleep(HOST_WAIT_POLL);
                             }
                         }
                     }
-                    resync_holder_ports(app_id);
+                    resync_ports_if_any(app_id);
                     continue;
                 }
                 info!(
                     app_id = %app_id,
-                    "Mission Control unreachable; releasing runtime"
+                    "host app runtime unreachable; releasing runtime"
                 );
                 release(app_id);
             }
         }
-        info!(app_id = %app_id, "waiting for Mission Control recovery");
-        wait_for_mission_control_recovery();
-        info!(app_id = %app_id, %listen, "Mission Control ready; re-activating");
+        info!(app_id = %app_id, "waiting for host app runtime recovery");
+        wait_for_host_runtime_recovery();
+        info!(app_id = %app_id, %listen, "host app runtime ready; re-activating");
         loop {
             match activate_with_hint(app_id, Some(listen)) {
                 Ok(addr) => {
@@ -249,11 +249,11 @@ fn control_plane_supervisor(app_id: &str, listen: SocketAddr) {
                 }
                 Err(e) => {
                     warn!(%app_id, error = %e, "re-activate failed");
-                    std::thread::sleep(MC_WAIT_POLL);
+                    std::thread::sleep(HOST_WAIT_POLL);
                 }
             }
         }
-        resync_holder_ports(app_id);
+        resync_ports_if_any(app_id);
     }
 }
 
@@ -265,7 +265,7 @@ fn hold_register_stream(app_id: &str) -> RegisterHold {
             return RegisterHold::Retry;
         }
     };
-    let url = devres::register_url(&mc_base_url(), app_id);
+    let url = devres::register_url(&app_base_url(), app_id);
     info!(app_id = %app_id, %url, "register stream connecting");
     let mut resp = match client.get(&url).send() {
         Ok(r) => r,
@@ -296,24 +296,30 @@ fn hold_register_stream(app_id: &str) -> RegisterHold {
     }
 }
 
-fn resync_holder_ports(app_id: &str) {
-    resync_udp_ports(app_id);
-    let tcp_ports = TCP_PORTS
-        .lock()
-        .map(|g| g.clone())
-        .unwrap_or_default();
-    if !tcp_ports.is_empty() {
-        sync_tcp_ports(app_id, &tcp_ports);
-    }
+fn port_bodies() -> Vec<PortBody> {
+    let udp = UDP_PORTS.lock().map(|g| g.clone()).unwrap_or_default();
+    let tcp = TCP_PORTS.lock().map(|g| g.clone()).unwrap_or_default();
+    udp.iter()
+        .map(|&port| PortBody {
+            port,
+            proto: "udp",
+        })
+        .chain(tcp.iter().map(|&port| PortBody {
+            port,
+            proto: "tcp",
+        }))
+        .collect()
 }
 
-fn resync_udp_ports(app_id: &str) {
-    let ports = UDP_PORTS
-        .lock()
-        .map(|g| g.clone())
-        .unwrap_or_default();
-    if !ports.is_empty() {
-        sync_udp_ports(app_id, &ports);
+fn push_ports(default_app_id: &str) {
+    sync_ports(default_app_id, &port_bodies());
+}
+
+/// Re-push holder ports after supervisor re-activate; skip when the app never registered any.
+fn resync_ports_if_any(default_app_id: &str) {
+    let bodies = port_bodies();
+    if !bodies.is_empty() {
+        sync_ports(default_app_id, &bodies);
     }
 }
 
@@ -325,16 +331,7 @@ pub fn sync_udp_ports(default_app_id: &str, ports: &[u16]) {
             .filter(|&p| p > 0)
             .collect();
     }
-    let body: Vec<PortBody> = ports
-        .iter()
-        .copied()
-        .filter(|&p| p > 0)
-        .map(|port| PortBody {
-            port,
-            proto: "udp",
-        })
-        .collect();
-    sync_ports(default_app_id, &body);
+    push_ports(default_app_id);
 }
 
 pub fn sync_tcp_ports(default_app_id: &str, ports: &[u16]) {
@@ -345,33 +342,24 @@ pub fn sync_tcp_ports(default_app_id: &str, ports: &[u16]) {
             .filter(|&p| p > 0)
             .collect();
     }
-    let body: Vec<PortBody> = ports
-        .iter()
-        .copied()
-        .filter(|&p| p > 0)
-        .map(|port| PortBody {
-            port,
-            proto: "tcp",
-        })
-        .collect();
-    sync_ports(default_app_id, &body);
+    push_ports(default_app_id);
 }
 
 fn sync_ports(default_app_id: &str, ports: &[PortBody]) {
     let client = match client() {
         Ok(c) => c,
         Err(e) => {
-            warn!("mc_runtime: {e}");
+            warn!("app-runtime: {e}");
             return;
         }
     };
     let id = resolve_app_id(default_app_id);
-    let url = devres::ports_url(&mc_base_url(), &id);
+    let url = devres::ports_url(&app_base_url(), &id);
     let payload = SyncBody { ports };
     match client.put(&url).json(&payload).send() {
         Ok(r) if r.status().is_success() => {}
-        Ok(r) => warn!("mc_runtime: PUT {} → {}", url, r.status()),
-        Err(e) => warn!("mc_runtime: PUT {url}: {e}"),
+        Ok(r) => warn!("app-runtime: PUT {} → {}", url, r.status()),
+        Err(e) => warn!("app-runtime: PUT {url}: {e}"),
     }
 }
 
@@ -381,8 +369,8 @@ pub fn release(default_app_id: &str) {
         Err(_) => return,
     };
     let id = resolve_app_id(default_app_id);
-    let url = devres::release_url(&mc_base_url(), &id);
+    let url = devres::release_url(&app_base_url(), &id);
     if let Err(e) = client.post(&url).send() {
-        warn!("mc_runtime: POST {url}: {e}");
+        warn!("app-runtime: POST {url}: {e}");
     }
 }

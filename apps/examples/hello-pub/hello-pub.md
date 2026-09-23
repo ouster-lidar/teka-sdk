@@ -1,6 +1,6 @@
 # hello-pub
 
-Demo publisher portable: owns an in-process event ring buffer and current aggregate state. Peers and browsers publish, query, and subscribe at `/api/v1/app/hello-pub/…`.
+Demo publisher app: owns an in-process event ring buffer and current aggregate state. Peers and browsers publish, query, and subscribe at `/api/v1/app/hello-pub/…`.
 
 Companion consumer: [hello-sub.md](../hello-sub/hello-sub.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Jetstream), not a shared platform bus.
 
@@ -20,7 +20,7 @@ Companion consumer: [hello-sub.md](../hello-sub/hello-sub.md). Together they dem
 | `MC_RUNTIME_URL` | From host / `http://localhost` |
 | `APP_ID` | `hello-pub` |
 
-Startup: `declare_mc_runtime!("hello-pub")`, activate/bind loopback, serve `/api/v1/…`, `sd_notify(READY=1)`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/state`, `card_stream_path: /api/v1/cards/stream`. Auth: `ojs-proxy-identity` / `0.1.0`.
+Startup: `declare_app_runtime!("hello-pub")`, activate/bind loopback, serve `/api/v1/…`, `sd_notify(READY=1)`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/state`, `card_stream_path: /api/v1/cards/stream`. Auth: `ojs-proxy-identity` / `0.1.0`.
 
 ## Event schema
 
@@ -58,7 +58,7 @@ Ring buffer retains the most recent **10** events. Older events are dropped.
 
 ## API
 
-All paths are on the portable; browsers and peers use `/api/v1/app/hello-pub/…`.
+All paths are on the app; browsers and peers use `/api/v1/app/hello-pub/…`.
 
 ### `GET /api/v1/state`
 

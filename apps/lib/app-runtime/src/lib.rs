@@ -1,7 +1,7 @@
-//! Shared Mission Control portable runtime for app backends.
+//! Shared app runtime for app backends.
 //!
-//! Every portable HTTP backend must depend on this crate and call
-//! [`declare_mc_runtime!`] — do not fork devres activate/register/release logic.
+//! Every app HTTP backend must depend on this crate and call
+//! [`declare_app_runtime!`] — do not fork devres activate/register/release logic.
 
 pub mod api_error;
 pub mod devres;
@@ -12,16 +12,16 @@ pub mod runtime;
 pub mod startup;
 pub mod status_stream;
 
-/// Declare a crate-local `mc_runtime` module bound to one app id.
+/// Declare a crate-local `app_runtime` module bound to one app id.
 #[macro_export]
-macro_rules! declare_mc_runtime {
+macro_rules! declare_app_runtime {
     ($id:literal) => {
-        /// Mission Control app devres client — specs/app-devres.md
-        pub mod mc_runtime {
+        /// Host app devres client.
+        pub mod app_runtime {
             pub const APP_ID: &str = $id;
 
-            pub fn mc_base_url() -> String {
-                $crate::runtime::mc_base_url()
+            pub fn app_base_url() -> String {
+                $crate::runtime::app_base_url()
             }
 
             pub fn sensors_list_url() -> Option<String> {

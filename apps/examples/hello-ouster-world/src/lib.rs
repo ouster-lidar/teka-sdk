@@ -10,7 +10,7 @@ pub mod source_config;
 pub mod ui_state;
 pub mod vpointer;
 
-mc_portable_runtime::declare_mc_runtime!("hello-ouster-world");
+::app_runtime::declare_app_runtime!("hello-ouster-world");
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -18,7 +18,7 @@ use std::sync::Arc;
 use crate::display::DisplayState;
 use crate::osf::ImportHandle;
 use crate::record::RecordHandle;
-use mc_portable_runtime::status_stream::SummaryStream;
+use ::app_runtime::status_stream::SummaryStream;
 
 /// Max concurrent Console log followers (WebSocket, no PTY).
 pub const MAX_PTY_SESSIONS: usize = 16;

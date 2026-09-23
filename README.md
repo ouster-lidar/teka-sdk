@@ -1,6 +1,6 @@
 # Jetstream Example Apps
 
-Build portable app images from `apps/`, deploy to a Jetstream device (for example a ZedBox), and run them alongside other appliance apps.
+Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBox), and run them alongside other appliance apps.
 
 `hello-ouster-terminal` is the simplest lidar app: a terminal-based Ouster CLI viewer. The remaining examples cover HTTP, GPU, Firefox, pub/sub, web UI, Slidev, LLM, and profiling tools.
 

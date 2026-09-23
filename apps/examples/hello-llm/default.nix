@@ -13,7 +13,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -22,7 +22,7 @@ let
       ;
   };
 
-  inherit (ps.callPortableFirewalld firewalld) firewallCmd firewalldCli;
+  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
 
   name = "hello-llm";
   webPort = 8080;
@@ -47,7 +47,7 @@ let
 
   ollamaBin = lib.getExe ollamaBackend;
 
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     hostGpuChecksCfg.enable = false;
   };
 
@@ -75,7 +75,7 @@ let
     export OLLAMA_KEEP_ALIVE=5m
 
     ${lib.optionalString isAarch64 ''
-      # Portable /etc has no nv_tegra_release; Ollama skips cuda_jetpack6 without this
+      # App image /etc has no nv_tegra_release; Ollama skips cuda_jetpack6 without this
       # (discover/runner.go). Host libcuda comes from jetstream-portable-gpu-generator
       # (X-Jetstream-PortableGPU=cuda), not BindReadOnlyPaths=/run/opengl-driver.
       export JETSON_JETPACK="''${JETSON_JETPACK:-6}"
@@ -177,14 +177,14 @@ let
   '';
 
   # BindReadOnlyPaths=-/etc/nv_tegra_release needs a file in the read-only DDI (same as
-  # resolv.conf stub in makePortableErofsImage); host L4T release overlays at runtime.
+  # resolv.conf stub in makeAppImage); host L4T release overlays at runtime.
   nvTegraReleaseStub =
     if isAarch64 then
       builtins.toFile "${name}-nv-tegra-release-stub" "# placeholder; host bind replaces\n"
     else
       null;
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -195,7 +195,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-llm",
       "version": "1.0.0",
@@ -223,8 +223,8 @@ let
 
   copyFiles =
     ps.caBundleCopyFiles
-    ++ pe.mcManifestCopyFiles {
-      inherit name mcManifest webTree;
+    ++ app.appManifestCopyFiles {
+      inherit name appManifest webTree;
     }
     ++ lib.optionals (nvTegraReleaseStub != null) [
       {
@@ -251,7 +251,7 @@ let
   ];
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name copyFiles runtimeClosures;
   unit = writeText "${name}.service" ''
     [Unit]

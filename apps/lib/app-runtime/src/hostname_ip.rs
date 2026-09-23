@@ -1,4 +1,4 @@
-//! Hostname resolution for sensor UDP sources (Mission Control sensors API).
+//! Hostname resolution for sensor UDP sources (host sensors API).
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -11,14 +11,14 @@ pub trait HostnameResolver: Send + Sync {
 }
 
 /// Poll `GET {sensors_url}` and cache hostname lookups.
-pub struct McSensorsResolver {
+pub struct AppSensorsResolver {
     client: Option<reqwest::blocking::Client>,
     sensors_url: String,
     cache: Mutex<HashMap<String, String>>,
     last_fetch: Mutex<Option<Instant>>,
 }
 
-impl McSensorsResolver {
+impl AppSensorsResolver {
     pub fn new(sensors_url: String) -> Self {
         Self {
             client: reqwest::blocking::Client::builder()
@@ -75,7 +75,7 @@ impl McSensorsResolver {
     }
 }
 
-impl HostnameResolver for McSensorsResolver {
+impl HostnameResolver for AppSensorsResolver {
     fn hostname_for_ip(&self, ip: &str) -> Option<String> {
         self.refresh_if_stale();
         self.cache.lock().ok()?.get(ip).cloned()

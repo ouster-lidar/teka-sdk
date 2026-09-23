@@ -9,7 +9,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit ps pkgs lib runCommand;
   };
 
@@ -21,20 +21,20 @@ let
 
   nvidiaDevtools = pkgs.callPackage ../../nix/nvidia-devtools.nix { };
 
-  jp = ps.jetstreamPortableService {
+  jp = ps.hostUnitDefaults {
     environmentFileWlroots = false;
     hostGpuChecksCfg.enable = false;
   };
 
-  nvidiaDevtoolsSrc = pe.mcRustSrc { srcDir = ./.; };
+  nvidiaDevtoolsSrc = app.appRustSrc { srcDir = ./.; };
 
   utilLinuxMount = pkgs.util-linux.mount;
 
-  nvidiaDevtoolsBin = pe.buildMcCrate2nix {
+  nvidiaDevtoolsBin = app.buildAppCrate2nix {
     cargoNix = ./Cargo.nix;
     crateName = "nvidia-devtools";
     filteredSrc = nvidiaDevtoolsSrc;
-    nativeBuildInputs = pe.mcOpensslNative;
+    nativeBuildInputs = app.appOpensslNative;
     meta.mainProgram = "nvidia-devtools";
   };
 
@@ -181,7 +181,7 @@ let
     exec ${pkgs.openssh}/bin/sshd -D -e -f ${devLibDir}/sshd_config
   '';
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -191,7 +191,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "${name}",
       "version": "1.0.0",
@@ -225,14 +225,14 @@ let
 
   unit = writeText "${name}.service" ''
     [Unit]
-    Description=${displayName} portable (sshd :${toString sshPort})
+    Description=${displayName} app (sshd :${toString sshPort})
     X-Jetstream-PortableGPU=cuda
     After=network.target mission-control.service
     Wants=network.target
-    ${ps.jetstreamMcPortableBackendUnitLines}
+    ${ps.appBackendUnitLines}
 
     [Service]
-    ${ps.mcPortableNotifyServiceLines}
+    ${ps.appNotifyServiceLines}
     PrivateNetwork=no
     ProtectSystem=no
     ProtectHome=no
@@ -244,7 +244,7 @@ let
     Environment=APP_ID=${name}
     Environment=PATH=${devBinPath}
     Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
-    ${ps.jetstreamMcPortableBackendServiceLines}
+    ${ps.appBackendServiceLines}
     ${jp.serviceFragment}
     SupplementaryGroups=video render
     BindReadOnlyPaths=-/run/systemd/resolve:/run/systemd/resolve
@@ -260,11 +260,11 @@ let
     WantedBy=jetstream-apps.target
   '';
 in
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name unit;
   copyFiles =
-    pe.mcManifestCopyFiles {
-      inherit name mcManifest webTree;
+    app.appManifestCopyFiles {
+      inherit name appManifest webTree;
     }
     ++ ps.caBundleCopyFiles
     ++ [

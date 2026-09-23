@@ -1,7 +1,7 @@
 #!@bash@/bin/bash
 set -euo pipefail
 
-@wlrootsPortableWaylandEnv@
+@wlrootsAppWaylandEnv@
 
 log() { echo "hello-wayland-gpu: $*" >&2; }
 

@@ -1,4 +1,4 @@
-//! API error envelope — mission-control/specs/error-codes.md
+//! API error envelope for app HTTP handlers.
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};

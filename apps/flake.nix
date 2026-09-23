@@ -1,5 +1,5 @@
 {
-  description = "Jetstream systemd portable service examples (erofs DDI images)";
+  description = "Jetstream app image examples (erofs DDI)";
 
   inputs = {
     # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).
@@ -34,7 +34,7 @@
           cudaPackages = prev.cudaPackages_13_2;
         };
 
-      portableOverlays = [
+      appOverlays = [
         jetpack.overlays.default
         jp7Overlay
       ];
@@ -44,7 +44,7 @@
         import nixpkgs {
           inherit system;
           config.allowUnfree = true;
-          overlays = portableOverlays;
+          overlays = appOverlays;
         };
       systems = [
         "x86_64-linux"
@@ -59,9 +59,9 @@
 
       exampleServices = import ./examples/flake-services.nix;
       services = exampleServices;
-      portableOutputs = (import ./nix/portable-service.nix).flakeOutputs {
+      appOutputs = (import ./nix/app-image.nix).flakeOutputs {
         nixpkgs = nixpkgsPkgs;
-        inherit systems services portableOverlays;
+        inherit systems services appOverlays;
         ousterSdkSrc = ouster-sdk;
       };
 
@@ -73,7 +73,7 @@
         "examples/nvidia-devtools"
       ];
     in
-    portableOutputs
+    appOutputs
     // {
       apps = nixpkgs.lib.genAttrs systems (
         system:

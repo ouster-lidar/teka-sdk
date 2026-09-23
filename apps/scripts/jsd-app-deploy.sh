@@ -30,7 +30,7 @@ APP_LOG_EXPECT+=(['hello-slidev']='hello-slidev listening')
 APP_LOG_EXPECT+=(['hello-llm']='hello-llm|Open WebUI|ollama|nemotron')
 APP_LOG_EXPECT+=(['nvidia-devtools']='nvidia-devtools listening')
 
-# Known-bad patterns for GPU/X11/Wayland app images.
+# Known-bad patterns for GPU/Wayland app images.
 BAD_PAT='Failed to initialize the GLX module|libnvidia-glcore\.so\..*cannot open shared object file|eglGetDisplay failed|glXQueryVersion failed|Failed at step NAMESPACE|Failed to set up mount namespacing|status=226/NAMESPACE|status=203/EXEC'
 
 usage() {
@@ -182,8 +182,15 @@ build_app_image() {
 upload_app_image() {
   local id=$1
   local gcroot raw raw_bytes app_name deploy_url http_code log_expect
+  local -a raws
   gcroot="$JETSTREAM_PORTABLE_GCROOT_DIR/${id}-${host_sys}"
-  raw=$(readlink -f "${gcroot}/${id}.raw")
+  # Per-package $out has exactly one DDI. Do not nix-eval the compose name here:
+  # E2E_SKIP_BUILD can leave a gcroot from a different flake rev.
+  shopt -s nullglob
+  raws=( "$gcroot"/*.raw )
+  shopt -u nullglob
+  (( ${#raws[@]} == 1 )) || die "expected exactly one .raw in $gcroot (got ${#raws[@]})"
+  raw=$(readlink -f "${raws[0]}")
   [[ -f "$raw" ]] || die "missing $raw"
   raw_bytes=$(stat -c '%s' "$raw" 2>/dev/null || wc -c <"$raw")
   log "raw=$raw ($(numfmt --to=iec-i --suffix=B "$raw_bytes" 2>/dev/null || echo "${raw_bytes}B"))"

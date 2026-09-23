@@ -2077,12 +2077,12 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" ];
       };
-      "mc-portable-runtime" = rec {
-        crateName = "mc-portable-runtime";
+      "app-runtime" = rec {
+        crateName = "app-runtime";
         version = "0.1.0";
         edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ../../lib/mc-portable-runtime; };
-        libName = "mc_portable_runtime";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ../../lib/app-runtime; };
+        libName = "app_runtime";
         dependencies = [
           {
             name = "axum";
@@ -2250,8 +2250,8 @@ rec {
             features = [ "derive" ];
           }
           {
-            name = "mc-portable-runtime";
-            packageId = "mc-portable-runtime";
+            name = "app-runtime";
+            packageId = "app-runtime";
           }
           {
             name = "parking_lot";

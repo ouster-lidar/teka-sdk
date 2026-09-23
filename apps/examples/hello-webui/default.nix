@@ -7,7 +7,7 @@
 }:
 
 let
-  pe = import ../../nix/portable-app.nix {
+  app = import ../../nix/app-crate.nix {
     inherit
       ps
       pkgs
@@ -17,9 +17,9 @@ let
   };
 
   name = "hello-webui";
-  jp = pe.mcJetstreamPortable;
+  jp = app.appHostUnitDefaults;
 
-  webTree = pe.mcWebTree {
+  webTree = app.appWebTree {
     inherit name;
     webSrc = ./web;
     webFiles = [
@@ -31,7 +31,7 @@ let
     ];
   };
 
-  mcManifest = writeText "mission-control-manifest.json" ''
+  appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-webui",
       "version": "1.0.0",
@@ -61,7 +61,7 @@ let
   '';
 in
 
-ps.makePortableErofsImage {
+ps.makeAppImage {
   inherit name;
   unit = writeText "${name}.service" ''
     [Unit]
@@ -79,7 +79,7 @@ ps.makePortableErofsImage {
     [Install]
     WantedBy=jetstream-apps.target
   '';
-  copyFiles = pe.mcManifestCopyFiles {
-    inherit name mcManifest webTree;
+  copyFiles = app.appManifestCopyFiles {
+    inherit name appManifest webTree;
   };
 }

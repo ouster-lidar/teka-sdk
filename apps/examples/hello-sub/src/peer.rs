@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use mc_portable_runtime::runtime::mc_base_url;
-use mc_portable_runtime::status_stream::SummaryStream;
+use ::app_runtime::runtime::app_base_url;
+use ::app_runtime::status_stream::SummaryStream;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::task::JoinHandle;
@@ -41,7 +41,7 @@ pub fn publisher_base_url_from_env() -> String {
     let peer = if peer.is_empty() { "hello-pub" } else { peer };
     normalize_publisher_url(&format!(
         "{}/api/v1/app/{peer}",
-        mc_base_url().trim_end_matches('/')
+        app_base_url().trim_end_matches('/')
     ))
 }
 

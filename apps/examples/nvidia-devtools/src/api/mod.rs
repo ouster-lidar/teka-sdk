@@ -9,7 +9,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
-use mc_portable_runtime::resource_stream::send_snapshot;
+use ::app_runtime::resource_stream::send_snapshot;
 use serde::Serialize;
 
 use crate::keys::KeysBody;

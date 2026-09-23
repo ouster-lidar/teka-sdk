@@ -1,4 +1,4 @@
-//! Resource live-picture WebSocket frames — mission-control/specs/error-codes.md lock 9a.
+//! Resource live-picture WebSocket frames for status streams.
 
 use axum::extract::ws::{Message, WebSocket};
 use serde::Serialize;

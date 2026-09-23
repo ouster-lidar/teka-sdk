@@ -1,6 +1,6 @@
-# Portable app cross-build
+# App image cross-build
 
-Portable DDIs target **Linux** only. The `apps/` flake `systems` list may include cross-only build hosts (e.g. `aarch64-darwin`) in addition to Linux.
+App image DDIs target **Linux** only. The `apps/` flake `systems` list may include cross-only build hosts (e.g. `aarch64-darwin`) in addition to Linux.
 
 ## Short names (`hello-http`)
 
@@ -23,10 +23,11 @@ Explicit `*-cross-<system>` attrs remain on every build host for other targets.
 
 ## Distribution filenames
 
-Each portable derivation still ships **`$out/<id>.raw`** (catalog, `portablectl`, and the host app manager expect that basename). The flake **`default`** bundle re-exports every native portable as **`<id>-<system>.raw`** so mixed-arch upload folders stay unique:
+Each app image derivation ships **`$out/<id>-<system>-v<compose>.raw`** (see [naming.md](naming.md)).
+The flake **`default`** bundle re-exports every native app image with that basename so mixed-arch upload folders stay unique. **`jetstream-portable-install`** copies into the catalog as **`<id>.raw`** (see [naming.md](naming.md)).
 
 ```bash
-nix build .#default   # on x86_64-linux: <id>-x86_64-linux.raw for every native portable
+nix build .#default   # on x86_64-linux: <id>-x86_64-linux-v<compose>.raw for every native app image
 ```
 
 Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, …).
@@ -39,6 +40,6 @@ Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, �
 | `aarch64-linux` | native aarch64 | `hello-http-cross-x86_64-linux` |
 | `aarch64-darwin` | cross aarch64-linux | `hello-http-cross-x86_64-linux`, … |
 
-`nix/portable-service.nix` derives Linux targets from `systems` via the `*-linux` suffix.
+`nix/app-image.nix` derives Linux targets from `systems` via the `*-linux` suffix.
 
 `scripts/jsd-app-deploy.sh` uses short names when the builder can produce the host system (native Linux or darwin same-CPU alias); otherwise `*-cross-<host-sys>`.

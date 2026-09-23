@@ -1,6 +1,6 @@
 # Peer FrameSet sockets
 
-Jetstream portables can publish live Ouster SDK `FrameSet` streams to peer apps
+Jetstream apps can publish live Ouster SDK `FrameSet` streams to peer apps
 on the same device using a Unix-domain socket. Consumers open the path with
 `osf_socket.open_source()` (SDK `open_source` plus `.sock` paths).
 
@@ -8,10 +8,10 @@ on the same device using a Unix-domain socket. Consumers open the path with
 
 | Role | Path |
 |------|------|
-| Producer portable `<app-id>` | `/run/<app-id>/frameset.sock` |
+| Producer app `<app-id>` | `/run/<app-id>/frameset.sock` |
 | Override (optional) | env `<APP>_FRAMESET_SOCK` or app config |
 
-`RuntimeDirectory=<app-id>` in the portable unit provides `/run/<app-id>/`.
+`RuntimeDirectory=<app-id>` in the app unit provides `/run/<app-id>/`.
 
 ## SDK API
 

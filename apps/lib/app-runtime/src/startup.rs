@@ -25,7 +25,7 @@ pub async fn bind_http_listener(
         Ok(listener) => Ok(listener),
         Err(e) if e.kind() == io::ErrorKind::AddrInUse => {
             tracing::warn!(
-                target: "mc_runtime",
+                target: "app-runtime",
                 app_id,
                 %bind,
                 "bind in use; releasing devres and retrying"

@@ -1,17 +1,17 @@
 (function (global) {
     'use strict';
 
+    function apiPath(id, path) {
+        var p = path.charAt(0) === '/' ? path : '/' + path;
+        return '/api/v1/app/' + encodeURIComponent(id) + p;
+    }
+
     function mcAppApi(defaultId) {
         var appHost = document.querySelector('.app-panel-host');
         var appId =
             (appHost && appHost.getAttribute('data-app-id')) ||
             defaultId ||
             '';
-
-        function apiPath(id, path) {
-            var p = path.charAt(0) === '/' ? path : '/' + path;
-            return '/api/v1/app/' + encodeURIComponent(id) + p;
-        }
 
         function appPagePath(id, path) {
             var p = path.charAt(0) === '/' ? path : '/' + path;
@@ -94,11 +94,51 @@
         return global.connectWebSocket(apiPath(appId, p), onMessage, options);
     }
 
-    /** Version chip HTML for jet-version-value spans (Jetstream OTA/install). */
+    /** Version chip HTML for jet-version-value spans (Jetstream sysupdate/install). */
     function versionValueHtml(value, variant) {
         var esc = global.escapeHtml || function (s) { return s; };
         var cls = 'jet-version-value' + (variant ? ' jet-version-value--' + variant : '');
         return '<span class="' + cls + '">' + esc(value || '(unknown)') + '</span>';
+    }
+
+    /** Sentence-case operator label (first word capitalized; rest lowercase). */
+    function formatChipLabel(value) {
+        if (value == null || value === '') return '';
+        var s = String(value).trim();
+        if (!s) return '';
+        var colon = s.indexOf(':');
+        if (colon >= 0) {
+            var head = formatChipLabel(s.slice(0, colon));
+            var tail = s.slice(colon + 1).trim();
+            if (!tail) return head + ':';
+            return head + ': ' + tail.toLowerCase();
+        }
+        if (/^[A-Z0-9]{2,4}$/.test(s)) return s;
+        return s.split(/\s+/).map(function (word, i) {
+            if (/^[A-Z0-9]{2,4}$/.test(word)) return word;
+            if (i === 0) return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+            return word.toLowerCase();
+        }).join(' ');
+    }
+
+    /** Map wire enum tokens (RUNNING, FALLBACK) to operator sentence case. */
+    function formatEnumLabel(value) {
+        if (value == null || value === '') return '—';
+        var s = String(value).trim();
+        if (!s) return '—';
+        if (/^[A-Z][A-Z0-9_]*$/.test(s)) {
+            if (!s.includes('_') && /^[A-Z0-9]{2,4}$/.test(s)) return s;
+            var label = s.replace(/_/g, ' ').toLowerCase();
+            return label.charAt(0).toUpperCase() + label.slice(1);
+        }
+        return formatChipLabel(s);
+    }
+
+    /** Service header one-liner: status.summary, else fallback, else 'Disabled'. */
+    function formatServiceSummary(status, fallback) {
+        if (status && status.summary) return status.summary;
+        if (fallback) return fallback;
+        return 'Disabled';
     }
 
     global.mcAppApi = mcAppApi;
@@ -112,4 +152,7 @@
     global.connectAppStream = connectStatusStream;
     global.appWs = appWs;
     global.versionValueHtml = versionValueHtml;
+    global.formatChipLabel = formatChipLabel;
+    global.formatEnumLabel = formatEnumLabel;
+    global.formatServiceSummary = formatServiceSummary;
 })(typeof window !== 'undefined' ? window : this);

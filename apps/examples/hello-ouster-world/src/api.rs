@@ -9,8 +9,8 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use inotify::{EventMask, Inotify, WatchMask};
-use mc_portable_runtime::api_error::ApiError;
-use mc_portable_runtime::status_stream::{
+use ::app_runtime::api_error::ApiError;
+use ::app_runtime::status_stream::{
     serve_broadcast, serve_summary_broadcast_with_initial,
 };
 use serde::{Deserialize, Serialize};

@@ -1,6 +1,6 @@
 # Nix
 
-This repository uses Nix as the **build system** for portable app images and assumes a multi-user Nix install.
+This repository uses Nix as the **build system** for app images and assumes a multi-user Nix install.
 
 ## Install
 

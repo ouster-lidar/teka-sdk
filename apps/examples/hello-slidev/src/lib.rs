@@ -1,3 +1,3 @@
-//! hello-slidev — guest-access API and auth-gated deck for the Slidev portable app.
+//! hello-slidev — guest-access API and auth-gated deck for the Slidev app.
 
-mc_portable_runtime::declare_mc_runtime!("hello-slidev");
+::app_runtime::declare_app_runtime!("hello-slidev");

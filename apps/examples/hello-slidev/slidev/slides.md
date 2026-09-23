@@ -4,7 +4,7 @@ background: ./ouster/hero-physical-ai.png
 title: Hello Slidev
 info: |
   ## Hello Slidev on Jetstream
-  Ouster marketing visuals + Jetstream portable app demo.
+  Ouster marketing visuals + Jetstream app demo.
 class: text-center
 highlighter: shiki
 drawings:
@@ -22,7 +22,7 @@ mdc: true
 Sensing & perception for robotics, infrastructure, and autonomy
 
 <div class="pt-10 text-lg opacity-80">
-  Built on Jetstream portable apps
+  Built on Jetstream apps
 </div>
 
 <div class="pt-8">
@@ -176,7 +176,7 @@ Static assets at `/app/hello-slidev/static/deck/`
 <v-clicks>
 
 - **Build** — `slidev build` in the Nix image
-- **Serve** — staged under `web/deck/` in the portable
+- **Serve** — staged under `web/deck/` in the app image
 - **Present** — embedded shell at `/app/hello-slidev`
 
 </v-clicks>
@@ -217,7 +217,7 @@ background: ./ouster/hero-physical-ai.png
 # Thanks!
 
 <div class="text-2xl mt-6 opacity-90">
-Ouster sensing × Jetstream portables
+Ouster sensing × Jetstream apps
 </div>
 
 <div class="mt-8 flex justify-center gap-6 text-sm opacity-70">

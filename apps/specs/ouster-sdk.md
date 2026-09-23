@@ -10,7 +10,7 @@ Pattern: `hello-ouster-terminal`.
 - Flake input: public `github:ouster-lidar/ouster-sdk` v1.0.1
 - hello-ouster-world peer sockets: `apps/nix/osf-socket/osf_socket.py` on the app PYTHONPATH (wraps `open_source`; public 1.0.1 has no OSF_SOCKET)
 - Python from the one nixpkgs pin
-- `GLFW_PLATFORM=wayland` via `ouster-portable-common.nix` (`wayland = true`)
+- `GLFW_PLATFORM=wayland` via `ouster-app-common.nix` (`wayland = true`)
 - `ouster-cli source … viz`
 
 ## nixpkgs first

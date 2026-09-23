@@ -1,5 +1,5 @@
 let
-  mkPs =
+  mkApp =
     pkgs: ousterSdkSrc:
     let
       inherit (pkgs)
@@ -10,15 +10,15 @@ let
         writeShellScript
         ;
 
-      hostGpuChecks = pkgs.callPackage ./portable-host-gpu-checks.nix { };
+      hostGpuChecks = pkgs.callPackage ./host-gpu-checks.nix { };
 
-      callPortableFirewalld = firewalld: import ./portable-firewalld-cmd.nix { inherit lib firewalld; };
+      callAppFirewalld = firewalld: import ./app-firewalld-cmd.nix { inherit lib firewalld; };
 
       ousterSdk = pkgs.callPackage ./ouster-sdk.nix { src = ousterSdkSrc; };
 
       callOusterCommon =
         args:
-        import ./ouster-portable-common.nix (
+        import ./ouster-app-common.nix (
           {
             inherit lib writeShellScript;
             pickOusterSensorPy = ./pick_ouster_sensor.py;
@@ -26,9 +26,9 @@ let
           // args
         );
 
-      mkFirefoxBin = import ./firefox-bin-portable.nix;
+      mkFirefoxBin = import ./firefox-bin-app.nix;
 
-      firefoxPortablePrefs = writeText "jetstream-portable-firefox-user.js" ''
+      firefoxAppPrefs = writeText "jetstream-portable-firefox-user.js" ''
         user_pref("network.trr.mode", 0);
         user_pref("network.captive-portal-service.enabled", false);
         user_pref("network.connectivity-service.enabled", false);
@@ -40,9 +40,9 @@ let
         user_pref("layers.acceleration.force-enabled", true);
       '';
 
-      firefoxPortableProfileSeed = runCommand "jetstream-portable-firefox-profile-seed" { } ''
+      firefoxAppProfileSeed = runCommand "jetstream-portable-firefox-profile-seed" { } ''
         mkdir -p "$out"
-        install -m444 ${firefoxPortablePrefs} "$out/user.js"
+        install -m444 ${firefoxAppPrefs} "$out/user.js"
       '';
 
       mkFirefoxClientLoop =
@@ -62,7 +62,7 @@ let
           export MOZ_ENABLE_WAYLAND=1
           export MOZ_DISABLE_TELEMETRY=1
           export MOZ_LOG="''${MOZ_LOG:-}"
-          predir="${firefoxPortableProfileSeed}"
+          predir="${firefoxAppProfileSeed}"
           profile="''${HOME}/${profileRel}"
           while true; do
             mkdir -p "$profile"
@@ -138,7 +138,7 @@ let
 
       seatdSockStub = builtins.toFile "jetstream-portable-seatd.sock" "";
 
-      jetstreamPortableHostEtcBindPaths = lib.concatStringsSep "\n" [
+      hostEtcBindPaths = lib.concatStringsSep "\n" [
         "BindReadOnlyPaths=-/etc/passwd:/etc/passwd"
         "BindReadOnlyPaths=-/etc/group:/etc/group"
         "BindReadOnlyPaths=-/etc/resolv.conf"
@@ -233,7 +233,7 @@ let
           done
         '';
 
-      mkPortableRunWrapper =
+      mkAppRunWrapper =
         {
           name,
           innerRun,
@@ -263,7 +263,7 @@ let
           </fontconfig>
         '';
 
-      waylandPortableBaseCopyFiles = [
+      waylandAppBaseCopyFiles = [
         {
           path = "etc/dbus-1/session.conf";
           source = dbusSessionConf;
@@ -291,30 +291,30 @@ let
       '';
 
       # MC proxy backends reach the host loopback; readiness is in-process (activate + sd_notify).
-      jetstreamMcPortableBackendUnitLines = ''
+      appBackendUnitLines = ''
         Wants=mission-control.service
       '';
 
-      mcPortableNotifyServiceLines = ''
+      appNotifyServiceLines = ''
         Type=notify
         NotifyAccess=main
       '';
 
-      jetstreamMcPortableBackendServiceLines = ''
+      appBackendServiceLines = ''
         PrivateNetwork=no
         NetworkNamespacePath=/proc/1/ns/net
       '';
 
-      mcGpuManifestJson =
+      appGpuManifestJson =
         {
           id,
           gpu,
         }:
-        writeText "mission-control-manifest.json" ''
+        writeText "app-manifest.json" ''
           {"id":"${id}","version":"1.0.0","portable":{"displayService":true,"gpu":"${gpu}"}}
         '';
 
-      mcGpuManifestCopyFiles =
+      appGpuManifestCopyFiles =
         {
           name,
           gpu,
@@ -322,7 +322,7 @@ let
         [
           {
             path = "usr/lib/jetstream/mission-control/manifest.json";
-            source = mcGpuManifestJson {
+            source = appGpuManifestJson {
               id = name;
               inherit gpu;
             };
@@ -368,7 +368,7 @@ let
             TTYVHangup=true
             TTYVTDisallocate=true
           ''}
-          ${lib.optionalString bindHostEtc jetstreamPortableHostEtcBindPaths}
+          ${lib.optionalString bindHostEtc hostEtcBindPaths}
           ${lib.optionalString (!bindHostEtc) passwdGroupBindPaths}
           BindReadOnlyPaths=-/run/seatd.sock
           RuntimeDirectory=${runtimeDirectory}
@@ -381,9 +381,9 @@ let
 
       # Jetstream appliance conveniences for portable unit snippets: optional
       # `EnvironmentFile=/etc/jetstream/wlroots.env` and fail-fast host GPU path
-      # checks (see `nix/portable-host-gpu-checks.nix`). Booleans use `? true`
+      # checks (see `nix/host-gpu-checks.nix`). Booleans use `? true`
       # / `or true` so callers can override individual knobs.
-      jetstreamPortableService =
+      hostUnitDefaults =
         {
           environmentFileWlroots ? true,
           hostGpuChecksCfg ? { },
@@ -429,10 +429,10 @@ let
     // {
       inherit
         hostGpuChecks
-        callPortableFirewalld
+        callAppFirewalld
         ousterSdk
         callOusterCommon
-        jetstreamPortableService
+        hostUnitDefaults
         dbusSessionConf
         etcHostsStub
         nsswitchConf
@@ -441,19 +441,19 @@ let
         caBundleCopyFiles
         mkPasswdGroupStubCopyFiles
         mkRestartLoop
-        mkPortableRunWrapper
+        mkAppRunWrapper
         mkFontconfigConf
-        waylandPortableBaseCopyFiles
+        waylandAppBaseCopyFiles
         passwdGroupBindPaths
-        mcGpuManifestCopyFiles
+        appGpuManifestCopyFiles
         mkGpuWaylandUnit
         mkFirefoxBin
         mkFirefoxClientLoop
         wlrootsSwayEnvShSubst
-        jetstreamPortableHostEtcBindPaths
-        jetstreamMcPortableBackendUnitLines
-        jetstreamMcPortableBackendServiceLines
-        mcPortableNotifyServiceLines
+        hostEtcBindPaths
+        appBackendUnitLines
+        appBackendServiceLines
+        appNotifyServiceLines
         ;
     };
 
@@ -478,11 +478,11 @@ let
           PORTABLE_PREFIXES=${name}
         '';
 
-      makePortableRawImage =
+      makeAppImage =
         {
           name,
           osRelease ? mkOsRelease name,
-          # Portable *base* images (library-only extension with no unit) omit a unit; upper
+          # App image *base* trees (library-only extension with no unit) omit a unit; upper
           # extension images must supply matching `.service` files for the attach prefix.
           unit ? null,
           copyFiles ? [ ],
@@ -526,7 +526,7 @@ let
               chmod -R u+w tree/bin
               cp -a ${rootInteractiveBin}/bin/. tree/bin/
             ''}
-            # Portable / extension validation: upper `ExtensionImages=` layers must not ship
+            # App image / extension validation: upper `ExtensionImages=` layers must not ship
             # `/usr/lib/os-release` (systemd `extension_has_forbidden_content()`), or dissect
             # returns `-ENOMEDIUM` ("No medium found"). `/etc/os-release` is enough for OS and
             # extension trees — see systemd `extension-util.c` / PORTABLE_SERVICES.md.
@@ -564,10 +564,9 @@ let
             ${packImage}
           '';
 
-      makePortableErofsImage = args: makePortableRawImage args;
     in
     {
-      inherit makePortableErofsImage;
+      inherit makeAppImage;
     };
 
   flakeOutputs =
@@ -584,14 +583,14 @@ let
         "hello-llm"
         "nvidia-devtools"
       ],
-      portableOverlays ? [ ],
+      appOverlays ? [ ],
     }:
     let
       inherit (nixpkgs) lib;
 
       allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
       heavyCrossServices = lib.filter (n: !(lib.elem n simpleCrossServices)) allServiceNames;
-      # Portable images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
+      # App images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
       linuxSystems = lib.filter (lib.hasSuffix "-linux") systems;
 
       hostCpu =
@@ -666,7 +665,7 @@ let
               lib.genAttrs allServiceNames (
                 n:
                 callService services.${n} {
-                  ps = mkPs pkgs ousterSdkSrc;
+                  ps = mkApp pkgs ousterSdkSrc;
                 }
               )
             else
@@ -691,11 +690,11 @@ let
                             system = target;
                           };
                           config.allowUnfree = true;
-                          overlays = portableOverlays;
+                          overlays = appOverlays;
                         };
                   in
                   crossPkgs.callPackage services.${n} {
-                    ps = mkPs crossPkgs ousterSdkSrc;
+                    ps = mkApp crossPkgs ousterSdkSrc;
                   };
               }) crossTargets
             ) allServiceNames
@@ -720,7 +719,7 @@ let
             path = "${nativeByName.${n}}/${n}.raw";
           }) allServiceNames;
 
-          defaultBundle = pkgs.linkFarm "portable-service-bundle" bundleMembers;
+          defaultBundle = pkgs.linkFarm "app-image-bundle" bundleMembers;
         in
         nativeByName
         // crossPackages
@@ -758,7 +757,7 @@ let
           crossTargets = lib.filter (t: t != system) linuxSystems;
 
           nativeChecks = lib.genAttrs allServiceNames (
-            n: mkRawCheck pkgs "portable-service-check-${n}" n hostPkgs.${n}
+            n: mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n}
           );
 
           crossChecks = lib.listToAttrs (
@@ -771,14 +770,14 @@ let
                 in
                 {
                   name = attr;
-                  value = mkRawCheck pkgs "portable-service-check-${attr}" n hostPkgs.${attr};
+                  value = mkRawCheck pkgs "app-image-check-${attr}" n hostPkgs.${attr};
                 }
               ) crossTargets
             ) allServiceNames
           );
         in
         lib.optionalAttrs (lib.hasSuffix "-linux" system) {
-          default = pkgs.runCommand "portable-service-check-default" { } ''
+          default = pkgs.runCommand "app-image-check-default" { } ''
             ${lib.concatMapStringsSep "\n" (n: ''
               test -f ${hostPkgs.${n}}/${n}.raw
             '') allServiceNames}

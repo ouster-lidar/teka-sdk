@@ -16,7 +16,7 @@ args@{
   dejavu_fonts,
 }:
 
-import ../../nix/portable-firefox-wayland.nix (
+import ../../nix/firefox-wayland-app.nix (
   (lib.removeAttrs args [ "cage" ])
   // {
     inherit
