@@ -10,7 +10,7 @@
 let
   appApiJsSrc =
     if lib.isDerivation appApiJs then
-      "${appApiJs}/mc-app-api.js"
+      "${appApiJs}/app-api.js"
     else
       builtins.path {
         path = appApiJs;
@@ -135,7 +135,7 @@ let
     }:
     runCommand "${name}-web" { } ''
       mkdir -p "$out/web"
-      install -m644 ${appApiJsSrc} "$out/web/mc-app-api.js"
+      install -m644 ${appApiJsSrc} "$out/web/app-api.js"
       for f in ${lib.concatStringsSep " " webFiles}; do
         case "$f" in
           *.js)

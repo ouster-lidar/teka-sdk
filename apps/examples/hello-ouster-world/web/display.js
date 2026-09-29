@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = mcAppApi('hello-ouster-world');
+    var appApi = jetstreamAppApi('hello-ouster-world');
     var ws = null;
     var controlling = false;
     var hoverStream = false;

@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = mcAppApi('hello-slidev');
+    var appApi = jetstreamAppApi('hello-slidev');
     var deckUrl = '/api/v1/app/hello-slidev/deck/index.html';
 
     function api(path) {

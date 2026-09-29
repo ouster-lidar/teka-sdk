@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = mcAppApi('hello-sub');
+    var appApi = jetstreamAppApi('hello-sub');
     var appId = appApi.appId;
     var FILTER_KEY = 'hello-sub.subscriber.feedFilters';
     var draftUrls = [];

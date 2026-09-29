@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = mcAppApi('hello-pub');
+    var appApi = jetstreamAppApi('hello-pub');
     var appId = appApi.appId;
 
     function api(path) {

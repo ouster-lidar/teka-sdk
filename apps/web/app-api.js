@@ -6,7 +6,7 @@
         return '/api/v1/app/' + encodeURIComponent(id) + p;
     }
 
-    function mcAppApi(defaultId) {
+    function jetstreamAppApi(defaultId) {
         var appHost = document.querySelector('.app-panel-host');
         var appId =
             (appHost && appHost.getAttribute('data-app-id')) ||
@@ -141,7 +141,7 @@
         return 'Disabled';
     }
 
-    global.mcAppApi = mcAppApi;
+    global.jetstreamAppApi = jetstreamAppApi;
     global.refetchOnStatus = refetchOnStatus;
     global.fetchApp = fetchApp;
     global.fetchAppJson = fetchAppJson;
