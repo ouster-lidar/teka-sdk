@@ -51,7 +51,6 @@ let
     exec swaymsg exec "${glmark2Loop}" >/dev/null 2>&1 || true
   '';
   swayConfig = writeText "hello-wayland-gpu-sway.conf" ''
-    xwayland disable
     exec ${swayStartup}
   '';
   clientLd = lib.makeLibraryPath [

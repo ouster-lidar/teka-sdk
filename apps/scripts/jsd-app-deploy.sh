@@ -31,7 +31,7 @@ APP_LOG_EXPECT+=(['hello-llm']='hello-llm|Open WebUI|ollama|nemotron')
 APP_LOG_EXPECT+=(['nvidia-devtools']='nvidia-devtools listening')
 
 # Known-bad patterns for GPU/Wayland app images.
-BAD_PAT='Failed to initialize the GLX module|libnvidia-glcore\.so\..*cannot open shared object file|eglGetDisplay failed|glXQueryVersion failed|Failed at step NAMESPACE|Failed to set up mount namespacing|status=226/NAMESPACE|status=203/EXEC'
+BAD_PAT='libnvidia-glcore\.so\..*cannot open shared object file|eglGetDisplay failed|Failed at step NAMESPACE|Failed to set up mount namespacing|status=226/NAMESPACE|status=203/EXEC'
 
 usage() {
   echo "usage: jsd-app-deploy help|-h|--help" >&2

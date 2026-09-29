@@ -251,7 +251,6 @@ let
   '';
 
   swayConfig = writeText "${name}-sway.conf" ''
-    xwayland disable
     # Kiosk: one client, no titlebars/split chrome.
     font pango:monospace 1
     default_border none

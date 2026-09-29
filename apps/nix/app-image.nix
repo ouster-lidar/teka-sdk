@@ -638,6 +638,9 @@ let
       inherit (nixpkgs) lib;
       inherit (version) appArtifactRawName imageVersion buildId;
 
+      waylandCompositorsOverlay = import ./wayland-compositors-overlay.nix;
+      appPkgsFor = system: nixpkgs.legacyPackages.${system}.extend waylandCompositorsOverlay;
+
       allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
       heavyCrossServices = lib.filter (n: !(lib.elem n simpleCrossServices)) allServiceNames;
       # Portable images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
@@ -665,6 +668,7 @@ let
       heavyCrossOverlay =
         final: prev:
         (import ./pipewire-cross-no-modemmanager-overlay.nix) final prev
+        // (import ./wayland-compositors-overlay.nix) final prev
         // {
           onnxruntime = prev.onnxruntime.overrideAttrs (old: {
             cmakeFlags =
@@ -707,7 +711,7 @@ let
       perHostPackages =
         host:
         let
-          pkgs = nixpkgs.legacyPackages.${host};
+          pkgs = appPkgsFor host;
           callService = pkgs.callPackage;
           crossTargets = lib.filter (t: t != host) linuxSystems;
           nativeByName =
@@ -749,7 +753,7 @@ let
                             system = target;
                           };
                           config.allowUnfree = true;
-                          overlays = appOverlays;
+                          overlays = appOverlays ++ [ waylandCompositorsOverlay ];
                         };
                   in
                   crossPkgs.callPackage services.${n} {
@@ -831,7 +835,7 @@ let
       perSystemChecks =
         system:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = appPkgsFor system;
           hostPkgs = perHostPackages system;
           crossTargets = lib.filter (t: t != system) linuxSystems;
           # Non-Linux hosts expose Linux cross builds via crossAliases; name artifacts for that target.
