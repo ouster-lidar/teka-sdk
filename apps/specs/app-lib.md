@@ -45,18 +45,11 @@ Install app manifests and web assets at host paths under `usr/lib/jetstream/miss
 
 This flake pins `nixpkgs`, `crate2nix`, and `jetpack`. Downstream flakes should use `inputs.<this-flake>.inputs.*.follows` so app builds inherit the consumer's toolchain pins.
 
-## Release tags
+## Downstream compatibility
 
-Tag shared-infra releases when the app API JS helper or builder API changes:
-
-```
-app-lib-v0.1.0
-```
-
-Document the minimum compatible tag in downstream consumer specs when the API changes.
+Commit and merge `lib` / app-api / app-runtime changes in **this repo** before downstreams bump their flake input. Consumers record the pinned git **commit** in `flake.lock`—not a release tag.
 
 ## Change checklist
 
-1. Land shared nix / rust / app API JS changes here first.
-2. Tag if the app API JS or `lib` API changed.
-3. Notify downstream consumers to bump their flake input rev.
+1. Commit and merge shared nix / rust / app API JS changes in this repo.
+2. Downstream bumps its `example-apps` input rev when the exported API changes.

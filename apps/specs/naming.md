@@ -14,6 +14,9 @@ Systemd portable-service mechanics (`portablectl`, `/var/lib/portables/`, `missi
 |-------|---------|---------|
 | App id / flake attr | `hello-{topic}` | `hello-http` |
 | Source dir | topic | `examples/hello-http/` |
+| Shared web helper (source) | `apps/web/app-api.js` | — |
+| Shared web helper (DDI install) | `usr/lib/jetstream/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
+| App panel JS global | `jetstreamAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
 
 ## Distributable artifact vs install identity
 
