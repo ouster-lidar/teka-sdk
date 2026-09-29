@@ -13,6 +13,8 @@ rustPlatform.buildRustPackage rec {
 
   dontCargoInstall = true;
 
+  RUSTFLAGS = "-Dwarnings";
+
   postInstall = ''
     mkdir -p $out/lib
     rlib=$(

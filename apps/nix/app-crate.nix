@@ -25,6 +25,11 @@ let
   appRuntimeSrcFilter =
     if lib.isDerivation appRuntimeSrc then appRuntimeSrc else lib.cleanSource appRuntimeSrc;
 
+  strictRustWarnings = attrs: {
+    extraRustcOpts = (attrs.extraRustcOpts or [ ]) ++ [ "-Dwarnings" ];
+    capLints = "forbid";
+  };
+
   appCrateOverridesFor =
     {
       crateName,
@@ -33,15 +38,22 @@ let
     }:
     targetPkgs.defaultCrateOverrides
     // {
-      app-runtime = attrs: {
-        src = appRuntimeSrcFilter;
-      };
-      ${crateName} = attrs: {
-        src = if filteredSrc != null then filteredSrc else attrs.src;
-        preBuild = (attrs.preBuild or "") + ''
-          export CARGO_CRATE_NAME="${attrs.libName or (lib.replaceStrings [ "-" ] [ "_" ] crateName)}"
-        '';
-      };
+      app-runtime =
+        attrs:
+        strictRustWarnings attrs
+        // {
+          src = appRuntimeSrcFilter;
+        };
+      jetstream-host = strictRustWarnings;
+      ${crateName} =
+        attrs:
+        strictRustWarnings attrs
+        // {
+          src = if filteredSrc != null then filteredSrc else attrs.src;
+          preBuild = (attrs.preBuild or "") + ''
+            export CARGO_CRATE_NAME="${attrs.libName or (lib.replaceStrings [ "-" ] [ "_" ] crateName)}"
+          '';
+        };
     };
 
   rootCrateBuildFor =
@@ -170,6 +182,7 @@ in
     appApiJsSrc
     appOpensslNative
     buildAppCrate2nix
+    strictRustWarnings
     appRustSrc
     appHostUnitDefaults
     appWebTree

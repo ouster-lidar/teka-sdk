@@ -74,21 +74,25 @@ let
         targetPkgs.defaultCrateOverrides
         // (import ./crate-config.nix { pkgs = targetPkgs; })
         // {
-          hello-ouster-world = attrs: {
-            src = howSrc;
-            preBuild = (attrs.preBuild or "") + ''
-              export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_world"}"
-            '';
-            nativeBuildInputs = (attrs.nativeBuildInputs or [ ]) ++ [ targetPkgs.pkg-config ];
-            buildInputs =
-              (attrs.buildInputs or [ ])
-              ++ (with targetPkgs; [
-                gst_all_1.gstreamer
-                gst_all_1.gst-plugins-base
-                glib
-                wayland
-              ]);
-          };
+          app-runtime = app.strictRustWarnings;
+          hello-ouster-world =
+            attrs:
+            app.strictRustWarnings attrs
+            // {
+              src = howSrc;
+              preBuild = (attrs.preBuild or "") + ''
+                export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_world"}"
+              '';
+              nativeBuildInputs = (attrs.nativeBuildInputs or [ ]) ++ [ targetPkgs.pkg-config ];
+              buildInputs =
+                (attrs.buildInputs or [ ])
+                ++ (with targetPkgs; [
+                  gst_all_1.gstreamer
+                  gst_all_1.gst-plugins-base
+                  glib
+                  wayland
+                ]);
+            };
         };
       cross = import ../../nix/cross-crate2nix.nix {
         inherit lib pkgs crateOverridesForPkgs;

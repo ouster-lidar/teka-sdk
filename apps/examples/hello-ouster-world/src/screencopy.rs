@@ -390,10 +390,6 @@ impl EncodePipeline {
         Ok(())
     }
 
-    fn set_paused(&self) {
-        let _ = self.pipeline.set_state(State::Paused);
-    }
-
     fn set_null(&self) {
         let _ = self.pipeline.set_state(State::Null);
     }
@@ -741,7 +737,7 @@ impl WaylandCapture {
         }
         let xdg = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
         let path = PathBuf::from(&xdg).join(format!("how-scrcpy-{}", std::process::id()));
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
@@ -862,7 +858,6 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
     let mut logged_ready = false;
     let mut wl: Option<WaylandCapture> = None;
     let mut pipeline: Option<EncodePipeline> = None;
-    let mut last_output: Option<String> = None;
     let mut last_size = (0u32, 0u32);
     let mut last_format = DRM_FORMAT_XRGB8888;
     let mut retry_after = Instant::now();
@@ -890,7 +885,6 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                 p.set_null();
             }
             wl = None;
-            last_output = None;
             thread::sleep(Duration::from_millis(200));
             continue;
         }
@@ -958,7 +952,6 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                     }
                     display.set_error(None);
                     pipeline = Some(p);
-                    last_output = Some(output_name.clone());
                     last_size = (dw, dh);
                 }
                 Err(e) => {

@@ -9,7 +9,7 @@ use parking_lot::Mutex;
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
-use crate::source_config::{self, PersistedSourceConfig};
+use crate::source_config::PersistedSourceConfig;
 use crate::ui_state;
 use crate::AppState;
 
@@ -183,7 +183,7 @@ fn utc_ymd_hms(secs: u64) -> (u32, u32, u32, u32, u32, u32) {
     let h = (time / 3600) as u32;
     let mi = ((time % 3600) / 60) as u32;
     let s = (time % 60) as u32;
-    let mut z = days + 719468;
+    let z = days + 719468;
     let era = z / 146097;
     let doe = z - era * 146097;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;

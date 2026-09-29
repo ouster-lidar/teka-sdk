@@ -1174,7 +1174,6 @@ fn spawn_output_manager(display: DisplayState) {
                 }
             }
         }
-        let mut last_on_device = *display.inner.on_device_active.lock();
         let mut last_hdmi = *display.inner.hdmi_enabled.lock();
         let mut last_present = *display.inner.hdmi_present.lock();
         loop {
@@ -1222,7 +1221,6 @@ fn spawn_output_manager(display: DisplayState) {
             } else {
                 let _ = write_stream_target(&display);
             }
-            last_on_device = *display.inner.on_device_active.lock();
             last_hdmi = hdmi_want;
             last_present = physical_present;
         }
