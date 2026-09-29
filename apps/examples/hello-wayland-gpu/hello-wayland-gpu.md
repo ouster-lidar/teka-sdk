@@ -22,4 +22,4 @@ Requires **`/run/opengl-driver`** on the appliance. **`WLR_BACKENDS=drm,libinput
 
 ## Non-goals
 
-X11 (this demo is Wayland-only); Firefox or sensor apps.
+Firefox or sensor apps. No X11 / Xwayland (compositor and image are Wayland-only).

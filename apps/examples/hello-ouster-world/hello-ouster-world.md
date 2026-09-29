@@ -75,7 +75,7 @@ from source (cross compiling if necessary) for Python 3.12.  This app
 utilizes the SDK to view and interact with LiDAR point clouds and
 object visualization using SimpleViz.
 
-Runtime: `GLFW_PLATFORM=wayland`, Sway with **no Xwayland**. SimpleViz is a native Wayland GLFW client.
+Runtime: `GLFW_PLATFORM=wayland`, Sway built without Xwayland. SimpleViz is a native Wayland GLFW client.
 
 ## Dynamo
 
