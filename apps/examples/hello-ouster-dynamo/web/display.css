@@ -1,0 +1,362 @@
+/* hello-ouster-world: Display card, then Console card */
+
+.how-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    width: 100%;
+}
+
+.how-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 0.5rem 1rem;
+    margin: 0.25rem 0 0.45rem;
+}
+
+.how-meta dt {
+    font-size: 0.75rem;
+    color: #5a6a7a;
+    margin: 0;
+}
+
+.how-meta dd {
+    margin: 0.15rem 0 0;
+    font-size: 0.85rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.how-meta code {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: #94a3b8;
+}
+
+.how-display-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.how-console-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+}
+
+.how-display-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: center;
+}
+
+.how-display-controls {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: center;
+}
+
+.how-stream-panel {
+    position: relative;
+    width: max-content;
+    max-width: 100%;
+}
+
+.how-source-block.iface-block {
+    margin: 0;
+    padding: 0.55rem 0.75rem 0.65rem;
+}
+
+.how-source-title {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #5a6a7a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.how-source-heading {
+    margin-bottom: 0.45rem;
+}
+
+.how-source-mode-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.how-source-mode-seg {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.72rem;
+}
+
+.how-source-mode-seg.how-source-mode-seg-active.how-source-mode-seg--local_file {
+    background: linear-gradient(135deg, #4ade80, #22c55e);
+    border: 1px solid #22c55e;
+    color: #0a0a0f;
+}
+
+.how-source-mode-seg.how-source-mode-seg-active.how-source-mode-seg--sensor {
+    background: #1e3a5f;
+    border: 1px solid #38bdf8;
+    color: #e0f2fe;
+}
+
+.how-source-fields-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 0.55rem;
+}
+
+.how-source-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.how-source-field .form-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #5a6a7a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.how-via-dynamo-control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 1rem;
+    min-height: 1.75rem;
+}
+
+.how-via-dynamo-control .mc-switch {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.how-via-dynamo-hint {
+    font-size: 0.8rem;
+    line-height: 1.2;
+    color: #64748b;
+    margin: 0;
+}
+
+.how-osf-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.how-osf-select {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+    width: auto;
+}
+
+.how-sensor-row {
+    align-items: center;
+}
+
+.how-record-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    flex: 2 1 24rem;
+    min-width: 14rem;
+}
+
+.how-record-toggle {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.how-sensor-host-input {
+    flex: 0 1 22rem;
+    min-width: 16rem;
+    max-width: 28rem;
+    width: auto;
+}
+
+.how-record-filename {
+    flex: 2 1 22rem;
+    min-width: 16rem;
+    max-width: 36rem;
+}
+
+.how-toggle-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.how-toggle-disabled .mc-switch-cb {
+    pointer-events: none;
+}
+
+.how-sock-input {
+    width: 100%;
+}
+
+.how-osf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+}
+
+.how-osf-file-btn {
+    margin: 0;
+    cursor: pointer;
+}
+
+.how-osf-fetch-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+    width: 100%;
+}
+
+.how-osf-fetch-progress .mc-progress-bar {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    height: 10px;
+}
+
+.how-osf-fetch-caption {
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+.how-osf-fetch-caption--err {
+    color: #fca5a5;
+}
+
+.how-control-status {
+    display: inline-block;
+    box-sizing: border-box;
+    min-width: 11ch; /* "Controlling" */
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: #94a3b8;
+    white-space: pre;
+}
+
+.how-control-status.how-control-active {
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+#hdmi-label,
+#stream-label {
+    display: inline-block;
+    min-width: 14ch; /* "Show on HDMI" / "Show in Browser" */
+    font-variant-numeric: tabular-nums;
+}
+
+.how-stream-wrap {
+    position: relative;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    line-height: 0;
+    background: #0b1220;
+    border: 1px solid #334155;
+    border-radius: 0.25rem;
+    overflow: hidden;
+    outline: none;
+    touch-action: none;
+    cursor: crosshair;
+}
+
+.how-stream-idle-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    box-sizing: border-box;
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.35;
+    color: #94a3b8;
+    background: rgba(11, 18, 32, 0.92);
+    font-size: 0.9rem;
+}
+
+.how-stream-idle-hint[hidden] {
+    display: none !important;
+}
+
+.how-stream-idle-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.how-stream-idle-hint p {
+    margin: 0;
+    max-width: 22rem;
+}
+
+.how-stream-wrap.how-controlling {
+    border-color: #60a5fa;
+    box-shadow: inset 0 0 0 1px #60a5fa;
+}
+
+.how-stream-canvas {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    /* Allow 1080p/native streams to actually grow (old 540px cap made 720/1080 identical). */
+    max-height: min(80vh, 1080px);
+    user-select: none;
+    pointer-events: none;
+    background: #000;
+    vertical-align: top;
+}
+
+.how-terminal {
+    flex: 1 1 auto;
+    min-height: 16rem;
+    height: 100%;
+    padding: 0.35rem;
+    border: 1px solid #334155;
+    border-radius: 0.25rem;
+    background: #0b1220;
+    overflow: hidden;
+}
+
+.how-terminal .xterm {
+    height: 100%;
+    padding: 0.25rem;
+}
+
+.how-terminal .xterm-viewport {
+    overflow-y: auto !important;
+}
+
