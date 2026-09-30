@@ -8,32 +8,6 @@
     width: 100%;
 }
 
-.how-meta {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-    gap: 0.5rem 1rem;
-    margin: 0.25rem 0 0.45rem;
-}
-
-.how-meta dt {
-    font-size: 0.75rem;
-    color: #5a6a7a;
-    margin: 0;
-}
-
-.how-meta dd {
-    margin: 0.15rem 0 0;
-    font-size: 0.85rem;
-    font-weight: 500;
-    overflow-wrap: anywhere;
-}
-
-.how-meta code {
-    font-size: 0.8rem;
-    font-weight: 400;
-    color: #94a3b8;
-}
-
 .how-display-card {
     display: flex;
     flex-direction: column;
@@ -51,11 +25,49 @@
     box-sizing: border-box;
 }
 
-.how-display-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 1rem;
+.how-guest-access .mc-switch-text {
+    font-size: 0.85rem;
+}
+
+.how-guest-bar {
+    display: none;
     align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
+.how-guest .how-guest-bar {
+    display: flex;
+}
+
+.how-guest-bar .iface-block-chips {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.how-guest-signin {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-decoration: none;
+}
+
+.how-guest-signin:hover {
+    color: #94a3b8;
+    text-decoration: underline;
+}
+
+.how-guest .how-source-block,
+.how-guest .how-console-card {
+    display: none !important;
+}
+
+.how-console-collapsed #terminal,
+.how-console-collapsed #console-error {
+    display: none !important;
+}
+
+.how-console-collapsed .service-header {
+    margin-bottom: 0;
 }
 
 .how-display-controls {
@@ -67,8 +79,8 @@
 
 .how-stream-panel {
     position: relative;
-    width: max-content;
-    max-width: 100%;
+    width: 100%;
+    margin-top: 0.75rem;
 }
 
 .how-source-block.iface-block {
@@ -86,7 +98,28 @@
 }
 
 .how-source-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
     margin-bottom: 0.45rem;
+}
+
+.how-source-message {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.how-source-collapsed .how-source-heading,
+.how-source-collapsed .how-source-mode-segmented,
+.how-source-collapsed #btn-apply-source,
+.how-source-collapsed .how-source-fields-stack {
+    display: none;
 }
 
 .how-source-mode-segmented {
@@ -135,24 +168,17 @@
     letter-spacing: 0.05em;
 }
 
-.how-via-dynamo-control {
+.how-sensor-discovery-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.65rem 1rem;
-    min-height: 1.75rem;
+    gap: 0.5rem;
 }
 
-.how-via-dynamo-control .mc-switch {
-    flex: 0 0 auto;
-    margin: 0;
-}
-
-.how-via-dynamo-hint {
-    font-size: 0.8rem;
-    line-height: 1.2;
-    color: #64748b;
-    margin: 0;
+.how-sensor-candidate-select {
+    flex: 1 1 18rem;
+    min-width: 12rem;
+    width: auto;
 }
 
 .how-osf-row {
@@ -197,6 +223,39 @@
     flex: 2 1 22rem;
     min-width: 16rem;
     max-width: 36rem;
+}
+
+.how-record-duration {
+    position: relative;
+    display: inline-block;
+}
+
+#record-duration {
+    width: 5.5rem;
+    padding-right: 1.5rem;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+#record-duration::-webkit-inner-spin-button,
+#record-duration::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.how-record-duration-unit {
+    position: absolute;
+    top: 50%;
+    right: 0.6rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.how-record-off .how-record-filename,
+.how-record-off .how-record-duration {
+    opacity: 0.45;
 }
 
 .how-toggle-disabled {
@@ -250,22 +309,6 @@
     color: #fca5a5;
 }
 
-.how-control-status {
-    display: inline-block;
-    box-sizing: border-box;
-    min-width: 11ch; /* "Controlling" */
-    font-size: 0.8rem;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-    color: #94a3b8;
-    white-space: pre;
-}
-
-.how-control-status.how-control-active {
-    color: #60a5fa;
-    font-weight: 600;
-}
-
 #hdmi-label,
 #stream-label {
     display: inline-block;
@@ -276,16 +319,176 @@
 .how-stream-wrap {
     position: relative;
     display: block;
-    width: max-content;
-    max-width: 100%;
+    width: 100%;
+    max-width: var(--stream-max-w, 100%);
+    margin-inline: auto;
+    box-sizing: border-box;
+    padding: 6px;
     line-height: 0;
-    background: #0b1220;
-    border: 1px solid #334155;
-    border-radius: 0.25rem;
+    background: #000;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.12), 0 18px 48px rgba(0, 0, 0, 0.55);
     overflow: hidden;
     outline: none;
     touch-action: none;
     cursor: crosshair;
+    transition: box-shadow 0.2s;
+}
+
+.how-stream-hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    line-height: 1.2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.how-stream-wrap:hover .how-stream-hud,
+.how-stream-wrap:focus-within .how-stream-hud {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .how-stream-hud {
+        opacity: 1;
+    }
+}
+
+.how-stream-hud-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.how-stream-hud-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+#screenshot-status {
+    position: absolute;
+    top: 3rem;
+    right: 0.6rem;
+    max-width: calc(100% - 1.2rem);
+    box-sizing: border-box;
+}
+
+.how-keybindings-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(58rem, calc(100vw - 3rem));
+    height: fit-content;
+    max-height: calc(100dvh - 3rem);
+    box-sizing: border-box;
+    padding: 1.25rem;
+    border: 1px solid #334155;
+    border-radius: 0.5rem;
+    background: #0b1220;
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    text-align: left;
+    overflow: auto;
+    cursor: default;
+    touch-action: pan-y;
+}
+
+.how-keybindings-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.how-keybindings-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.how-keybindings-heading h3 {
+    margin: 0;
+}
+
+.how-keybindings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 0.75rem 1.5rem;
+}
+
+.how-keybindings-dialog h4 {
+    margin: 0.4rem 0;
+    color: #94a3b8;
+}
+
+.how-keybindings-dialog [hidden] {
+    display: none;
+}
+
+.how-keybindings-dialog table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.how-keybindings-dialog th,
+.how-keybindings-dialog td {
+    padding: 0.25rem;
+    border-bottom: 1px solid #334155;
+    vertical-align: top;
+}
+
+.how-keybindings-dialog td:first-child {
+    width: 40%;
+}
+
+.how-hud-chip,
+.how-hud-btn {
+    background: rgba(2, 6, 23, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    backdrop-filter: blur(6px);
+    color: #cbd5e1;
+}
+
+.how-hud-chip {
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.how-hud-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.how-hud-btn:hover {
+    color: #fff;
+    border-color: #38bdf8;
+}
+
+.how-hud-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.how-hud-chip[hidden],
+.how-hud-btn[hidden] {
+    display: none;
 }
 
 .how-stream-idle-hint {
@@ -322,18 +525,54 @@
     max-width: 22rem;
 }
 
+.how-stream-alert {
+    padding: 0.35rem 0.75rem;
+    border-radius: 0.35rem;
+    font-size: 0.85rem;
+    color: #fde68a;
+    background: rgba(66, 32, 6, 0.9);
+}
+
+.how-stream-alert a {
+    color: inherit;
+    pointer-events: auto;
+}
+
+/* While frames are live, keep the viz visible and float the warning on top. */
+.how-stream-idle-hint.how-alert-only {
+    justify-content: flex-start;
+    padding-top: 3rem;
+    background: transparent;
+}
+
+.how-stream-wrap:fullscreen {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.how-stream-wrap:fullscreen .how-stream-canvas {
+    height: 100%;
+    max-height: none;
+}
+
 .how-stream-wrap.how-controlling {
-    border-color: #60a5fa;
-    box-shadow: inset 0 0 0 1px #60a5fa;
+    box-shadow: 0 0 0 1px #60a5fa, 0 0 28px rgba(96, 165, 250, 0.3), 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.how-stream-wrap:fullscreen.how-controlling {
+    box-shadow: none;
 }
 
 .how-stream-canvas {
     display: block;
-    width: auto;
+    width: 100%;
     height: auto;
-    max-width: 100%;
-    /* Allow 1080p/native streams to actually grow (old 540px cap made 720/1080 identical). */
-    max-height: min(80vh, 1080px);
+    max-height: var(--stream-max-h, calc(100vh - 16rem));
+    object-fit: contain;
     user-select: none;
     pointer-events: none;
     background: #000;
@@ -359,4 +598,3 @@
 .how-terminal .xterm-viewport {
     overflow-y: auto !important;
 }
-

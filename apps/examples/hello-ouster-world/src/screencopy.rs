@@ -297,6 +297,8 @@ impl EncodePipeline {
             Caps::builder("video/x-raw")
                 .features(["memory:NVMM"])
                 .field("format", "NV12")
+                // Full-range BT.601 (JFIF); limited range shows black as 16 in browsers.
+                .field("colorimetry", "1:4:0:0")
                 .build(),
         );
         tracing::debug!("gst: encoder props (jpeg)");
@@ -312,7 +314,8 @@ impl EncodePipeline {
 
         set_element_prop_if_exists(&encoder, "quality", 80i32);
         if nvvidconv.find_property("compute-hw").is_some() {
-            nvvidconv.set_property_from_str("compute-hw", "GPU");
+            // GPU conversion intermittently produces green JPEG frames on Orin.
+            nvvidconv.set_property_from_str("compute-hw", "VIC");
         }
 
         tracing::debug!("gst: appsrc/appsink caps (system memory BGRx → NVMM JPEG)");
@@ -896,7 +899,6 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
 
         let preferred = display.inner.viz_output.lock().clone();
         let Some(output_name) = preferred else {
-            display.set_error(Some("viz output not ready".into()));
             thread::sleep(Duration::from_millis(500));
             continue;
         };

@@ -12,7 +12,7 @@ Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBo
 | `hello-llm`             | LLM guide in Jetstream; chat on host `:8080`         |
 | `hello-ouster-dynamo`   | Optional advanced viewer with FrameSet input and overlays; Ouster Dynamo installs separately |
 | `hello-ouster-terminal` | Terminal lidar viewer (ouster-cli viz)               |
-| `hello-ouster-world`    | SimpleViz + Display; FrameSet / OSF / sensor sources |
+| `hello-ouster-world`    | Direct SDK OSF / sensor viewer with discovery and recording |
 | `hello-pub`             | Event publisher demo                                 |
 | `hello-sub`             | Event subscriber demo                                |
 | `hello-slidev`          | Slidev presentation demo                             |

@@ -247,6 +247,58 @@ rec {
         };
         resolvedDefaultFeatures = [ "default" "std" ];
       };
+      "app-runtime" = rec {
+        crateName = "app-runtime";
+        version = "0.1.0";
+        edition = "2021";
+        src = lib.cleanSourceWith { filter = sourceFilter;  src = ../../lib/app-runtime; };
+        libName = "app_runtime";
+        dependencies = [
+          {
+            name = "axum";
+            packageId = "axum";
+            features = [ "ws" ];
+          }
+          {
+            name = "parking_lot";
+            packageId = "parking_lot";
+          }
+          {
+            name = "reqwest";
+            packageId = "reqwest 0.13.4";
+            usesDefaultFeatures = false;
+            features = [ "json" "blocking" ];
+          }
+          {
+            name = "sd-notify";
+            packageId = "sd-notify";
+            target = { target, features }: ("linux" == target."os" or null);
+          }
+          {
+            name = "serde";
+            packageId = "serde";
+            features = [ "derive" ];
+          }
+          {
+            name = "serde_json";
+            packageId = "serde_json";
+          }
+          {
+            name = "socket2";
+            packageId = "socket2";
+          }
+          {
+            name = "tokio";
+            packageId = "tokio";
+            features = [ "sync" "time" "signal" "rt" ];
+          }
+          {
+            name = "tracing";
+            packageId = "tracing";
+          }
+        ];
+
+      };
       "atomic-waker" = rec {
         crateName = "atomic-waker";
         version = "1.1.2";
@@ -2219,6 +2271,10 @@ rec {
             packageId = "anyhow";
           }
           {
+            name = "app-runtime";
+            packageId = "app-runtime";
+          }
+          {
             name = "axum";
             packageId = "axum";
             features = [ "json" "ws" ];
@@ -2250,10 +2306,6 @@ rec {
             usesDefaultFeatures = false;
           }
           {
-            name = "app-runtime";
-            packageId = "app-runtime";
-          }
-          {
             name = "parking_lot";
             packageId = "parking_lot";
           }
@@ -2276,6 +2328,11 @@ rec {
             name = "tokio";
             packageId = "tokio";
             features = [ "full" ];
+          }
+          {
+            name = "tokio-tungstenite";
+            packageId = "tokio-tungstenite";
+            features = [ "rustls-tls-webpki-roots" ];
           }
           {
             name = "tower-http";
@@ -2556,7 +2613,7 @@ rec {
           }
           {
             name = "webpki-roots";
-            packageId = "webpki-roots";
+            packageId = "webpki-roots 1.0.9";
             optional = true;
           }
         ];
@@ -3392,58 +3449,6 @@ rec {
         features = {
         };
         resolvedDefaultFeatures = [ "default" ];
-      };
-      "app-runtime" = rec {
-        crateName = "app-runtime";
-        version = "0.1.0";
-        edition = "2021";
-        src = lib.cleanSourceWith { filter = sourceFilter;  src = ../../lib/app-runtime; };
-        libName = "app_runtime";
-        dependencies = [
-          {
-            name = "axum";
-            packageId = "axum";
-            features = [ "ws" ];
-          }
-          {
-            name = "parking_lot";
-            packageId = "parking_lot";
-          }
-          {
-            name = "reqwest";
-            packageId = "reqwest 0.13.4";
-            usesDefaultFeatures = false;
-            features = [ "json" "blocking" ];
-          }
-          {
-            name = "sd-notify";
-            packageId = "sd-notify";
-            target = { target, features }: ("linux" == target."os" or null);
-          }
-          {
-            name = "serde";
-            packageId = "serde";
-            features = [ "derive" ];
-          }
-          {
-            name = "serde_json";
-            packageId = "serde_json";
-          }
-          {
-            name = "socket2";
-            packageId = "socket2";
-          }
-          {
-            name = "tokio";
-            packageId = "tokio";
-            features = [ "sync" "time" "signal" "rt" ];
-          }
-          {
-            name = "tracing";
-            packageId = "tracing";
-          }
-        ];
-
       };
       "memchr" = rec {
         crateName = "memchr";
@@ -4646,7 +4651,7 @@ rec {
           }
           {
             name = "webpki-roots";
-            packageId = "webpki-roots";
+            packageId = "webpki-roots 1.0.9";
             optional = true;
             target = { target, features }: (!("wasm32" == target."arch" or null));
           }
@@ -6247,15 +6252,37 @@ rec {
             packageId = "log";
           }
           {
+            name = "rustls";
+            packageId = "rustls";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+          {
+            name = "rustls-pki-types";
+            packageId = "rustls-pki-types";
+            optional = true;
+          }
+          {
             name = "tokio";
             packageId = "tokio";
             usesDefaultFeatures = false;
             features = [ "io-util" ];
           }
           {
+            name = "tokio-rustls";
+            packageId = "tokio-rustls";
+            optional = true;
+            usesDefaultFeatures = false;
+          }
+          {
             name = "tungstenite";
             packageId = "tungstenite";
             usesDefaultFeatures = false;
+          }
+          {
+            name = "webpki-roots";
+            packageId = "webpki-roots 0.26.11";
+            optional = true;
           }
         ];
         devDependencies = [
@@ -6284,7 +6311,7 @@ rec {
           "url" = [ "tungstenite/url" ];
           "webpki-roots" = [ "dep:webpki-roots" ];
         };
-        resolvedDefaultFeatures = [ "connect" "default" "handshake" "stream" ];
+        resolvedDefaultFeatures = [ "__rustls-tls" "connect" "default" "handshake" "rustls" "rustls-pki-types" "rustls-tls-webpki-roots" "stream" "tokio-rustls" "webpki-roots" ];
       };
       "tokio-util" = rec {
         crateName = "tokio-util";
@@ -7029,6 +7056,18 @@ rec {
             packageId = "rand 0.9.5";
           }
           {
+            name = "rustls";
+            packageId = "rustls";
+            optional = true;
+            usesDefaultFeatures = false;
+            features = [ "std" ];
+          }
+          {
+            name = "rustls-pki-types";
+            packageId = "rustls-pki-types";
+            optional = true;
+          }
+          {
             name = "sha1";
             packageId = "sha1";
             optional = true;
@@ -7063,7 +7102,7 @@ rec {
           "url" = [ "dep:url" ];
           "webpki-roots" = [ "dep:webpki-roots" ];
         };
-        resolvedDefaultFeatures = [ "data-encoding" "handshake" "http" "httparse" "sha1" ];
+        resolvedDefaultFeatures = [ "__rustls-tls" "data-encoding" "handshake" "http" "httparse" "rustls" "rustls-pki-types" "sha1" ];
       };
       "typenum" = rec {
         crateName = "typenum";
@@ -8186,7 +8225,22 @@ rec {
           "serde" = [ "dep:serde" ];
         };
       };
-      "webpki-roots" = rec {
+      "webpki-roots 0.26.11" = rec {
+        crateName = "webpki-roots";
+        version = "0.26.11";
+        edition = "2021";
+        sha256 = "1agpayg5zzf7m1a01q30jahlgmn5nwggbabdhq0in008pf5c66sj";
+        libName = "webpki_roots";
+        dependencies = [
+          {
+            name = "webpki-roots";
+            packageId = "webpki-roots 1.0.9";
+            rename = "parent";
+          }
+        ];
+
+      };
+      "webpki-roots 1.0.9" = rec {
         crateName = "webpki-roots";
         version = "1.0.9";
         edition = "2021";

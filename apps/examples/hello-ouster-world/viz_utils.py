@@ -20,13 +20,7 @@ from typing import Any, Callable, Optional
 import ouster.sdk.viz.core as viz_core
 from ouster.sdk.viz import PointViz, WindowCtx
 
-from source_config import (
-    AppSocketStatus,
-    FrameSetSourceType,
-    is_app_source,
-    parse_source,
-    set_runtime_status,
-)
+from source_config import FrameSetSourceType
 
 # Shared with Rust via HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR (systemd).
 RUNTIME_DIR = Path(
@@ -68,6 +62,10 @@ _GLFW_DOM = {
     "Space": 32,
     "Minus": 45,
     "Equal": 61,
+    "Comma": 44,
+    "Period": 46,
+    "Slash": 47,
+    "Quote": 39,
     "ShiftLeft": 340,
     "ShiftRight": 344,
     "ControlLeft": 341,
@@ -249,6 +247,57 @@ class KeyBridge:
         self._orthographic = False
         self._fov_levels = (30, 45, 60, 75, 90, 105, 120, 135, 150)
         self._fov_index = 4
+        self._simple: Any = None
+        self._replay = False
+        self._controls: dict = {}
+
+    def attach(self, simple: Any, *, replay: bool) -> None:
+        self._simple = simple
+        self._replay = replay
+
+    def _update_controls(self) -> None:
+        if self._simple is None:
+            return
+        metas = self._simple._metadata
+        frames = self._simple._frame_viz._frame_set
+        controls = {
+            "sensor_count": len(metas),
+            "replay": self._replay,
+            "objects": self._controls.get("objects", False) or bool(frames.objects)
+            or any(bool(frame.objects) for frame in frames if frame is not None),
+            "zones": any(meta.format.zone_monitoring_enabled and meta.zone_set is not None
+                         and bool(meta.zone_set.zones) for meta in metas),
+        }
+        if controls == self._controls:
+            return
+        path = RUNTIME_DIR / "viz-controls.json"
+        tmp = path.with_suffix(".tmp")
+        try:
+            tmp.write_text(json.dumps(controls), encoding="utf-8")
+            os.replace(tmp, path)
+            self._controls = controls
+        except OSError as exc:
+            print(f"hello-ouster-world: viz controls write failed: {exc!r}", flush=True)
+
+    def _key_allowed(self, key: int, mods: int) -> bool:
+        if key == 256 or (key, mods) in {
+            (ord("/"), 1), (ord("X"), 1), (ord("X"), 2), (ord("Z"), 1),
+            (ord("V"), 0), (ord("V"), 1), (ord("6"), 0), (ord("7"), 0),
+            (ord("J"), 0), (ord("J"), 1), (ord("K"), 0), (ord("K"), 1),
+            (ord("G"), 0), (ord("G"), 1),
+        }:
+            return False
+        if not self._replay and key in (ord(","), ord("."), ord("H")):
+            return False
+        if not self._controls.get("objects") and (key, mods) in {
+            (ord("C"), 2), (ord("C"), 3), (ord("5"), 0),
+        }:
+            return False
+        if not self._controls.get("zones") and (key, mods) in {(ord("Y"), 0), (ord("Y"), 2)}:
+            return False
+        if mods == 2 and ord("1") <= key <= ord("9"):
+            return key - ord("1") < self._controls.get("sensor_count", 0)
+        return True
 
     def push_handler(self, handler: Callable) -> None:
         self._handlers.append(handler)
@@ -283,17 +332,8 @@ class KeyBridge:
 
     @staticmethod
     def _cameras(viz: Any) -> list:
-        """Resolve PointViz camera(s). Python binds `camera` as a property."""
-        cams: list = []
-        for name in ("camera", "current_camera"):
-            attr = getattr(viz, name, None)
-            if attr is None:
-                continue
-            # C++ uses camera(); Python exposes property Camera (not callable).
-            cam = attr() if callable(attr) else attr
-            if cam is not None:
-                cams.append(cam)
-        return cams
+        # Publish the pending camera through update(); rendering owns current_camera.
+        return [viz.camera]
 
     def _move_camera(self, viz: Any, key: int, amount: float) -> bool:
         cams = self._cameras(viz)
@@ -370,18 +410,21 @@ class KeyBridge:
                     cam.birds_eye_view()
 
     def flush(self, viz: Any) -> None:
-        """Apply queued keys on the PointViz thread."""
+        """Apply queued keys independently of frame processing."""
+        self._update_controls()
         while True:
             try:
                 key, mods = self._q.get_nowait()
             except queue.Empty:
                 break
+            if not self._key_allowed(key, mods):
+                continue
             try:
                 self._apply_default_controls(viz, int(key), int(mods))
             except Exception as exc:  # noqa: BLE001
                 print(f"hello-ouster-world: camera key inject error: {exc!r}", flush=True)
             ctx = WindowCtx()
-            for handler in list(self._handlers):
+            for handler in reversed(self._handlers.copy()):
                 try:
                     keep = handler(ctx, int(key), int(mods))
                 except Exception as exc:  # noqa: BLE001
@@ -389,6 +432,7 @@ class KeyBridge:
                     break
                 if keep is False:
                     break
+            viz.update()
 
     def _listen_loop(self) -> None:
         try:
@@ -467,11 +511,11 @@ class KeyBridge:
 
 
 class VizProxy:
-    """Thin wrapper around PointViz so we can hook update and run.
+    """Thin wrapper around PointViz for remote keys and config reload.
 
     PointViz's pybind methods cannot be overridden in place, so SimpleViz
-    gets this proxy instead: update flushes remote keys, run starts the
-    config-reload watcher, and key handlers also register with KeyBridge.
+    gets this proxy instead: run starts the render loop and config-reload
+    watcher, and key handlers also register with KeyBridge.
     ``add_default_controls`` is unwrapped to the real PointViz at module load.
     """
 
@@ -485,13 +529,17 @@ class VizProxy:
         object.__setattr__(self, "_on_run", on_run)
         object.__setattr__(self, "_keys", keys)
 
+    @property
+    def __class__(self) -> type:
+        # The SDK registers frame controls only for isinstance(viz, PointViz).
+        return type(self._real)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._real, name, value)
+
     def push_key_handler(self, handler: Callable) -> None:
         self._keys.push_handler(handler)
         self._real.push_key_handler(handler)
-
-    def update(self) -> None:
-        self._keys.flush(self._real)
-        self._real.update()
 
     def run(self) -> None:
         self._on_run(self._real)
@@ -501,51 +549,23 @@ class VizProxy:
 
 
 class JetstreamDisplayBridge:
-    """Bridges between the browser's display panel and the HDMI output, 
-       allowing the browser's display panel to mirror the HDMI output 
-       and control it via mouse/keyboard.
-    
-        -Creates a shared PointViz (with remote mouse/keyboard)
-        -Sets playback rate / EOF behavior from the source type
-        -Publishes app-socket waiting/connected status for the UI
-    """
+    """Share one PointViz window between the browser and HDMI output."""
 
-    def __init__(self, source_type: Any, frame_set_source: str) -> None:
-        self.source_type = parse_source(source_type)
-        self.frame_set_source = frame_set_source
-        # Play once; outer main() reopens live/app sources or idles after OSF EOF.
-        self.on_eof = "stop"
-        self.rate: Optional[float] = None if self.is_app else 1.0
+    def __init__(self, source_type: FrameSetSourceType) -> None:
+        self.source_type = FrameSetSourceType(source_type)
+        self.rate: float = 1.0
         self.pointviz: Any = None
         self._source: Any = None
         self._keys: Optional[KeyBridge] = None
         self._demand: Optional[DemandController] = None
         self._config_watch: Any = None
 
-    @property
-    def is_app(self) -> bool:
-        return is_app_source(self.source_type)
-
     def __enter__(self) -> "JetstreamDisplayBridge":
-        if self.is_app:
-            self._set_status(
-                AppSocketStatus.WAITING,
-                f"Waiting for app FrameSets on {self.frame_set_source}",
-            )
-        else:
-            self._set_status(AppSocketStatus.N_A)
-
         self._start_bridges()
         self.pointviz = self._build_pointviz()
         return self
 
     def __exit__(self, *exc: Any) -> None:
-        if self.is_app:
-            self._set_status(
-                AppSocketStatus.DISCONNECTED,
-                f"App source ended ({self.frame_set_source}). "
-                "Restart the producer — visualization resumes automatically.",
-            )
         if self._source is not None:
             close = getattr(self._source, "close", None)
             if callable(close):
@@ -562,28 +582,11 @@ class JetstreamDisplayBridge:
         """After SimpleViz is constructed: bind source, keys, and status."""
         self._config_watch = config_watch
         self._source = source
-        on_disconnect = getattr(source, "set_on_disconnect", None)
-        if callable(on_disconnect):
-            on_disconnect(self.request_stop)
-
-        if self.is_app:
-            self._set_status(
-                AppSocketStatus.CONNECTED,
-                f"Connected to {self.frame_set_source}",
-            )
 
         assert self.pointviz is not None and self._demand is not None
+        assert self._keys is not None
+        self._keys.attach(simple, replay=self.source_type is FrameSetSourceType.LOCAL_FILE)
         self._demand.attach(simple)
-
-    def request_stop(self) -> None:
-        """Unblock PointViz.run so SimpleViz can exit when a live source ends."""
-        viz = self.pointviz
-        if viz is None:
-            return
-        try:
-            viz.running(False)
-        except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: request_stop failed: {exc!r}", flush=True)
 
     def _destroy_pointviz(self) -> None:
         viz = self.pointviz
@@ -595,9 +598,6 @@ class JetstreamDisplayBridge:
                 getattr(viz, name)(arg)
             except Exception:
                 pass
-
-    def _set_status(self, bridge: AppSocketStatus, message: str = "") -> None:
-        set_runtime_status(source=self.source_type, bridge=bridge, message=message)
 
     def _start_bridges(self) -> None:
         stream_target = StreamTarget()
@@ -619,11 +619,8 @@ class JetstreamDisplayBridge:
         return VizProxy(real, self._run_with_capture, self._keys)
 
     def _run_with_capture(self, viz: Any) -> None:
-        """PointViz.run + config-reload watcher (browser capture is Rust screencopy)."""
-        print(
-            "hello-ouster-world: PointViz.run (browser capture is Rust screencopy)",
-            flush=True,
-        )
+        """Run PointViz while watching source configuration."""
+        print("hello-ouster-world: PointViz.run", flush=True)
         stop = threading.Event()
 
         def watch_loop() -> None:
@@ -631,6 +628,8 @@ class JetstreamDisplayBridge:
                 try:
                     if not viz.running():
                         break
+                    assert self._keys is not None
+                    self._keys.flush(viz)
                     watch = self._config_watch
                     if watch is not None and watch.reload_requested():
                         print(
@@ -645,13 +644,13 @@ class JetstreamDisplayBridge:
                                 flush=True,
                             )
                         break
-                    time.sleep(0.2)
+                    stop.wait(0.02)
                 except Exception as exc:  # noqa: BLE001
                     print(
                         f"hello-ouster-world: viz watch loop error: {exc!r}",
                         flush=True,
                     )
-                    time.sleep(0.2)
+                    stop.wait(0.02)
 
         try:
             viz.cursor_visible(False)
@@ -677,6 +676,7 @@ class JetstreamDisplayBridge:
                     f"hello-ouster-world: glfwSwapInterval failed: {exc!r}",
                     flush=True,
                 )
+            # The native loop releases the GIL while rendering.
             type(viz).run(viz)
         finally:
             stop.set()

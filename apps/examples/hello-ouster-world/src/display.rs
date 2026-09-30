@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket};
-use axum::extract::{State, WebSocketUpgrade};
+use axum::extract::{Extension, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -18,6 +18,7 @@ use serde_json::json;
 use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, watch};
 
+use crate::access::Access;
 use crate::display_config;
 use crate::ui_state;
 use crate::vpointer::{VPtrButton, VPtrCmd, VirtualPointer};
@@ -25,7 +26,8 @@ use crate::AppState;
 
 /// JPEG frame fan-out + one control lease.
 pub const MAX_DISPLAY_VIEWERS: usize = 8;
-const DEFAULT_FPS: u64 = 5;
+const RESERVED_EDITOR_VIEWERS: usize = 2;
+const DEFAULT_FPS: u64 = 10;
 const ALLOWED_FPS: &[u64] = &[2, 5, 10, 20];
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
@@ -267,8 +269,13 @@ async fn set_fps(
     Json(state.display.status_json())
 }
 
-async fn display_stream(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| stream_session(socket, state))
+async fn display_stream(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    Extension(access): Extension<Access>,
+) -> impl IntoResponse {
+    let can_control = access == Access::Editor;
+    ws.on_upgrade(move |socket| stream_session(socket, state, can_control))
 }
 
 #[derive(Debug, Deserialize)]
@@ -323,15 +330,21 @@ enum ServerEvent {
     Error { message: String },
 }
 
-async fn stream_session(mut socket: WebSocket, state: AppState) {
+async fn stream_session(mut socket: WebSocket, state: AppState, can_control: bool) {
+    // Guests stop short of the cap so signed-in operators can always connect.
+    let max = if can_control {
+        MAX_DISPLAY_VIEWERS
+    } else {
+        MAX_DISPLAY_VIEWERS - RESERVED_EDITOR_VIEWERS
+    };
     let viewers = state.display.inner.viewers.fetch_add(1, Ordering::SeqCst) + 1;
-    if viewers > MAX_DISPLAY_VIEWERS {
+    if viewers > max {
         state.display.inner.viewers.fetch_sub(1, Ordering::SeqCst);
-        tracing::warn!(viewers, max = MAX_DISPLAY_VIEWERS, "display viewer rejected");
+        tracing::warn!(viewers, max, "display viewer rejected");
         let _ = send_event(
             &mut socket,
             ServerEvent::Error {
-                message: format!("too many display viewers (max {MAX_DISPLAY_VIEWERS})"),
+                message: format!("too many display viewers (max {max})"),
             },
         )
         .await;
@@ -368,15 +381,45 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
     };
 
     let _ = send_meta(&mut socket, &state.display).await;
+    let mut guest_access_check = tokio::time::interval(Duration::from_millis(500));
+    guest_access_check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    guest_access_check.tick().await;
 
     loop {
         tokio::select! {
+            _ = guest_access_check.tick(), if !can_control => {
+                if !crate::access::guest_access_enabled() {
+                    let _ = socket.send(Message::Close(None)).await;
+                    break;
+                }
+            }
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
                         match serde_json::from_str::<ClientEvent>(&text) {
                             Ok(ev) => {
                                 let is_control = matches!(ev, ClientEvent::Control { .. });
+                                if !can_control {
+                                    let msg = "view only".to_string();
+                                    let _ = send_event(
+                                        &mut socket,
+                                        ServerEvent::Error {
+                                            message: msg.clone(),
+                                        },
+                                    )
+                                    .await;
+                                    if is_control {
+                                        let _ = send_event(
+                                            &mut socket,
+                                            ServerEvent::Control {
+                                                ok: false,
+                                                message: msg,
+                                            },
+                                        )
+                                        .await;
+                                    }
+                                    continue;
+                                }
                                 match handle_client_event(&state, viewer_id, ev) {
                                     Ok(()) if is_control => {
                                         let controlling =
@@ -725,12 +768,48 @@ async fn focus_viz_window() -> anyhow::Result<()> {
 /// Walk `swaymsg -t get_tree` and return the output name hosting the viz window.
 /// GLFW Wayland windows often show up as `app_id`, not the GLFW title.
 fn is_viz_con(node: &serde_json::Value) -> bool {
-    if node.get("type").and_then(|t| t.as_str()) != Some("con") {
+    if !matches!(
+        node.get("type").and_then(|t| t.as_str()),
+        Some("con" | "floating_con")
+    ) {
         return false;
     }
     let name = node.get("name").and_then(|n| n.as_str()).unwrap_or("");
     let app_id = node.get("app_id").and_then(|n| n.as_str()).unwrap_or("");
     name == VIZ_WINDOW_TITLE || app_id == VIZ_APP_ID
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_viz_output_in_tree;
+
+    #[test]
+    fn finds_viz_on_tiled_and_floating_sway_containers() {
+        for container_type in ["con", "floating_con"] {
+            let tree = serde_json::json!({
+                "type": "root",
+                "nodes": [{
+                    "type": "output",
+                    "name": "DP-1",
+                    "nodes": [{
+                        "type": "workspace",
+                        "nodes": [],
+                        "floating_nodes": [{
+                            "type": container_type,
+                            "name": "Ouster Viz",
+                            "app_id": "hello-ouster-world",
+                            "nodes": [],
+                            "floating_nodes": []
+                        }]
+                    }],
+                    "floating_nodes": []
+                }],
+                "floating_nodes": []
+            });
+
+            assert_eq!(find_viz_output_in_tree(&tree, None), Some("DP-1".to_string()));
+        }
+    }
 }
 
 fn find_viz_output_in_tree(node: &serde_json::Value, current_output: Option<&str>) -> Option<String> {
@@ -1207,6 +1286,7 @@ fn spawn_output_manager(display: DisplayState) {
                 || physical_present != last_present
                 || (want_on_device && !physical_active)
                 || viz_misplaced
+                || viz_out != *display.inner.viz_output.lock()
             {
                 if let Err(e) = place_viz_window(&display).await {
                     tracing::debug!(?e, "viz placement refresh failed");
@@ -1226,4 +1306,3 @@ fn spawn_output_manager(display: DisplayState) {
         }
     });
 }
-

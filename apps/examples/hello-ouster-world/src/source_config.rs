@@ -1,9 +1,8 @@
-//! Persisted FrameSet source selection — `{state_dir}/source-config.json`.
-//! Runtime bridge status — `{runtime_dir}/source-runtime.json` (Python viz).
+//! Persisted direct source selection and the status shared with the display.
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -13,145 +12,94 @@ const FILE_NAME: &str = "source-config.json";
 const RUNTIME_FILE_NAME: &str = "source-runtime.json";
 
 pub const SOURCE_LOCAL_FILE: &str = "local_file";
-pub const SOURCE_APP: &str = "app";
 pub const SOURCE_SENSOR: &str = "sensor";
-pub const PRODUCER_OSF: &str = "osf";
-pub const PRODUCER_SENSOR: &str = "sensor";
-pub const DEFAULT_DYNAMO_APP_SOCKET: &str = "/run/ouster-dynamo/frameset.sock";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PersistedSourceConfig {
-    #[serde(default = "default_source")]
     pub source: String,
-    #[serde(default)]
     pub osf_path: String,
-    #[serde(default)]
     pub sensor_hostname: String,
-    #[serde(default = "default_app_socket")]
-    pub app_socket: String,
-    /// Dynamo ingest (`osf` | `sensor`). Always the lidar origin (OSF vs live).
-    #[serde(default = "default_producer_kind")]
-    pub producer_kind: String,
-    /// SimpleViz consumes Dynamo FrameSets instead of opening lidar itself.
-    /// `None` on disk = infer from ``source == app`` (legacy files).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub via_dynamo: Option<bool>,
-    /// Apply with sensor source: SimpleViz saves frames to ``record_filename`` (or auto name).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub record_enabled: Option<bool>,
-    /// Basename under ``/srv/recordings/``; empty = ``hello-ouster-world-YYYYMMDD-HHMMSS.osf``.
-    #[serde(default)]
+    pub record_enabled: bool,
     pub record_filename: String,
-    /// When false, SimpleViz idles until Apply re-enables (Stop button).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_enabled: Option<bool>,
-}
-
-fn default_source() -> String {
-    SOURCE_LOCAL_FILE.to_string()
-}
-
-fn default_app_socket() -> String {
-    DEFAULT_DYNAMO_APP_SOCKET.to_string()
-}
-
-fn default_producer_kind() -> String {
-    PRODUCER_OSF.to_string()
-}
-
-fn normalize_producer_kind(raw: &str) -> String {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        PRODUCER_SENSOR => PRODUCER_SENSOR.to_string(),
-        _ => PRODUCER_OSF.to_string(),
-    }
+    pub record_duration_seconds: u64,
+    pub source_enabled: bool,
 }
 
 impl Default for PersistedSourceConfig {
     fn default() -> Self {
         Self {
-            source: default_source(),
+            source: SOURCE_SENSOR.to_string(),
             osf_path: String::new(),
             sensor_hostname: String::new(),
-            app_socket: default_app_socket(),
-            producer_kind: default_producer_kind(),
-            via_dynamo: None,
-            record_enabled: None,
+            record_enabled: false,
             record_filename: String::new(),
-            source_enabled: None,
+            record_duration_seconds: 120,
+            source_enabled: true,
         }
     }
 }
 
 impl PersistedSourceConfig {
-    pub fn is_via_dynamo(&self) -> bool {
-        self.via_dynamo.unwrap_or(false)
-    }
-
-    pub fn normalize(mut self) -> Self {
-        let src = self.source.trim().to_ascii_lowercase();
-        let src = match src.as_str() {
-            SOURCE_APP => SOURCE_APP.to_string(),
+    pub fn normalize(mut self) -> Result<Self, String> {
+        self.source = match self.source.trim().to_ascii_lowercase().as_str() {
+            SOURCE_LOCAL_FILE => SOURCE_LOCAL_FILE.to_string(),
             SOURCE_SENSOR => SOURCE_SENSOR.to_string(),
-            _ => SOURCE_LOCAL_FILE.to_string(),
-        };
-        let via = self.via_dynamo.unwrap_or(src == SOURCE_APP);
-        self.producer_kind = match self.via_dynamo {
-            Some(_) => normalize_producer_kind(&self.producer_kind),
-            None if src == SOURCE_SENSOR => PRODUCER_SENSOR.to_string(),
-            None if src == SOURCE_LOCAL_FILE => PRODUCER_OSF.to_string(),
-            None => normalize_producer_kind(&self.producer_kind),
-        };
-        self.via_dynamo = Some(via);
-        self.source = if via {
-            SOURCE_APP.to_string()
-        } else if self.producer_kind == PRODUCER_SENSOR {
-            SOURCE_SENSOR.to_string()
-        } else {
-            SOURCE_LOCAL_FILE.to_string()
+            _ => return Err("unsupported source value".into()),
         };
         self.osf_path = self.osf_path.trim().to_string();
-        if via || self.app_socket.trim().is_empty() {
-            self.app_socket = DEFAULT_DYNAMO_APP_SOCKET.to_string();
-        }
         self.sensor_hostname = self.sensor_hostname.trim().to_string();
         self.record_filename = self.record_filename.trim().to_string();
-        self
+        if !self.osf_path.is_empty() {
+            let path = Path::new(&self.osf_path);
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if path.parent() != Some(&crate::osf::osf_dir())
+                || crate::osf::sanitize_osf_filename(name).is_err()
+            {
+                return Err("osf_path must be an .osf file in the recordings directory".into());
+            }
+        }
+        if self.sensor_hostname.len() > 253
+            || !self
+                .sensor_hostname
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ':' | '%'))
+        {
+            return Err("invalid sensor hostname".into());
+        }
+        if !(1..=3600).contains(&self.record_duration_seconds) {
+            return Err("record duration must be between 1 and 3600 seconds".into());
+        }
+        if self.source != SOURCE_SENSOR {
+            self.record_enabled = false;
+        }
+        Ok(self)
     }
 
-    pub fn app_socket_available(&self) -> bool {
-        Path::new(&self.app_socket).exists()
-    }
-
-    /// Dashboard card line: lidar origin + Dynamo toggle.
     pub fn dashboard_summary(&self) -> String {
-        let cfg = self.clone().normalize();
-        let lidar = if cfg.producer_kind == PRODUCER_SENSOR {
-            "Sensor"
-        } else {
-            "Local file"
-        };
-        let dynamo = if cfg.is_via_dynamo() {
-            "Dynamo on"
-        } else {
-            "Dynamo off"
-        };
-        format!("{lidar} · {dynamo}")
+        if !self.source_enabled {
+            return "Source stopped".into();
+        }
+        match self.source.as_str() {
+            SOURCE_SENSOR if self.sensor_hostname.is_empty() => "Discovering sensors".into(),
+            SOURCE_SENSOR => "Sensor".into(),
+            _ => "Local file".into(),
+        }
     }
 }
 
-/// Viz-side bridge lifecycle written by Python (`waiting` / `connected` / …).
+#[derive(Debug, Clone)]
+pub struct LoadedSourceConfig {
+    pub config: PersistedSourceConfig,
+    pub error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SourceRuntimeStatus {
     #[serde(default)]
-    pub source: String,
-    #[serde(default = "default_bridge_na")]
-    pub bridge: String,
+    pub state: String,
     #[serde(default)]
     pub message: String,
-}
-
-fn default_bridge_na() -> String {
-    "n/a".to_string()
 }
 
 fn runtime_dir() -> PathBuf {
@@ -166,52 +114,50 @@ pub fn runtime_path() -> PathBuf {
 }
 
 pub fn load_runtime() -> SourceRuntimeStatus {
-    let p = runtime_path();
-    let raw = match fs::read_to_string(&p) {
-        Ok(s) => s,
+    let path = runtime_path();
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
         Err(_) => return SourceRuntimeStatus::default(),
     };
-    match serde_json::from_str::<SourceRuntimeStatus>(&raw) {
-        Ok(s) => s,
-        Err(e) => {
-            warn!("failed to parse {}: {e}", p.display());
+    match serde_json::from_str(&raw) {
+        Ok(status) => status,
+        Err(error) => {
+            warn!("failed to parse {}: {error}", path.display());
             SourceRuntimeStatus::default()
         }
     }
 }
 
-pub fn runtime_json(rt: &SourceRuntimeStatus) -> serde_json::Value {
-    json!({
-        "source": rt.source,
-        "bridge": rt.bridge,
-        "message": rt.message,
-    })
+pub fn set_runtime_status(state: &str, message: &str) -> Result<(), String> {
+    let path = runtime_path();
+    let status = SourceRuntimeStatus {
+        state: state.to_string(),
+        message: message.to_string(),
+    };
+    atomic_write(
+        &path,
+        &serde_json::to_vec(&status).map_err(|e| e.to_string())?,
+    )
 }
 
-pub fn persisted_json(cfg: &PersistedSourceConfig) -> serde_json::Value {
+pub fn runtime_json(status: &SourceRuntimeStatus) -> serde_json::Value {
+    let controls = fs::read_to_string(runtime_dir().join("viz-controls.json"))
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok());
+    json!({ "state": status.state, "message": status.message, "controls": controls })
+}
+
+pub fn persisted_json(cfg: &PersistedSourceConfig, error: Option<&str>) -> serde_json::Value {
     json!({
         "source": cfg.source,
         "osf_path": cfg.osf_path,
         "sensor_hostname": cfg.sensor_hostname,
-        "producer_kind": cfg.producer_kind,
-        "via_dynamo": cfg.is_via_dynamo(),
-        "app_socket": cfg.app_socket,
-        "record_enabled": cfg.record_enabled.unwrap_or(false),
+        "record_enabled": cfg.record_enabled,
         "record_filename": cfg.record_filename,
-        "source_enabled": cfg.source_enabled.unwrap_or(true),
-        "app_socket_available": cfg.app_socket_available(),
-        "valid_sources": [
-            SOURCE_LOCAL_FILE,
-            SOURCE_APP,
-            SOURCE_SENSOR,
-        ],
-        "app_presets": [
-            {
-                "id": "ouster_dynamo",
-                "label": "ouster-dynamo",
-                "app_socket": DEFAULT_DYNAMO_APP_SOCKET,
-            },
-        ],
+        "record_duration_seconds": cfg.record_duration_seconds,
+        "source_enabled": cfg.source_enabled,
+        "config_error": error,
+        "valid_sources": [SOURCE_LOCAL_FILE, SOURCE_SENSOR],
     })
 }
 
@@ -219,89 +165,167 @@ pub fn path(state_dir: &Path) -> PathBuf {
     state_dir.join(FILE_NAME)
 }
 
-pub fn load(state_dir: &Path) -> PersistedSourceConfig {
-    let p = path(state_dir);
-    let raw = match fs::read_to_string(&p) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return PersistedSourceConfig::default();
+pub fn load_details(state_dir: &Path) -> LoadedSourceConfig {
+    let path = path(state_dir);
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return LoadedSourceConfig {
+                config: PersistedSourceConfig::default(),
+                error: None,
+            };
         }
-        Err(e) => {
-            warn!("failed to read {}: {e}", p.display());
-            return PersistedSourceConfig::default();
+        Err(error) => {
+            return LoadedSourceConfig {
+                config: PersistedSourceConfig::default(),
+                error: Some(format!("cannot read source configuration: {error}")),
+            };
         }
     };
-    match serde_json::from_str::<PersistedSourceConfig>(&raw) {
-        Ok(c) => c.normalize(),
-        Err(e) => {
-            warn!("failed to parse {}: {e}", p.display());
-            PersistedSourceConfig::default()
+    let loaded = serde_json::from_str::<PersistedSourceConfig>(&raw)
+        .map_err(|error| format!("invalid source configuration: {error}"))
+        .and_then(PersistedSourceConfig::normalize);
+    match loaded {
+        Ok(config) => LoadedSourceConfig {
+            config,
+            error: None,
+        },
+        Err(error) => {
+            warn!("{}: {error}", path.display());
+            LoadedSourceConfig {
+                config: PersistedSourceConfig::default(),
+                error: Some(error),
+            }
         }
     }
+}
+
+pub fn load(state_dir: &Path) -> PersistedSourceConfig {
+    load_details(state_dir).config
 }
 
 pub fn save(state_dir: &Path, cfg: &PersistedSourceConfig) -> Result<(), String> {
-    let p = path(state_dir);
-    if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
-    }
-    let normalized = cfg.clone().normalize();
-    let body = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
-    fs::write(&p, body).map_err(|e| format!("write {}: {e}", p.display()))?;
-    info!(source = %normalized.source, "saved source config to {}", p.display());
+    let path = path(state_dir);
+    let config = cfg.clone().normalize()?;
+    let body = serde_json::to_vec_pretty(&config).map_err(|error| error.to_string())?;
+    atomic_write(&path, &body)?;
+    info!(source = %config.source, "saved source config to {}", path.display());
     Ok(())
 }
 
-/// POST Dynamo `/source-config` when SimpleViz is consuming Dynamo FrameSets.
-///
-/// hello-ouster-world save must succeed even if Dynamo is down. Direct lidar (via off) skips
-/// the POST so UDP/OSF is not opened twice.
-pub async fn push_to_dynamo(cfg: &PersistedSourceConfig) -> serde_json::Value {
-    if !cfg.is_via_dynamo() {
-        return json!({
-            "ok": true,
-            "skipped": true,
-            "reason": "how_owns_lidar",
-        });
+pub(crate) fn atomic_write(path: &Path, body: &[u8]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("{} has no parent directory", path.display()))?;
+    fs::create_dir_all(parent).map_err(|error| format!("create {}: {error}", parent.display()))?;
+    let tmp = path.with_extension(format!(
+        "{}.{}.tmp",
+        path.extension().unwrap_or_default().to_string_lossy(),
+        std::process::id()
+    ));
+    let mut file =
+        fs::File::create(&tmp).map_err(|error| format!("create {}: {error}", tmp.display()))?;
+    file.write_all(body)
+        .map_err(|error| format!("write {}: {error}", tmp.display()))?;
+    file.sync_all()
+        .map_err(|error| format!("sync {}: {error}", tmp.display()))?;
+    fs::rename(&tmp, path).map_err(|error| format!("rename {}: {error}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{load_details, save, PersistedSourceConfig, SOURCE_LOCAL_FILE, SOURCE_SENSOR};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_dir() -> PathBuf {
+        let id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("hello-world-source-{id}"));
+        fs::create_dir_all(&path).unwrap();
+        path
     }
-    let kind = normalize_producer_kind(&cfg.producer_kind);
-    let url = format!(
-        "{}/api/v1/app/ouster-dynamo/source-config",
-        ::app_runtime::runtime::app_base_url().trim_end_matches('/')
-    );
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(3))
-        .connect_timeout(Duration::from_secs(2))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            warn!("dynamo HTTP client: {e}");
-            return json!({ "ok": false, "error": e.to_string() });
+
+    #[test]
+    fn missing_config_defaults_to_enabled_sensor_discovery() {
+        let dir = test_dir();
+        let loaded = load_details(&dir);
+        assert!(loaded.error.is_none());
+        assert_eq!(loaded.config.source, SOURCE_SENSOR);
+        assert!(loaded.config.source_enabled);
+        assert!(!loaded.config.record_enabled);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn recording_duration_defaults_and_bounds() {
+        let old: PersistedSourceConfig = serde_json::from_str(r#"{"source":"sensor"}"#).unwrap();
+        assert_eq!(old.record_duration_seconds, 120);
+        for seconds in [1, 120, 3600] {
+            assert!(PersistedSourceConfig {
+                record_duration_seconds: seconds,
+                ..Default::default()
+            }.normalize().is_ok());
         }
-    };
-    let body = json!({
-        "kind": kind,
-        "osf_path": cfg.osf_path,
-        "sensor_hostname": cfg.sensor_hostname,
-    });
-    match client.post(&url).json(&body).send().await {
-        Ok(resp) => {
-            let status = resp.status();
-            if status.is_success() {
-                json!({ "ok": true, "skipped": false, "status": status.as_u16() })
-            } else {
-                warn!(%status, %url, "dynamo source-config POST failed");
-                json!({
-                    "ok": false,
-                    "status": status.as_u16(),
-                    "error": format!("HTTP {status}"),
-                })
+        for seconds in [0, 3601] {
+            assert!(PersistedSourceConfig {
+                record_duration_seconds: seconds,
+                ..Default::default()
+            }.normalize().is_err());
+        }
+    }
+
+    #[test]
+    fn source_targets_are_confined() {
+        let ok = |osf_path: &str, sensor_hostname: &str| {
+            PersistedSourceConfig {
+                osf_path: osf_path.into(),
+                sensor_hostname: sensor_hostname.into(),
+                ..Default::default()
             }
+            .normalize()
+            .is_ok()
+        };
+        assert!(ok("/srv/recordings/a.osf", "os-122.local"));
+        assert!(ok("", "192.168.1.5"));
+        for path in ["/etc/passwd", "/srv/recordings/../etc/x.osf", "/srv/recordings/a.txt", "/srv/recordings/sub/a.osf"] {
+            assert!(!ok(path, ""), "{path}");
         }
-        Err(e) => {
-            warn!("dynamo source-config POST: {e}");
-            json!({ "ok": false, "error": e.to_string() })
+        for host in ["a b", "http://x/", "x;y", "a/b"] {
+            assert!(!ok("", host), "{host}");
         }
+    }
+
+    #[test]
+    fn saved_source_and_stop_state_survive_load() {
+        let dir = test_dir();
+        let cfg = PersistedSourceConfig {
+            source: SOURCE_LOCAL_FILE.into(),
+            osf_path: "/srv/recordings/drive.osf".into(),
+            source_enabled: false,
+            ..Default::default()
+        };
+        save(&dir, &cfg).unwrap();
+        let loaded = load_details(&dir);
+        assert!(loaded.error.is_none());
+        assert_eq!(loaded.config.osf_path, "/srv/recordings/drive.osf");
+        assert!(!loaded.config.source_enabled);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn invalid_and_unsupported_configs_are_reported() {
+        let dir = test_dir();
+        fs::write(dir.join("source-config.json"), "{").unwrap();
+        assert!(load_details(&dir).error.is_some());
+        fs::write(dir.join("source-config.json"), r#"{"source":"app"}"#).unwrap();
+        assert_eq!(
+            load_details(&dir).error.as_deref(),
+            Some("unsupported source value")
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 }

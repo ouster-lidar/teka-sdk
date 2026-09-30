@@ -1,9 +1,0 @@
-{
-  "label_scale": 2.25,
-  "label_z_offset": 0.0,
-  "osd_scale": 0.75,
-  "sans_font": false,
-  "show_trk_history_pts": true,
-  "print_tracks": false,
-  "print_timing": false
-}

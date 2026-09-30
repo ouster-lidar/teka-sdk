@@ -71,6 +71,7 @@ export XDG_RUNTIME_DIR=/run/hello-ouster-world
 export HOME="$XDG_RUNTIME_DIR"
 export SHELL=@bash@/bin/bash
 export FONTCONFIG_FILE=@fontsConf@
+export XCURSOR_PATH=@xcursorPath@
 
 # Persistent HEADLESS output so browser Display survives HDMI unplug/blank.
 export WLR_BACKENDS=drm,headless,libinput

@@ -1,38 +1,9 @@
-flowchart TB
-    subgraph device ["Device"]
-        direction LR
-        subgraph dyn ["Dynamo"]
-            direction TB
-            SRC["Source (Live/OSF)"] --> |"LiDAR FrameSets"|PROC["Processing"] --> |"LiDAR FrameSets</br>+ objects"|TXFS["TX"]
-        end
-        OSF["OSF File"] --> SRC
-
-        subgraph how ["H-O-W"]
-            direction LR
-            RXFS["RX"] --> SV["SimpleViz"] --> SWAY["Sway"]
-	    HOWSC["Source Config</br>/var/lib/hello-ouster-world/source-config.json"]
-            SWAY --> NVJPG["nvjpeg encoder"]
-        end
-
-        TXFS -->|"IPC<br/>/run/ouster-dynamo/frameset.sock"| RXFS
-        HOWSC -->|"HTTP POST</br>api/v1/app/ouster-dynamo/source-config"| SRC
-
-        subgraph peripherals ["Local Peripherals"]
-            MONITOR["Display Monitor"]
-            MKBD["Mouse &<br/>Keyboard"]
-        end
-    end
-
-    subgraph remote ["Remote"]
-        BR["Browser"]
-    end
-    
-    LIDAR["LiDAR"] --> SRC
-    SWAY -->|"HDMI"| MONITOR
-    MKBD --> SV
-    NVJPG -->|"WebSocket"| BR
-    BR -->|"HTTP POST</br>/api/v1/app/hello-ouster-world/source_config"| HOWSC
-    BR -->|"WS JSON: mouse / keys"| SV
-
-    style dyn stroke-dasharray: 5 5
-    style how stroke-dasharray: 5 5
+flowchart LR
+    MC[Jetstream sensors roster] -->|WebSocket| API[World backend]
+    UI[Browser controls] <-->|HTTP and WebSocket| API
+    API -->|apply source and status| VIZ[Ouster SDK SimpleViz]
+    OSF[OSF file] --> VIZ
+    SENSOR[Ouster sensor] -->|UDP 7502 / 7503| VIZ
+    VIZ -->|Wayland| HDMI[HDMI display]
+    VIZ -->|capture stream| UI
+    VIZ -->|optional recording| REC[/srv/recordings]

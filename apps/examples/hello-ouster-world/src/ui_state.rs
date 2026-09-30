@@ -55,14 +55,21 @@ pub fn snapshot_message(data: &Value) -> String {
 }
 
 pub fn build_ui_state(state: &AppState) -> Value {
-    let cfg = source_config::load(&display_config::state_dir());
-    let runtime = source_config::load_runtime();
     json!({
-        "source": source_config::persisted_json(&cfg),
-        "runtime": source_config::runtime_json(&runtime),
+        "source": source_ui_json(state),
         "display": display_ui_json(state),
         "record": state.record.status_json(),
     })
+}
+
+pub fn source_ui_json(state: &AppState) -> Value {
+    let loaded = source_config::load_details(&display_config::state_dir());
+    let runtime = source_config::load_runtime();
+    let mut source = source_config::persisted_json(&loaded.config, loaded.error.as_deref());
+    source["runtime"] = source_config::runtime_json(&runtime);
+    source["discovery"] = serde_json::to_value(state.sensor_discovery.snapshot())
+        .unwrap_or_else(|_| json!({ "status": "unavailable", "candidates": [] }));
+    source
 }
 
 /// Drop per-frame fields so HDMI/source deltas aren't drowned by capture ticks.
@@ -96,9 +103,7 @@ pub fn diff_ui(prev: Option<&Value>, next: &Value) -> Option<Value> {
 }
 
 pub fn publish_ui(state: &AppState) {
-    state
-        .ui_state
-        .publish_if_changed(build_ui_state(state));
+    state.ui_state.publish_if_changed(build_ui_state(state));
     let summary = source_config::load(&display_config::state_dir()).dashboard_summary();
     let mut last = state.card_stream.cache.read().clone().unwrap_or_default();
     state.card_stream.tick(&summary, &mut last);

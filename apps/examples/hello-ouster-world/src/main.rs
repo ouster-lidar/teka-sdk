@@ -3,7 +3,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use axum::Router;
+use axum::{middleware, Router};
 use clap::Parser;
 use hello_ouster_world::api;
 use hello_ouster_world::{display_config, AppState};
@@ -20,7 +20,8 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let bind = hello_ouster_world::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind =
+        hello_ouster_world::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -42,15 +43,21 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 
     let state_dir = display_config::state_dir();
     let display_cfg = display_config::load(&state_dir);
-    tracing::info!(hdmi = display_cfg.hdmi, stream = display_cfg.stream, "display config");
+    tracing::info!(
+        hdmi = display_cfg.hdmi,
+        stream = display_cfg.stream,
+        "display config"
+    );
 
     let state = AppState::new(&display_cfg);
     hello_ouster_world::ui_state::spawn_ui_watchers(state.clone());
+    hello_ouster_world::sensor_discovery::spawn(state.clone());
 
+    let api = api::routes().layer(middleware::from_fn(hello_ouster_world::access::gate));
     let app = Router::new()
-        .nest("/api/v1", api::routes())
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+        .nest("/api/v1", api)
+        .layer(CorsLayer::new())
+        .with_state(state.clone());
 
     let listener = hello_ouster_world::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
@@ -62,6 +69,7 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+    state.shutdown.send_replace(true);
     Ok(())
 }
 

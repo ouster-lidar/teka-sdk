@@ -143,7 +143,7 @@ let
 
   vizCmd = writeShellScript "${name}-viz" ''
     set -euo pipefail
-    export PYTHONPATH="/usr/lib/${name}:/usr/lib/${name}/dynamo-utils''${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="/usr/lib/${name}''${PYTHONPATH:+:$PYTHONPATH}"
     export SSL_CERT_FILE="''${SSL_CERT_FILE:-${ps.caBundlePath}}"
     export GLFW_PLATFORM=wayland
     export GLFW_WAYLAND_APP_ID=hello-ouster-world
@@ -176,6 +176,30 @@ let
     inherit dejavu_fonts;
     cacheDir = "/run/${name}/fontconfig-cache";
   };
+
+  ousterLogo =
+    runCommand "${name}-ouster-logo.png"
+      {
+        nativeBuildInputs = [ pkgs.librsvg ];
+      }
+      ''
+        export FONTCONFIG_FILE=${fontsConf}
+        rsvg-convert -w 880 -h 220 ${./ouster-logo.svg} -o "$out"
+      '';
+
+  # Sway's hide_cursor still shows the pointer on every motion (USB mouse or
+  # browser input), so use a 1x1 transparent Xcursor for the compositor and
+  # GLFW instead.
+  hiddenCursorIcons = runCommand "${name}-hidden-cursor" { } ''
+    d=$out/share/icons/hidden/cursors
+    mkdir -p $d
+    printf 'Xcur\x10\x00\x00\x00\x00\x00\x01\x00\x01\x00\x00\x00\x02\x00\xfd\xff\x18\x00\x00\x00\x1c\x00\x00\x00\x24\x00\x00\x00\x02\x00\xfd\xff\x18\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' > $d/default
+    ln -s default $d/left_ptr
+  '';
+
+  statusBarCmd = writeShellScript "${name}-status-bar" ''
+    exec ${pythonEnv}/bin/python3 /usr/lib/${name}/status_bar.py
+  '';
 
   clientLd = lib.makeLibraryPath [
     vulkan-loader
@@ -245,7 +269,7 @@ let
         echo "hello-ouster-world: launching SimpleViz (GLFW Wayland)" >&2
         while true; do
           ${vizCmd} || true
-          echo "hello-ouster-world: SimpleViz exited $?; restarting in 2s" >&2
+          echo "hello-ouster-world: display process exited; restarting in 2s" >&2
           sleep 2
         done
   '';
@@ -256,7 +280,19 @@ let
     default_border none
     default_floating_border none
     hide_edge_borders both
-    output * bg #000000 solid_color
+    seat * xcursor_theme hidden
+    output * bg ${ousterLogo} center #000000
+    bar {
+      mode dock
+      position top
+      workspace_buttons no
+      font pango:DejaVu Sans 14
+      status_command ${statusBarCmd}
+      colors {
+        background #050505
+        statusline #f8fafc
+      }
+    }
     # Do not pin Ouster Viz to HEADLESS here — Display places it on HDMI or
     # HEADLESS based on the HDMI toggle. A for_window move would fight that.
     for_window [app_id="hello-ouster-world"] border none, fullscreen enable
@@ -272,6 +308,8 @@ let
     wtype
     pythonEnv
     ouster-sdk
+    statusBarCmd
+    ousterLogo
   ];
 
   innerRun = replaceVars ./run-wayland.sh.in {
@@ -279,6 +317,7 @@ let
     inherit clientLd ldPreloadExport;
     inherit clientPath;
     fontsConf = "${fontsConf}";
+    xcursorPath = "${hiddenCursorIcons}/share/icons";
     inherit swayConfig;
   };
 
@@ -321,7 +360,8 @@ let
         "mode": "static",
         "title": "hello-ouster-world",
         "template": "display.html",
-        "styles": ["display.css", "xterm.css"]
+        "styles": ["display.css", "xterm.css"],
+        "anonymous": true
       },
       "backend": {
         "mode": "proxy",
@@ -336,7 +376,7 @@ let
         {
           "card_id": "hello-ouster-world",
           "title": "Hello Ouster World",
-          "description": "Example visualizer app with Ouster Dynamo integration",
+          "description": "Direct Ouster sensor and OSF viewer",
           "icon": "📡",
           "link_alias": "hello-ouster-world"
         }
@@ -358,20 +398,17 @@ let
 
   commonEnv = ''
     Environment=HELLO_OUSTER_WORLD_VIZ=${runLoop}
-    Environment=HELLO_OUSTER_WORLD_SHELL=${bash}/bin/bash
-    Environment=HELLO_OUSTER_WORLD_CWD=/var/lib/${name}
     Environment=HELLO_OUSTER_WORLD_PATH=${clientPath}
     Environment=HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR=/run/${name}
     Environment=HELLO_OUSTER_WORLD_WAYLAND_DISPLAY=wayland-1
     Environment=HELLO_OUSTER_WORLD_SWAYMSG=${sway}/bin/swaymsg
     Environment=HELLO_OUSTER_WORLD_WTYPE=${lib.getExe wtype}
     Environment=HELLO_OUSTER_WORLD_CONSOLE_LOG=/run/${name}/console.log
+    Environment=MC_SENSORS_APP_ID=sensors
     Environment=STATE_DIRECTORY=/var/lib/${name}
     Environment=APP_ID=${name}
     Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
   '';
-
-  dynamoRuntimeBind = "BindPaths=-/run/ouster-dynamo";
 
   # Host /srv exists; /srv/recordings does not until first mkdir. Bind the parent
   # (no '-' skip) so create_dir_all in the API is not EROFS.
@@ -391,36 +428,8 @@ let
       source = ./source_config.py;
     }
     {
-      path = "usr/lib/${name}/osf_socket.py";
-      source = ../../nix/osf-socket/osf_socket.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/detect_utils.py";
-      source = ./dynamo-utils/detect_utils.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/dynamo_viz_utils.py";
-      source = ./dynamo-utils/dynamo_viz_utils.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/ouster_dynamo_api.py";
-      source = ./dynamo-utils/ouster_dynamo_api.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/configs/__init__.py";
-      source = ./dynamo-utils/configs/__init__.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/configs/viz_config.py";
-      source = ./dynamo-utils/configs/viz_config.py;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/configs/viz_configs.json";
-      source = ./dynamo-utils/configs/viz_configs.json;
-    }
-    {
-      path = "usr/lib/${name}/dynamo-utils/configs/detect_configs.json";
-      source = ./dynamo-utils/configs/detect_configs.json;
+      path = "usr/lib/${name}/status_bar.py";
+      source = ./status_bar.py;
     }
   ];
 
@@ -447,7 +456,6 @@ let
     StandardError=journal
     ${ps.hostEtcBindPaths}
     BindReadOnlyPaths=-/run/seatd.sock
-    ${dynamoRuntimeBind}
     ${demoOsfBind}
     RuntimeDirectory=${name}
     RuntimeDirectoryMode=0700
@@ -507,7 +515,6 @@ ps.makeAppImage {
     SupplementaryGroups=tty seat video render
     ${ps.hostEtcBindPaths}
     BindReadOnlyPaths=-/run/seatd.sock
-    ${dynamoRuntimeBind}
     ${demoOsfBind}
     RuntimeDirectory=${name}
     RuntimeDirectoryMode=0700

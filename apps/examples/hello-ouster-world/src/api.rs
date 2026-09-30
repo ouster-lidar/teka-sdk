@@ -3,22 +3,21 @@
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
+use ::app_runtime::api_error::ApiError;
+use ::app_runtime::status_stream::{serve_broadcast, serve_summary_broadcast_with_initial};
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use inotify::{EventMask, Inotify, WatchMask};
-use ::app_runtime::api_error::ApiError;
-use ::app_runtime::status_stream::{
-    serve_broadcast, serve_summary_broadcast_with_initial,
-};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::fs::File;
 use tokio::io::unix::AsyncFd;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
+use crate::access;
 use crate::display;
 use crate::display_config;
 use crate::osf;
@@ -26,12 +25,10 @@ use crate::source_config;
 use crate::ui_state;
 use crate::AppState;
 
-const DEFAULT_SHELL: &str = "/bin/bash";
-const DEFAULT_CWD: &str = "/var/lib/hello-ouster-world";
-
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/status", get(status))
+        .route("/status/detail", get(status_detail))
         .route("/status/stream", get(status_stream))
         .route("/cards/stream", get(cards_ws))
         .route("/pty", get(pty_ws))
@@ -40,24 +37,27 @@ pub fn routes() -> Router<AppState> {
             get(get_source_config).post(post_source_config),
         )
         .route("/record", get(get_record).post(post_record))
+        .route("/sensors/picker", get(sensor_picker_ws))
+        .route(
+            "/guest-access",
+            get(access::get_guest_access).put(access::put_guest_access),
+        )
         .merge(display::routes())
         .merge(osf::routes())
 }
 
-async fn status(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let cfg = source_config::load(&display_config::state_dir());
+async fn status() -> Json<serde_json::Value> {
+    Json(json!({ "ok": true, "app": "hello-ouster-world" }))
+}
+
+async fn status_detail(State(state): State<AppState>) -> Json<serde_json::Value> {
     Json(json!({
         "ok": true,
         "app": "hello-ouster-world",
         "pty_sessions": state.pty_sessions.load(std::sync::atomic::Ordering::Relaxed),
         "pty_max": crate::MAX_PTY_SESSIONS,
-        "shell": shell_path(),
-        "cwd": cwd_path(),
         "console_log": console_log_path(),
         "display": state.display.status_json(),
-        "source": source_config_json(&cfg),
-        "record": state.record.status_json(),
-        "summary": cfg.dashboard_summary(),
     }))
 }
 
@@ -70,37 +70,26 @@ struct SourceConfigBody {
     #[serde(default)]
     sensor_hostname: Option<String>,
     #[serde(default)]
-    app_socket: Option<String>,
-    #[serde(default)]
-    producer_kind: Option<String>,
-    #[serde(default)]
-    via_dynamo: Option<bool>,
-    #[serde(default)]
     record_enabled: Option<bool>,
     #[serde(default)]
     record_filename: Option<String>,
     #[serde(default)]
+    record_duration_seconds: Option<u64>,
+    #[serde(default)]
     source_enabled: Option<bool>,
 }
 
-fn source_config_json(cfg: &source_config::PersistedSourceConfig) -> serde_json::Value {
-    let runtime = source_config::load_runtime();
-    let mut v = source_config::persisted_json(cfg);
-    v["runtime"] = source_config::runtime_json(&runtime);
-    v
-}
-
-async fn get_source_config() -> Json<serde_json::Value> {
-    let cfg = source_config::load(&display_config::state_dir());
-    Json(source_config_json(&cfg))
+async fn get_source_config(State(state): State<AppState>) -> Json<serde_json::Value> {
+    Json(ui_state::source_ui_json(&state))
 }
 
 async fn post_source_config(
     State(state): State<AppState>,
     Json(body): Json<SourceConfigBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let _operation = state.source_operation.lock().await;
     let state_dir = display_config::state_dir();
-    let mut cfg = source_config::load(&state_dir);
+    let mut cfg = source_config::load_details(&state_dir).config;
     if let Some(s) = body.source {
         cfg.source = s;
     }
@@ -110,71 +99,87 @@ async fn post_source_config(
     if let Some(h) = body.sensor_hostname {
         cfg.sensor_hostname = h;
     }
-    if let Some(s) = body.app_socket {
-        cfg.app_socket = s;
-    }
-    if let Some(k) = body.producer_kind {
-        cfg.producer_kind = k;
-    }
-    if let Some(via) = body.via_dynamo {
-        cfg.via_dynamo = Some(via);
-    }
     if let Some(rec) = body.record_enabled {
-        cfg.record_enabled = Some(rec);
+        cfg.record_enabled = rec;
     }
     if let Some(name) = body.record_filename {
         cfg.record_filename = name;
     }
+    if let Some(duration) = body.record_duration_seconds {
+        cfg.record_duration_seconds = duration;
+    }
     if let Some(en) = body.source_enabled {
-        cfg.source_enabled = Some(en);
+        cfg.source_enabled = en;
     }
-    let source_on = cfg.source_enabled.unwrap_or(true);
-    let want_record = source_on && cfg.record_enabled.unwrap_or(false);
-    if want_record {
-        cfg.via_dynamo = Some(false);
-        cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
+    cfg = cfg.normalize().map_err(ApiError::invalid_request)?;
+    let want_record = cfg.source_enabled && cfg.record_enabled;
+    if want_record && (cfg.source != source_config::SOURCE_SENSOR || cfg.sensor_hostname.is_empty())
+    {
+        return Err(ApiError::invalid_request(
+            "select a sensor before enabling recording",
+        ));
     }
-    cfg = cfg.normalize();
-    source_config::save(&state_dir, &cfg).map_err(|e| {
-        ApiError::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            e,
-        )
-    })?;
-    let dynamo = source_config::push_to_dynamo(&cfg).await;
-    if dynamo.get("ok") == Some(&json!(false)) {
-        tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-world save kept)");
+    if want_record && state.record.is_active() {
+        return Err(ApiError::new(
+            axum::http::StatusCode::CONFLICT,
+            "recording_active",
+            "stop the current recording before applying with recording enabled",
+        ));
     }
+    source_config::save(&state_dir, &cfg)
+        .map_err(|e| ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e))?;
+    state
+        .source_generation
+        .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    state.source_changed.notify_one();
     let record = if want_record {
-        if cfg.sensor_hostname.trim().is_empty() {
-            return Err(ApiError::invalid_request(
-                "sensor_hostname is required when recording is enabled",
-            ));
-        }
         state
             .record
             .start_from_config(&state, &cfg)
             .map_err(|e| ApiError::invalid_request(e))?
     } else if state.record.is_active() {
-        state.record.stop(&state)
+        state.record.stop(&state).await.map_err(|e| {
+            ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e)
+        })?
     } else {
         state.record.status_json()
     };
-    // SimpleViz watches source-config.json mtime and execv restarts on Apply.
     ui_state::publish_ui(&state);
     Ok(Json(json!({
         "ok": true,
         "restart_required": true,
-        "dynamo": dynamo,
         "record": record,
-        "config": source_config_json(&cfg),
+        "config": ui_state::source_ui_json(&state),
     })))
+}
+
+async fn sensor_picker_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    let _operation = state.source_operation.lock().await;
+    let lease = state.sensor_discovery.begin_picker();
+    drop(_operation);
+    ui_state::publish_ui(&state);
+    ws.on_upgrade(move |mut socket| async move {
+        let _lease = lease;
+        while let Some(message) = socket.recv().await {
+            match message {
+                Ok(Message::Ping(payload)) => {
+                    if socket.send(Message::Pong(payload)).await.is_err() {
+                        break;
+                    }
+                }
+                Ok(Message::Close(_)) | Err(_) => break,
+                Ok(_) => {}
+            }
+        }
+        ui_state::publish_ui(&state);
+    })
 }
 
 #[derive(Deserialize)]
 struct RecordBody {
     active: bool,
+    #[serde(default)]
+    record_duration_seconds: Option<u64>,
     #[serde(default)]
     sensor_hostname: Option<String>,
 }
@@ -187,9 +192,13 @@ async fn post_record(
     State(state): State<AppState>,
     Json(body): Json<RecordBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let _operation = state.source_operation.lock().await;
     let state_dir = display_config::state_dir();
-    let mut cfg = source_config::load(&state_dir);
-    cfg.record_enabled = Some(body.active);
+    let mut cfg = source_config::load_details(&state_dir).config;
+    cfg.record_enabled = body.active;
+    if let Some(duration) = body.record_duration_seconds {
+        cfg.record_duration_seconds = duration;
+    }
     if let Some(h) = body.sensor_hostname {
         let h = h.trim();
         if !h.is_empty() {
@@ -197,24 +206,35 @@ async fn post_record(
         }
     }
     if body.active {
-        cfg.via_dynamo = Some(false);
-        cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
+        if cfg.source != source_config::SOURCE_SENSOR || cfg.sensor_hostname.is_empty() {
+            return Err(ApiError::invalid_request(
+                "select a sensor before enabling recording",
+            ));
+        }
     }
-    cfg = cfg.normalize();
-    source_config::save(&state_dir, &cfg).map_err(|e| {
-        ApiError::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            e,
-        )
-    })?;
+    cfg = cfg.normalize().map_err(ApiError::invalid_request)?;
+    if body.active && state.record.is_active() {
+        return Err(ApiError::new(
+            axum::http::StatusCode::CONFLICT,
+            "recording_active",
+            "a recording is already active",
+        ));
+    }
+    source_config::save(&state_dir, &cfg)
+        .map_err(|e| ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e))?;
+    state
+        .source_generation
+        .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+    state.source_changed.notify_one();
     let rec = if body.active {
         state
             .record
             .start_from_config(&state, &cfg)
             .map_err(|e| ApiError::invalid_request(e))?
     } else {
-        state.record.stop(&state)
+        state.record.stop(&state).await.map_err(|e| {
+            ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e)
+        })?
     };
     ui_state::publish_ui(&state);
     Ok(Json(json!({ "ok": true, "record": rec })))
@@ -251,19 +271,6 @@ enum ClientMsg {
 enum ServerMsg {
     Output { data: String },
     Error { message: String },
-}
-
-fn shell_path() -> String {
-    std::env::var("HELLO_OUSTER_WORLD_SHELL").unwrap_or_else(|_| DEFAULT_SHELL.to_string())
-}
-
-fn cwd_path() -> String {
-    let cwd = std::env::var("HELLO_OUSTER_WORLD_CWD").unwrap_or_else(|_| DEFAULT_CWD.to_string());
-    if Path::new(&cwd).is_dir() {
-        cwd
-    } else {
-        "/".to_string()
-    }
 }
 
 async fn pty_session(mut socket: WebSocket, state: AppState) {
@@ -316,7 +323,10 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
         .unwrap_or_default();
 
     if let Some(tail) = log_tail(&log_path, 200).await {
-        if send_msg(socket, ServerMsg::Output { data: tail }).await.is_err() {
+        if send_msg(socket, ServerMsg::Output { data: tail })
+            .await
+            .is_err()
+        {
             return Ok(());
         }
     }
@@ -340,7 +350,7 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
                         match serde_json::from_str::<ClientMsg>(&text) {
                             Ok(ClientMsg::Input { data }) => {
                                 if data.as_bytes().contains(&0x03) {
-                                    note_ctrl_c(&log_path, state);
+                                    note_ctrl_c(&log_path, state).await;
                                 }
                             }
                             Ok(ClientMsg::Resize { .. }) => {}
@@ -356,7 +366,7 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
                     }
                     Some(Ok(Message::Binary(bin))) => {
                         if bin.contains(&0x03) {
-                            note_ctrl_c(&log_path, state);
+                            note_ctrl_c(&log_path, state).await;
                         }
                     }
                     Some(Ok(Message::Ping(p))) => {
@@ -440,18 +450,20 @@ async fn drain_log(
     }
 }
 
-fn note_ctrl_c(log_path: &str, _state: &AppState) {
+async fn note_ctrl_c(log_path: &str, state: &AppState) {
+    let _operation = state.source_operation.lock().await;
     let state_dir = display_config::state_dir();
-    let cfg = source_config::load(&state_dir);
-    if source_config::save(&state_dir, &cfg).is_ok() {
-        let _ = append_console_note(
-            log_path,
-            "hello-ouster-world: ^C — re-saved source-config; SimpleViz will reload",
-        );
+    let loaded = source_config::load_details(&state_dir);
+    if loaded.error.is_none() && source_config::save(&state_dir, &loaded.config).is_ok() {
+        state
+            .source_generation
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        state.source_changed.notify_one();
+        let _ = append_console_note(log_path, "hello-ouster-world: ^C — source config reloaded");
     } else {
         let _ = append_console_note(
             log_path,
-            "hello-ouster-world: ^C — failed to re-save source-config",
+            "hello-ouster-world: ^C — source config is invalid or could not be saved",
         );
     }
 }
@@ -482,15 +494,17 @@ async fn log_tail(path: &str, max_lines: usize) -> Option<String> {
 
 fn append_console_note(path: &str, line: &str) -> std::io::Result<()> {
     use std::io::Write;
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
     writeln!(f, "{line}")?;
     Ok(())
 }
 
 fn console_log_path() -> String {
-    std::env::var("HELLO_OUSTER_WORLD_CONSOLE_LOG").unwrap_or_else(|_| {
-        "/run/hello-ouster-world/console.log".to_string()
-    })
+    std::env::var("HELLO_OUSTER_WORLD_CONSOLE_LOG")
+        .unwrap_or_else(|_| "/run/hello-ouster-world/console.log".to_string())
 }
 
 fn ensure_console_log(path: &str) {

@@ -2,6 +2,7 @@
 //! list, client upload, device Studio import.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,6 +23,8 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 
 use crate::AppState;
+
+static NEXT_OSF_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 pub fn osf_dir() -> PathBuf {
     PathBuf::from("/srv/recordings")
@@ -159,6 +162,28 @@ fn osf_path(name: &str) -> PathBuf {
     osf_dir().join(name)
 }
 
+fn partial_osf_path(name: &str) -> PathBuf {
+    let id = NEXT_OSF_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+    osf_dir().join(format!(".{name}.{}.{}.partial", std::process::id(), id))
+}
+
+fn incomplete_recording_marker(name: &str) -> PathBuf {
+    osf_dir().join(format!(".{name}.incomplete"))
+}
+
+pub(crate) fn mark_recording_incomplete(name: &str) -> Result<(), String> {
+    std::fs::write(incomplete_recording_marker(name), b"record writer close failed\n")
+        .map_err(|e| format!("mark {name} incomplete: {e}"))
+}
+
+fn recording_is_incomplete(name: &str) -> bool {
+    incomplete_recording_marker(name).exists()
+}
+
+pub(crate) fn clear_incomplete_recording(name: &str) {
+    let _ = std::fs::remove_file(incomplete_recording_marker(name));
+}
+
 fn file_ok(path: &Path) -> bool {
     std::fs::metadata(path)
         .map(|m| m.is_file() && m.len() > 0)
@@ -246,13 +271,21 @@ async fn list_osf_files() -> Result<Vec<OsfFileEntry>, ApiError> {
 
 fn with_present(mut seed_list: Vec<OsfSeed>) -> Vec<OsfSeed> {
     for seed in &mut seed_list {
-        seed.present = file_ok(&osf_path(&seed.name));
+        seed.present = !recording_is_incomplete(&seed.name) && file_ok(&osf_path(&seed.name));
     }
     seed_list
 }
 
 async fn catalog_json(state: &AppState) -> Result<Value, ApiError> {
-    let files = list_osf_files().await?;
+    let active_record = state.record.active_filename();
+    let files: Vec<_> = list_osf_files()
+        .await?
+        .into_iter()
+        .filter(|file| {
+            active_record.as_deref() != Some(file.name.as_str())
+                && !recording_is_incomplete(&file.name)
+        })
+        .collect();
     let dir = osf_dir();
     Ok(json!({
         "dir": dir.to_string_lossy(),
@@ -286,7 +319,7 @@ async fn post_import(
     })?;
     ensure_osf_dir().await?;
     let path = osf_path(&name);
-    if file_ok(&path) {
+    if !recording_is_incomplete(&name) && file_ok(&path) {
         return Ok(Json(json!({
             "ok": true,
             "already_present": true,
@@ -296,8 +329,9 @@ async fn post_import(
     }
     state.osf_import.try_begin(&name)?;
     let handle = state.osf_import.clone();
+    let import_state = state.clone();
     tokio::spawn(async move {
-        match import_seed(&handle, &seed).await {
+        match import_seed(&handle, &seed, &import_state).await {
             Ok(()) => handle.finish_ok(),
             Err(e) => handle.finish_err(e),
         }
@@ -310,7 +344,11 @@ async fn post_import(
     })))
 }
 
-async fn import_seed(handle: &ImportHandle, seed: &OsfSeed) -> Result<(), String> {
+async fn import_seed(
+    handle: &ImportHandle,
+    seed: &OsfSeed,
+    state: &AppState,
+) -> Result<(), String> {
     let share_id = share_id_from_url(&seed.share_url)
         .ok_or_else(|| "invalid Studio share URL".to_string())?;
     let client = reqwest::Client::builder()
@@ -365,10 +403,10 @@ async fn import_seed(handle: &ImportHandle, seed: &OsfSeed) -> Result<(), String
     handle.set_progress(0, total);
 
     let dest = osf_path(&seed.name);
-    let partial = format!("{}.partial", dest.to_string_lossy());
+    let partial = partial_osf_path(&seed.name);
     let mut file = File::create(&partial)
         .await
-        .map_err(|e| format!("create {partial}: {e}"))?;
+        .map_err(|e| format!("create {}: {e}", partial.display()))?;
     let mut stream = resp.bytes_stream();
     let mut downloaded: u64 = 0;
     let mut last_report: u64 = 0;
@@ -394,9 +432,15 @@ async fn import_seed(handle: &ImportHandle, seed: &OsfSeed) -> Result<(), String
         return Err(e);
     }
     handle.set_progress(downloaded, total.max(downloaded));
+    let _operation = state.source_operation.lock().await;
+    if state.record.active_filename().as_deref() == Some(seed.name.as_str()) {
+        let _ = fs::remove_file(&partial).await;
+        return Err("OSF is still being recorded".into());
+    }
     fs::rename(&partial, &dest)
         .await
         .map_err(|e| format!("rename: {e}"))?;
+    clear_incomplete_recording(&seed.name);
     tracing::info!(name = %seed.name, downloaded, "OSF import complete");
     Ok(())
 }
@@ -419,8 +463,25 @@ fn find_studio_osf(files: &Value) -> Option<&Value> {
 
 const DOWNLOAD_CHUNK: usize = 64 * 1024;
 
-async fn get_osf(AxumPath(name): AxumPath<String>) -> Result<Response, ApiError> {
+async fn get_osf(
+    State(state): State<AppState>,
+    AxumPath(name): AxumPath<String>,
+) -> Result<Response, ApiError> {
     let name = sanitize_osf_filename(&name)?;
+    if recording_is_incomplete(&name) {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            "OSF not on device",
+        ));
+    }
+    if state.record.active_filename().as_deref() == Some(name.as_str()) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "conflict",
+            "OSF is still being recorded",
+        ));
+    }
     let path = osf_path(&name);
     let meta = fs::metadata(&path).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -474,6 +535,14 @@ async fn delete_osf(
     AxumPath(name): AxumPath<String>,
 ) -> Result<Json<Value>, ApiError> {
     let name = sanitize_osf_filename(&name)?;
+    let _operation = state.source_operation.lock().await;
+    if state.record.active_filename().as_deref() == Some(name.as_str()) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "conflict",
+            "OSF is still being recorded",
+        ));
+    }
     let snap = state.osf_import.snapshot();
     if snap.state == "running" && snap.name == name {
         return Err(ApiError::new(
@@ -484,7 +553,14 @@ async fn delete_osf(
     }
     let path = osf_path(&name);
     match fs::remove_file(&path).await {
-        Ok(()) => Ok(Json(json!({ "ok": true, "name": name }))),
+        Ok(()) => {
+            clear_incomplete_recording(&name);
+            Ok(Json(json!({ "ok": true, "name": name })))
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && recording_is_incomplete(&name) => {
+            clear_incomplete_recording(&name);
+            Ok(Json(json!({ "ok": true, "name": name })))
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(ApiError::new(
             StatusCode::NOT_FOUND,
             "not_found",
@@ -495,13 +571,21 @@ async fn delete_osf(
 }
 
 async fn post_osf(
+    State(state): State<AppState>,
     AxumPath(name): AxumPath<String>,
     body: Body,
 ) -> Result<Json<Value>, ApiError> {
     let name = sanitize_osf_filename(&name)?;
+    if state.record.active_filename().as_deref() == Some(name.as_str()) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "conflict",
+            "OSF is still being recorded",
+        ));
+    }
     ensure_osf_dir().await?;
     let path = osf_path(&name);
-    let partial = format!("{}.partial", path.to_string_lossy());
+    let partial = partial_osf_path(&name);
 
     let mut file = File::create(&partial).await.map_err(io_err)?;
     let mut body = body.into_data_stream();
@@ -523,7 +607,17 @@ async fn post_osf(
         let _ = fs::remove_file(&partial).await;
         return Err(e);
     }
+    let _operation = state.source_operation.lock().await;
+    if state.record.active_filename().as_deref() == Some(name.as_str()) {
+        let _ = fs::remove_file(&partial).await;
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "conflict",
+            "OSF is still being recorded",
+        ));
+    }
     fs::rename(&partial, &path).await.map_err(io_err)?;
+    clear_incomplete_recording(&name);
     Ok(Json(json!({
         "ok": true,
         "name": name,

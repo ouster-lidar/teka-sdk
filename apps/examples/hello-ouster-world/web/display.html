@@ -1,11 +1,11 @@
 <h2>hello-ouster-world</h2>
-<p>Example visualizer app with Ouster Dynamo integration</p>
+<p>View an Ouster sensor or a recorded OSF directly in the browser or on HDMI.</p>
 
 <div class="how-stack">
     <div class="stat-card how-display-card">
-        <div class="service-header">
-            <div class="service-header-title">Display</div>
-            <div class="service-header-actions how-display-toolbar">
+        <div class="iface-block how-source-block">
+            <div class="how-source-heading">
+                <div class="how-source-title">Source</div>
                 <div id="display-controls" class="how-display-controls">
                     <label class="mc-switch service-auto-enable" id="hdmi-toggle-wrap" title="On-device HDMI panel">
                         <input type="checkbox" class="mc-switch-cb" id="hdmi-toggle" checked>
@@ -17,14 +17,12 @@
                         <span class="mc-switch-track" aria-hidden="true"></span>
                         <span id="stream-label">Show in Browser</span>
                     </label>
-                    <span id="control-status" class="how-control-status" aria-live="polite">Watching&nbsp;&nbsp;&nbsp;</span>
+                    <label class="mc-switch how-guest-access" title="Let signed-out visitors watch the point cloud (view only)" hidden>
+                        <input type="checkbox" class="mc-switch-cb" id="guest-access-toggle" disabled>
+                        <span class="mc-switch-track" aria-hidden="true"></span>
+                        <span class="mc-switch-text">Guest view</span>
+                    </label>
                 </div>
-            </div>
-        </div>
-        <div id="display-error" class="mc-alert" style="display: none;"></div>
-        <div class="iface-block how-source-block">
-            <div class="how-source-heading">
-                <div class="how-source-title">Source</div>
             </div>
             <div class="iface-block-header how-source-header">
                 <div class="iface-block-row-left">
@@ -32,17 +30,18 @@
                         <button type="button" class="btn btn-small how-source-mode-seg how-source-mode-seg--local_file how-source-mode-seg-active" data-lidar="osf">Local file</button>
                         <button type="button" class="btn btn-secondary btn-small how-source-mode-seg how-source-mode-seg--sensor" data-lidar="sensor">Connected sensor</button>
                     </span>
-                    <span id="frameset-source-hint" class="app-meta-chip app-meta-chip--type" hidden></span>
-                    <input type="hidden" id="cfg-app-socket" value="/run/ouster-dynamo/frameset.sock">
+                    <span id="source-status-chips" class="iface-block-chips"></span>
+                    <span id="source-status-message" class="how-source-message" hidden></span>
                 </div>
                 <div class="iface-block-actions">
                     <div class="btn-group">
+                        <button type="button" class="btn btn-secondary btn-small" id="btn-source-toggle" aria-expanded="true" aria-controls="source-fields">Hide</button>
                         <button type="button" class="btn btn-stop btn-small" id="btn-stop-source" title="Stop lidar/OSF playback and recording">Stop</button>
                         <button type="button" class="btn btn-primary btn-small" id="btn-apply-source">Apply</button>
                     </div>
                 </div>
             </div>
-            <div class="how-source-fields-stack">
+            <div id="source-fields" class="how-source-fields-stack">
                 <div id="cfg-osf-wrap" class="how-source-field">
                     <label class="form-label" for="cfg-osf-select">Recorded OSFs</label>
                     <div class="how-osf-row">
@@ -66,7 +65,13 @@
                     </div>
                 </div>
                 <div id="cfg-sensor-wrap" class="how-source-field" style="display: none;">
-                    <label class="form-label" for="cfg-sensor-host">Sensor host</label>
+                    <label class="form-label" for="sensor-candidate-select" title="* Preferred: already configured to stream lidar data to this device">Detected sensors</label>
+                    <div id="sensor-picker" class="how-sensor-discovery-row" title="* Preferred: already configured to stream lidar data to this device">
+                        <select id="sensor-candidate-select" class="mc-input mc-select how-sensor-candidate-select" aria-label="Detected sensors">
+                            <option value="">Waiting for Mission Control sensor roster…</option>
+                        </select>
+                    </div>
+                    <label class="form-label" for="cfg-sensor-host">Sensor hostname or IP</label>
                     <div class="how-osf-row how-sensor-row">
                         <input type="text" id="cfg-sensor-host" class="mc-input how-sock-input how-sensor-host-input" placeholder="os-… / IP" autocomplete="off" spellcheck="false">
                         <div class="how-record-controls">
@@ -76,50 +81,150 @@
                                 <span id="record-enabled-label">Record</span>
                             </label>
                             <input type="text" id="record-filename" class="mc-input how-record-filename" placeholder="hello-ouster-world-YYYYMMDD-HHMMSS.osf" autocomplete="off" spellcheck="false" disabled title="Basename under /srv/recordings/ (empty = auto)">
+                            <span class="how-record-duration" title="Recording duration in seconds">
+                                <input type="number" id="record-duration" class="mc-input" min="1" max="3600" step="1" value="120" disabled aria-label="Recording duration in seconds">
+                                <span class="how-record-duration-unit" aria-hidden="true">s</span>
+                            </span>
                         </div>
-                    </div>
-                </div>
-                <div class="how-source-field">
-                    <label class="form-label" for="via-dynamo-toggle">Ouster Dynamo</label>
-                    <div class="how-via-dynamo-control" id="via-dynamo-wrap">
-                        <label class="mc-switch service-auto-enable" title="Optional. Ouster Dynamo is proprietary software installed separately. When on, Dynamo ingests lidar and publishes detections on the app FrameSet stream. When off, lidar/OSF is opened directly without Dynamo overlays.">
-                            <input type="checkbox" class="mc-switch-cb" id="via-dynamo-toggle">
-                            <span class="mc-switch-track" aria-hidden="true"></span>
-                            <span id="via-dynamo-label">Off</span>
-                        </label>
-                        <span id="via-dynamo-hint" class="how-via-dynamo-hint">Direct lidar/OSF — no Dynamo detections overlay</span>
                     </div>
                 </div>
             </div>
         </div>
-        <dl class="how-meta">
-            <div><dt>Source</dt><dd id="meta-source">—</dd></div>
-            <div><dt>Stream</dt><dd id="meta-stream">—</dd></div>
-        </dl>
+        <div class="how-guest-bar">
+            <span id="guest-source-chips" class="iface-block-chips"></span>
+            <a class="how-guest-signin" href="/login?next=/app/hello-ouster-world">Sign in for full controls</a>
+        </div>
         <div id="stream-panel" class="how-stream-panel">
             <div id="stream-wrap" class="how-stream-wrap" tabindex="0" aria-label="Remote display">
                 <canvas id="stream-canvas" class="how-stream-canvas" width="854" height="480"></canvas>
+                <div class="how-stream-hud">
+                    <div class="how-stream-hud-info">
+                        <span class="how-hud-chip" id="meta-source">—</span>
+                        <span class="how-hud-chip" title="Browser stream resolution">Stream <span id="meta-stream">—</span></span>
+                    </div>
+                    <div class="how-stream-hud-actions">
+                        <span class="how-hud-chip" id="screenshot-status" role="status" hidden></span>
+                        <button type="button" class="how-hud-btn" id="btn-screenshot" title="Copy screenshot at stream resolution" aria-label="Copy screenshot" disabled>
+                            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                        </button>
+                        <button type="button" class="how-hud-btn" id="btn-keybindings" title="Viewer keybindings" aria-label="Show viewer keybindings" aria-haspopup="dialog" aria-controls="keybindings-dialog">?</button>
+                        <button type="button" class="how-hud-btn" id="btn-fullscreen" title="Fullscreen (Esc to exit)" aria-label="Toggle fullscreen">
+                            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <dialog id="keybindings-dialog" class="how-keybindings-dialog" aria-labelledby="keybindings-title">
+                    <div class="how-keybindings-heading">
+                        <h3 id="keybindings-title">Viewer keybindings</h3>
+                        <button type="button" class="btn btn-secondary btn-small" id="btn-close-keybindings" autofocus>Close</button>
+                    </div>
+                    <p>Hover over the display to take control. Shift reverses cycles and makes camera movements smaller.</p>
+                    <div class="how-keybindings-grid">
+                        <section>
+                            <h4>Camera</h4>
+                            <table><tbody>
+                                <tr><td><kbd>w</kbd> / <kbd>s</kbd></td><td>Pitch down / up</td></tr>
+                                <tr><td><kbd>a</kbd> / <kbd>d</kbd></td><td>Yaw right / left</td></tr>
+                                <tr><td><kbd>q</kbd> / <kbd>e</kbd></td><td>Roll left / right</td></tr>
+                                <tr><td><kbd>=</kbd> / <kbd>-</kbd></td><td>Zoom in / out</td></tr>
+                                <tr><td><kbd>Shift+r</kbd></td><td>Reset orientation</td></tr>
+                                <tr><td><kbd>Shift+1 / 2 / 3</kbd></td><td>Top / front / left view</td></tr>
+                                <tr><td><kbd>Ctrl+r</kbd></td><td>Bird’s-eye view</td></tr>
+                                <tr><td><kbd>0</kbd></td><td>Perspective / orthographic</td></tr>
+                                <tr><td><kbd>Ctrl+-</kbd> / <kbd>Ctrl+=</kbd></td><td>Wider / narrower field of view</td></tr>
+                                <tr><td><kbd>u</kbd></td><td>Cycle camera mode</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section>
+                            <h4>Point cloud</h4>
+                            <table><tbody>
+                                <tr><td><kbd>1</kbd> / <kbd>2</kbd></td><td>Show / hide first or second return</td></tr>
+                                <tr><td><kbd>p</kbd> / <kbd>Shift+p</kbd></td><td>Larger / smaller points</td></tr>
+                                <tr><td><kbd>m</kbd></td><td>Cycle coloring</td></tr>
+                                <tr><td><kbd>f</kbd></td><td>Cycle palette</td></tr>
+                                <tr><td><kbd>c</kbd></td><td>Cycle highlighting</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section id="keybindings-sensors" hidden>
+                            <h4>Sensors</h4>
+                            <table><tbody id="keybindings-sensor-rows"></tbody></table>
+                        </section>
+                        <section>
+                            <h4>Images</h4>
+                            <table><tbody>
+                                <tr><td><kbd>b</kbd></td><td>Cycle top image</td></tr>
+                                <tr><td><kbd>n</kbd></td><td>Cycle bottom image</td></tr>
+                                <tr><td><kbd>i</kbd> / <kbd>Shift+i</kbd></td><td>Larger / smaller images</td></tr>
+                                <tr><td><kbd>Ctrl+i</kbd></td><td>Flip / hide images</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section>
+                            <h4>Overlays</h4>
+                            <table><tbody>
+                                <tr><td><kbd>o</kbd></td><td>Show / hide information</td></tr>
+                                <tr><td><kbd>Ctrl+o</kbd></td><td>Cycle text size</td></tr>
+                                <tr><td><kbd>9</kbd></td><td>Show / hide axes</td></tr>
+                                <tr><td><kbd>8</kbd></td><td>Cycle track view</td></tr>
+                                <tr><td><kbd>&#x27;</kbd> / <kbd>&quot;</kbd></td><td>Wider / narrower range spacing</td></tr>
+                                <tr><td><kbd>Ctrl+&#x27;</kbd></td><td>Cycle range line thickness</td></tr>
+                                <tr><td><kbd>Ctrl+s</kbd></td><td>Show / hide sky</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section>
+                            <h4>Playback</h4>
+                            <table><tbody>
+                                <tr><td><kbd>Space</kbd></td><td>Pause / resume</td></tr>
+                            </tbody><tbody id="keybindings-playback" hidden>
+                                <tr><td><kbd>.</kbd> / <kbd>,</kbd></td><td>Step forward / backward</td></tr>
+                                <tr><td><kbd>Ctrl+.</kbd> / <kbd>Ctrl+,</kbd></td><td>Step ten frames</td></tr>
+                                <tr><td><kbd>&gt;</kbd> / <kbd>&lt;</kbd></td><td>Faster / slower</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section id="keybindings-objects" hidden>
+                            <h4>Objects</h4>
+                            <table><tbody>
+                                <tr><td><kbd>5</kbd></td><td>Cycle display mode</td></tr>
+                                <tr><td><kbd>Ctrl+c</kbd></td><td>Cycle palette</td></tr>
+                                <tr><td><kbd>Ctrl+Shift+c</kbd></td><td>Cycle color attribute</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section id="keybindings-zones" hidden>
+                            <h4>Zones</h4>
+                            <table><tbody>
+                                <tr><td><kbd>y</kbd></td><td>Cycle zone set</td></tr>
+                                <tr><td><kbd>Ctrl+y</kbd></td><td>Cycle render mode</td></tr>
+                            </tbody></table>
+                        </section>
+                        <section>
+                            <h4>Help</h4>
+                            <table><tbody>
+                                <tr><td><kbd>?</kbd></td><td>Open keyboard help</td></tr>
+                                <tr><td><kbd>Esc</kbd></td><td>Close help / leave fullscreen</td></tr>
+                            </tbody></table>
+                        </section>
+                    </div>
+                    <details id="keybindings-advanced" hidden>
+                        <summary>Advanced playback</summary>
+                        <p><kbd>h</kbd> / <kbd>Shift+h</kbd> — More / fewer camera subframes.</p>
+                    </details>
+                </dialog>
                 <div id="stream-idle-hint" class="how-stream-idle-hint" hidden>
                     <p class="how-stream-idle-title">Browser stream turned off</p>
                     <p>Click, drag, or type in this window to control the HDMI SimpleViz display.</p>
                 </div>
-                <div id="peer-source-hint" class="how-stream-idle-hint" hidden>
-                    <p class="how-stream-idle-title" id="peer-source-title">Waiting for peer FrameSets</p>
-                    <p id="peer-source-body">
-                        Start Ouster Dynamo (proprietary, installed separately)
-                        so it publishes /run/ouster-dynamo/frameset.sock.
-                        Visualization starts automatically when FrameSets arrive.
-                    </p>
+                <div id="source-state-overlay" class="how-stream-idle-hint" hidden>
+                    <p class="how-stream-idle-title" id="source-state-title">Waiting for source</p>
+                    <p id="source-state-message"></p>
+                    <p id="stream-alert" class="how-stream-alert" hidden></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="stat-card how-console-card">
+    <div class="stat-card how-console-card how-console-collapsed">
         <div class="service-header">
-            <div class="service-header-title">Console</div>
-            <div class="service-header-actions">
-                <button type="button" class="btn btn-primary btn-small" id="btn-reconnect">Reconnect</button>
+            <div class="service-header-title">Console</div>            <div class="service-header-actions">
+                <button type="button" class="btn btn-secondary btn-small" id="btn-console-toggle" aria-expanded="false" aria-controls="terminal">Open</button>
             </div>
         </div>
         <div id="console-error" class="mc-alert" style="display: none;"></div>

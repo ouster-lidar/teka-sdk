@@ -2,23 +2,22 @@
     'use strict';
 
     var appApi = jetstreamAppApi('hello-ouster-world');
+    var howStack = document.querySelector('.how-stack');
+    var guestAccessToggle = document.getElementById('guest-access-toggle');
+    var guestView = false;
+    var guestAccessEnabled = true;
+    var guestEditable = false;
+    var guestAccessBusy = false;
     var ws = null;
     var controlling = false;
     var hoverStream = false;
     var sourceW = 0;
     var sourceH = 0;
-    /** Separate fields so status polls don't append into meta-source. */
     var metaSourceLabel = '';
-    var metaSourceRes = '';
 
     function refreshMetaSource() {
         var meta = document.getElementById('meta-source');
-        if (!meta) return;
-        if (metaSourceLabel && metaSourceRes) {
-            meta.textContent = metaSourceLabel + ' · ' + metaSourceRes;
-        } else {
-            meta.textContent = metaSourceLabel || metaSourceRes || '—';
-        }
+        if (meta) meta.textContent = metaSourceLabel || '—';
     }
     var activePointers = Object.create(null);
     var lastMoveSent = 0;
@@ -33,26 +32,29 @@
     var canvas = document.getElementById('stream-canvas');
     var ctx = canvas.getContext('2d');
     var wrap = document.getElementById('stream-wrap');
+    var keybindingsDialog = document.getElementById('keybindings-dialog');
+    var btnScreenshot = document.getElementById('btn-screenshot');
     var streamIdleHint = document.getElementById('stream-idle-hint');
-    var peerSourceHint = document.getElementById('peer-source-hint');
-    var peerSourceTitle = document.getElementById('peer-source-title');
-    var peerSourceBody = document.getElementById('peer-source-body');
-    var peerSourceActive = false;
-    var lastSourceCfg = null;
+    var sourceStateOverlay = document.getElementById('source-state-overlay');
+    var sourceStateTitle = document.getElementById('source-state-title');
+    var sourceStateMessage = document.getElementById('source-state-message');
+    var sourceWaiting = true;
+    var sourceRunning = null;
+    var sourceBlock = document.querySelector('.how-source-block');
+    var btnSourceToggle = document.getElementById('btn-source-toggle');
     var hdmiToggle = document.getElementById('hdmi-toggle');
     var hdmiLabel = document.getElementById('hdmi-label');
     var hdmiToggleWrap = document.getElementById('hdmi-toggle-wrap');
     var streamToggle = document.getElementById('stream-toggle');
     var streamLabel = document.getElementById('stream-label');
-    var controlStatus = document.getElementById('control-status');
     var consoleCard = document.querySelector('.how-console-card');
-    var reconnectBtn = document.getElementById('btn-reconnect');
-    // Equal visual width: "Controlling" is 11 chars; pad Watching with NBSP.
-    var LABEL_WATCHING = 'Watching\u00A0\u00A0\u00A0';
-    var LABEL_CONTROLLING = 'Controlling';
-
+    var consoleToggleBtn = document.getElementById('btn-console-toggle');
+    var streamAlert = document.getElementById('stream-alert');
+    var streamAlertText = '';
     function showError(msg) {
-        window.showInlineError('display-error', msg || '');
+        streamAlertText = msg || '';
+        if (streamAlert) streamAlert.textContent = streamAlertText;
+        updateIdleHint();
     }
 
     function viewerLimitBanner(raw) {
@@ -73,8 +75,69 @@
     }
 
     function sendJson(obj) {
+        if (guestView) return;
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         ws.send(JSON.stringify(obj));
+    }
+
+    function streamAllowed() {
+        return guestEditable || guestAccessEnabled;
+    }
+
+    function applyGuestAccessUi(data) {
+        if (!guestAccessToggle) return;
+        var wrapLabel = guestAccessToggle.closest('.how-guest-access');
+        guestAccessToggle.checked = !!(data && data.enabled);
+        guestAccessToggle.disabled = !guestEditable || guestAccessBusy;
+        if (wrapLabel) wrapLabel.hidden = !guestEditable;
+    }
+
+    function applyGuestMode() {
+        if (!howStack) return;
+        var guestOffSignedOut = !guestEditable && !guestAccessEnabled;
+        var guestUi = (guestView && guestAccessEnabled) || guestOffSignedOut;
+        howStack.classList.toggle('how-guest', guestUi);
+        if (guestView && guestAccessEnabled && guestSourceChips) {
+            guestSourceChips.replaceChildren(metaChip('View only', 'type'));
+        }
+        if (guestView && guestAccessEnabled && sourceBlock) {
+            sourceBlock.querySelectorAll('input, select, button, textarea').forEach(function (el) {
+                el.disabled = true;
+            });
+        }
+        if (guestOffSignedOut) {
+            showError('Guest view is off.');
+            if (streamAlert) {
+                streamAlert.innerHTML = 'Guest view is off. <a href="/login?next=/app/hello-ouster-world">Sign in</a> to view.';
+            }
+        }
+    }
+
+    function loadGuestAccess() {
+        // On failure keep the full UI; the backend still enforces access.
+        return fetchAppJson(api('/guest-access')).catch(function () { return null; }).then(function (data) {
+            if (!data) return;
+            guestView = !!data.guest;
+            guestAccessEnabled = data.enabled !== false;
+            guestEditable = !!data.editable;
+            applyGuestAccessUi(data);
+            applyGuestMode();
+        });
+    }
+
+    function saveGuestAccess(enabled) {
+        if (guestAccessBusy || !guestEditable) return;
+        guestAccessBusy = true;
+        guestAccessToggle.disabled = true;
+        fetch(api('/guest-access'), {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        }).catch(function () {}).finally(function () {
+            guestAccessBusy = false;
+            loadGuestAccess();
+        });
     }
 
     function hasActivePointers() {
@@ -101,57 +164,81 @@
     }
 
     function updateIdleHint() {
-        if (peerSourceHint) {
-            peerSourceHint.hidden = !peerSourceActive;
+        btnScreenshot.disabled = sourceWaiting || !(streamToggle && streamToggle.checked);
+        if (sourceStateOverlay) {
+            sourceStateOverlay.hidden = !sourceWaiting && !streamAlertText;
+            sourceStateOverlay.classList.toggle('how-alert-only', !sourceWaiting);
+            if (sourceStateTitle) sourceStateTitle.hidden = !sourceWaiting;
+            if (sourceStateMessage) sourceStateMessage.hidden = !sourceWaiting;
+            if (streamAlert) streamAlert.hidden = !streamAlertText;
         }
         if (streamIdleHint) {
             var browserOff = streamToggle && !streamToggle.checked;
             var hdmiOn = hdmiToggle && hdmiToggle.checked && !hdmiToggle.disabled;
-            // Peer-source waiting overlay takes precedence over the browser-off hint.
-            streamIdleHint.hidden = peerSourceActive
+            streamIdleHint.hidden = sourceWaiting
                 || !(browserOff && hdmiOn);
         }
     }
 
-    function isAppSource(src) {
-        return src === 'app';
+    function applySourceState(cfg) {
+        cfg = cfg || {};
+        var runtime = cfg.runtime || {};
+        var discovery = cfg.discovery || {};
+        var state = runtime.state || discovery.status || '';
+        var receiving = !cfg.config_error && cfg.source_enabled !== false
+            && (state === 'streaming' || state === 'playing_osf');
+        var message = cfg.config_error || runtime.message || discovery.message || '';
+        var title = 'Waiting for source';
+        var chip = ['Waiting', 'state'];
+        if (cfg.config_error) { title = 'Source configuration needs attention'; chip = ['Needs attention', 'ro']; }
+        else if (cfg.source_enabled === false || state === 'stopped') { title = 'Source stopped'; chip = ['Stopped', 'type']; }
+        else if (state === 'no_sensors') { title = 'No sensors detected'; chip = ['No sensors', 'state']; }
+        else if (state === 'selection_required') { title = 'Select a sensor'; chip = ['Select sensor', 'state']; }
+        else if (state === 'discovering') { title = 'Scanning for sensors'; chip = ['Scanning', 'state']; }
+        else if (state === 'configuring') { title = 'Auto-configuring sensor'; chip = ['Configuring', 'state']; }
+        else if (state === 'configuration_error' || state === 'error') { title = 'Source error'; chip = ['Error', 'ro']; }
+        else if (receiving) { title = 'Receiving frames'; chip = [state === 'playing_osf' ? 'Playing' : 'Streaming', 'usage']; }
+        sourceWaiting = !receiving;
+        updateKeybindings(receiving ? runtime.controls : null, cfg.source);
+        if (sourceWaiting) clearStreamBlack();
+        // Collapse only on running/not-running transitions so a manual toggle sticks.
+        if (receiving !== sourceRunning && !sourceDraftDirty && !sourceBusy) {
+            sourceRunning = receiving;
+            setSourceCollapsed(receiving);
+        }
+        if (sourceStateTitle) sourceStateTitle.textContent = title;
+        if (sourceStateMessage) sourceStateMessage.textContent = message || 'Waiting for source status';
+        if (sourceStatusChips) {
+            var isSensor = canonicalizeSource(cfg.source) === 'sensor';
+            var target = isSensor ? cfg.sensor_hostname : String(cfg.osf_path || '').split('/').pop();
+            var kind = isSensor ? 'Sensor' : 'Local file';
+            var chips = [metaChip(chip[0], chip[1], message), metaChip(target ? kind + ': ' + target : kind, 'type')];
+            [sourceStatusChips, guestSourceChips].forEach(function (el) {
+                if (el) el.replaceChildren.apply(el, chips.map(function (c) { return c.cloneNode(true); }));
+            });
+        }
+        if (sourceStatusMessage) {
+            sourceStatusMessage.textContent = receiving ? '' : message;
+            sourceStatusMessage.title = message;
+            sourceStatusMessage.hidden = receiving || !message;
+        }
+        applySensorDiscovery(discovery);
+        updateIdleHint();
     }
 
-    function setPeerSourceUi(cfg) {
-        lastSourceCfg = cfg || lastSourceCfg;
-        var src = (cfg && cfg.source) || (lastSourceCfg && lastSourceCfg.source) || '';
-        var rt = (cfg && cfg.runtime) || {};
-        var bridge = rt.bridge || '';
-        // Treat missing/empty runtime as waiting when a peer socket is selected.
-        var waiting = isAppSource(src) && bridge !== 'connected';
-        if (waiting !== peerSourceActive) {
-            peerSourceActive = waiting;
-            if (waiting) clearStreamBlack();
-        } else {
-            peerSourceActive = waiting;
-        }
-        if (peerSourceHint) {
-            peerSourceHint.hidden = !peerSourceActive;
-        }
-        if (peerSourceTitle) {
-            peerSourceTitle.textContent = bridge === 'disconnected'
-                ? 'Peer source disconnected'
-                : 'Waiting for peer FrameSets';
-        }
-        if (peerSourceBody) {
-            if (rt.message && String(rt.message).trim()) {
-                peerSourceBody.textContent = String(rt.message);
-            } else if (bridge === 'disconnected') {
-                peerSourceBody.textContent =
-                    'Restart the peer producer — visualization resumes automatically.';
-            } else {
-                peerSourceBody.textContent =
-                    'Start Ouster Dynamo (proprietary, installed separately) '
-                    + 'so it publishes /run/ouster-dynamo/frameset.sock. '
-                    + 'Visualization starts automatically when FrameSets arrive.';
-            }
-        }
-        updateIdleHint();
+    function metaChip(text, variant, title) {
+        var el = document.createElement('span');
+        el.className = 'app-meta-chip app-meta-chip--' + variant;
+        el.textContent = text;
+        if (title) el.title = title;
+        return el;
+    }
+
+    function setSourceCollapsed(collapsed) {
+        if (!sourceBlock || !btnSourceToggle) return;
+        sourceBlock.classList.toggle('how-source-collapsed', collapsed);
+        btnSourceToggle.setAttribute('aria-expanded', String(!collapsed));
+        btnSourceToggle.textContent = collapsed ? 'Configure' : 'Hide';
     }
 
     function setHdmiPresent(present) {
@@ -188,10 +275,6 @@
     function setControlUi(on) {
         controlling = !!on;
         wrap.classList.toggle('how-controlling', controlling);
-        if (controlStatus) {
-            controlStatus.textContent = controlling ? LABEL_CONTROLLING : LABEL_WATCHING;
-            controlStatus.classList.toggle('how-control-active', controlling);
-        }
         if (!controlling) {
             activePointers = Object.create(null);
             pendingMove = null;
@@ -209,6 +292,7 @@
     }
 
     function requestAcquire() {
+        if (guestView) return;
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
         sendJson({ type: 'control', action: 'acquire' });
     }
@@ -227,8 +311,6 @@
         if (meta.width && meta.height) {
             sourceW = meta.width;
             sourceH = meta.height;
-            metaSourceRes = meta.width + '×' + meta.height;
-            refreshMetaSource();
         }
         if (meta.stream_width && meta.stream_height) {
             document.getElementById('meta-stream').textContent =
@@ -249,13 +331,20 @@
     }
 
     function paintFrame(blob) {
+        if (guestView && sourceWaiting) {
+            sourceWaiting = false;
+            if (guestSourceChips) {
+                guestSourceChips.replaceChildren(metaChip('Live stream', 'usage'));
+            }
+            updateIdleHint();
+        }
         // Stream toggle off: keep panel black (HDMI is independent).
         if (streamToggle && !streamToggle.checked) {
             pendingFrame = null;
             return;
         }
         // Peer waiting / disconnected: keep the instruction overlay clear.
-        if (peerSourceActive) {
+        if (sourceWaiting) {
             pendingFrame = null;
             return;
         }
@@ -277,6 +366,7 @@
                 if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
                     canvas.width = bmp.width;
                     canvas.height = bmp.height;
+                    fitStream();
                 }
                 ctx.drawImage(bmp, 0, 0);
                 bmp.close();
@@ -291,6 +381,7 @@
             if (canvas.width !== im.naturalWidth || canvas.height !== im.naturalHeight) {
                 canvas.width = im.naturalWidth;
                 canvas.height = im.naturalHeight;
+                fitStream();
             }
             ctx.drawImage(im, 0, 0);
             URL.revokeObjectURL(url);
@@ -309,8 +400,12 @@
         }
         var rect = canvas.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return null;
-        var nx = (ev.clientX - rect.left) / rect.width;
-        var ny = (ev.clientY - rect.top) / rect.height;
+        // object-fit: contain letterboxes the stream in fullscreen.
+        var scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+        var w = canvas.width * scale;
+        var h = canvas.height * scale;
+        var nx = (ev.clientX - rect.left - (rect.width - w) / 2) / w;
+        var ny = (ev.clientY - rect.top - (rect.height - h) / 2) / h;
         if (!clamp && (nx < 0 || ny < 0 || nx > 1 || ny > 1)) return null;
         if (clamp) {
             nx = Math.min(1, Math.max(0, nx));
@@ -355,14 +450,10 @@
     }
 
     function connect() {
+        if (!streamAllowed()) return;
         if (displayReconnectTimer) {
             clearTimeout(displayReconnectTimer);
             displayReconnectTimer = null;
-        }
-        var stayingOnLimit = !!viewerLimitBanner(displayWsError);
-        if (!stayingOnLimit) {
-            showError('');
-            displayWsError = '';
         }
         if (ws) {
             try {
@@ -407,10 +498,6 @@
             paintFrame(ev.data);
         };
 
-        ws.onerror = function () {
-            showError('Display WebSocket error');
-        };
-
         ws.onclose = function () {
             setControlUi(false);
             var limit = viewerLimitBanner(displayWsError);
@@ -425,7 +512,9 @@
         };
     }
 
-    var framesetSourceHint = document.getElementById('frameset-source-hint');
+    var sourceStatusChips = document.getElementById('source-status-chips');
+    var guestSourceChips = document.getElementById('guest-source-chips');
+    var sourceStatusMessage = document.getElementById('source-status-message');
     var cfgOsfSelect = document.getElementById('cfg-osf-select');
     var cfgOsfUploadInput = document.getElementById('cfg-osf-upload-input');
     var osfLibraryLink = document.getElementById('osf-sample-library');
@@ -435,18 +524,20 @@
     var osfFetchBarWrap = document.getElementById('osf-fetch-bar-wrap');
     var osfFetchBar = document.getElementById('osf-fetch-bar');
     var osfFetchStatus = document.getElementById('osf-fetch-status');
-    var cfgAppSocket = document.getElementById('cfg-app-socket');
     var cfgSensorHost = document.getElementById('cfg-sensor-host');
-    var viaDynamoToggle = document.getElementById('via-dynamo-toggle');
-    var viaDynamoLabel = document.getElementById('via-dynamo-label');
-    var viaDynamoHint = document.getElementById('via-dynamo-hint');
+    var sensorPicker = document.getElementById('sensor-picker');
+    var sensorCandidateSelect = document.getElementById('sensor-candidate-select');
     var btnApplySource = document.getElementById('btn-apply-source');
     var btnStopSource = document.getElementById('btn-stop-source');
     var recordEnabledToggle = document.getElementById('record-enabled-toggle');
     var recordFilename = document.getElementById('record-filename');
-    var viaDynamoWrap = document.getElementById('via-dynamo-wrap');
+    var recordDuration = document.getElementById('record-duration');
+    var recordControls = document.querySelector('.how-record-controls');
     var lastRecord = { active: false };
     var lastRuntime = {};
+    var lastDiscovery = {};
+    var sensorPickerSocket = null;
+    var lastCandidateKey = '';
     var osfWrapWasVisible = false;
     var recordFilenameUserEdited = false;
     var lastSuggestedRecordName = '';
@@ -458,6 +549,7 @@
         sourceBusy = busy;
         if (btnApplySource) btnApplySource.disabled = busy;
         if (btnStopSource) btnStopSource.disabled = busy;
+        updateSourceFieldsUi();
     }
     var sourceDraftDirty = false;
     var lastPersistedSource = null;
@@ -468,35 +560,18 @@
     var osfXferKey = '';
     var osfXferSamples = [];
     var osfXferStarted = 0;
-    var DYNAMO_APP_SOCKET = '/run/ouster-dynamo/frameset.sock';
     var SEED_PREFIX = 'seed:';
-    var lidarKind = 'osf';
-
-    function viaDynamo() {
-        return !!(viaDynamoToggle && viaDynamoToggle.checked);
-    }
+    var lidarKind = 'sensor';
 
     function vizSource() {
-        if (viaDynamo()) return 'app';
         return lidarKind === 'sensor' ? 'sensor' : 'local_file';
     }
 
-    function syncVizSourceSelect() {
-        if (cfgAppSocket && viaDynamo() && !cfgAppSocket.value.trim()) {
-            cfgAppSocket.value = DYNAMO_APP_SOCKET;
-        }
-    }
-
     function canonicalizeSource(src) {
-        return src || 'local_file';
+        return src === 'sensor' ? 'sensor' : 'local_file';
     }
 
-    function sourceLabel(src, sock) {
-        if (isAppSource(src)) {
-            var lidar = lidarKind === 'sensor' ? 'sensor' : 'OSF';
-            if (sock === DYNAMO_APP_SOCKET || !sock) return 'ouster-dynamo · ' + lidar;
-            return 'app FrameSet socket · ' + lidar;
-        }
+    function sourceLabel(src) {
         if (src === 'sensor') return 'connected sensor';
         return 'local file';
     }
@@ -701,12 +776,13 @@
     }
 
     function loadOsfLibrary(preferredPath) {
+        if (guestView) return Promise.resolve(null);
         var prefer = preferredPath
             || (lastPersistedSource && lastPersistedSource.osf_path)
             || '';
         return fetchAppJson(api('/osfs')).then(function (catalog) {
             if (!catalog) return null;
-            renderOsfSelect(catalog, prefer);
+            renderOsfSelect(catalog, preferredPath || (sourceDraftDirty ? selectedOsfPath() : prefer));
             if (importRunning(catalog) && !osfFetchPollTimer) startOsfFetchPoll();
             return catalog;
         }).catch(function () { return null; });
@@ -890,20 +966,14 @@
         return !!(recordEnabledToggle && recordEnabledToggle.checked);
     }
 
-    function recordingUiLocked() {
-        return recordDraftEnabled() || !!(lastRecord && lastRecord.active);
-    }
-
     function syncRecordControlsUi() {
+        if (recordDuration) {
+            recordDuration.disabled = !recordDraftEnabled() || !!(lastRecord && lastRecord.active);
+        }
         if (recordFilename) {
             recordFilename.disabled = !recordDraftEnabled() || !!(lastRecord && lastRecord.active);
         }
-        if (viaDynamoWrap) {
-            viaDynamoWrap.classList.toggle('how-toggle-disabled', recordDraftEnabled());
-            viaDynamoWrap.title = recordDraftEnabled()
-                ? 'Recording requires direct sensor input (Dynamo off)'
-                : '';
-        }
+        if (recordControls) recordControls.classList.toggle('how-record-off', !recordDraftEnabled());
     }
 
     function defaultRecordFilename() {
@@ -941,12 +1011,6 @@
         return v;
     }
 
-    function sourceEnabled(cfg) {
-        if (!cfg) return true;
-        if (typeof cfg.source_enabled === 'boolean') return cfg.source_enabled;
-        return true;
-    }
-
     function syncLidarSegments() {
         document.querySelectorAll('.how-source-mode-seg[data-lidar]').forEach(function (btn) {
             var kind = btn.getAttribute('data-lidar');
@@ -957,7 +1021,6 @@
     }
 
     function updateSourceFieldsUi() {
-        syncVizSourceSelect();
         var osfWrap = document.getElementById('cfg-osf-wrap');
         var osfActions = document.getElementById('how-osf-actions');
         var sensorWrap = document.getElementById('cfg-sensor-wrap');
@@ -966,21 +1029,7 @@
         if (osfWrap) osfWrap.style.display = showOsf ? '' : 'none';
         if (osfActions) osfActions.style.display = showOsf ? '' : 'none';
         if (sensorWrap) sensorWrap.style.display = showSensor ? '' : 'none';
-        if (viaDynamoLabel) {
-            viaDynamoLabel.textContent = viaDynamo() ? 'On' : 'Off';
-        }
-        if (viaDynamoToggle) {
-            viaDynamoToggle.disabled = recordingUiLocked();
-        }
-        if (viaDynamoHint) {
-            if (recordingUiLocked()) {
-                viaDynamoHint.textContent = 'Dynamo off while recording (direct sensor lidar)';
-            } else {
-                viaDynamoHint.textContent = viaDynamo()
-                    ? 'Dynamo ingest — detections on the app FrameSet stream'
-                    : 'Direct lidar/OSF — no Dynamo detections overlay';
-            }
-        }
+        if (sensorCandidateSelect) sensorCandidateSelect.disabled = sourceBusy;
         if (showOsf && !osfWrapWasVisible) {
             loadOsfLibrary();
         }
@@ -992,38 +1041,31 @@
     function applyPersistedSource(cfg) {
         if (!cfg) return;
         lastPersistedSource = cfg;
+        lastRuntime = cfg.runtime || {};
+        lastDiscovery = cfg.discovery || {};
+        applySourceState(cfg);
         if (sourceDraftDirty || sourceBusy) return;
         var src = canonicalizeSource(cfg.source);
-        var via = typeof cfg.via_dynamo === 'boolean' ? cfg.via_dynamo : isAppSource(src);
-        if (viaDynamoToggle) viaDynamoToggle.checked = via;
-        if (typeof cfg.producer_kind === 'string' && cfg.producer_kind) {
-            lidarKind = cfg.producer_kind === 'sensor' ? 'sensor' : 'osf';
-        } else {
-            lidarKind = src === 'sensor' ? 'sensor' : 'osf';
-        }
+        lidarKind = src === 'sensor' ? 'sensor' : 'osf';
         if (cfgOsfSelect && typeof cfg.osf_path === 'string' && cfg.osf_path) {
-            var osfPath = cfg.osf_path;
             var matched = false;
             for (var i = 0; i < cfgOsfSelect.options.length; i++) {
-                if (cfgOsfSelect.options[i].value === osfPath) {
+                if (cfgOsfSelect.options[i].value === cfg.osf_path) {
                     cfgOsfSelect.selectedIndex = i;
                     matched = true;
                     break;
                 }
             }
-            if (!matched && lastOsfCatalog) {
-                renderOsfSelect(lastOsfCatalog, osfPath);
-            }
-        }
-        var sock = cfg.app_socket;
-        if (cfgAppSocket && typeof sock === 'string') {
-            cfgAppSocket.value = sock;
+            if (!matched && lastOsfCatalog) renderOsfSelect(lastOsfCatalog, cfg.osf_path);
         }
         if (cfgSensorHost && typeof cfg.sensor_hostname === 'string') {
             cfgSensorHost.value = cfg.sensor_hostname;
         }
         if (recordEnabledToggle && typeof cfg.record_enabled === 'boolean') {
-            recordEnabledToggle.checked = cfg.record_enabled;
+            recordEnabledToggle.checked = !!lastRecord.active;
+        }
+        if (recordDuration && typeof cfg.record_duration_seconds === 'number') {
+            recordDuration.value = cfg.record_duration_seconds;
         }
         if (recordFilename && typeof cfg.record_filename === 'string' && cfg.record_filename) {
             recordFilename.value = ensureOsfFilename(cfg.record_filename);
@@ -1033,72 +1075,82 @@
             recordFilenameUserEdited = false;
             suggestRecordFilenameIfNeeded();
         }
-        var srcForLabel = vizSource();
-        var sockForLabel = cfgAppSocket ? cfgAppSocket.value.trim() : '';
-        metaSourceLabel = sourceLabel(srcForLabel, sockForLabel);
+        metaSourceLabel = sourceLabel(src);
         refreshMetaSource();
         updateSourceFieldsUi();
     }
 
-    function applySourceRuntime(rt, extra) {
-        extra = extra || {};
-        rt = rt || {};
-        lastRuntime = rt;
-        var srcForLabel = vizSource();
-        var sockForLabel = cfgAppSocket ? cfgAppSocket.value.trim() : '';
-        var sockAvailable = extra.app_socket_available;
-        if (typeof sockAvailable !== 'boolean' && lastPersistedSource) {
-            sockAvailable = lastPersistedSource.app_socket_available;
-        }
-        if (framesetSourceHint) {
-            if (!sourceEnabled(lastPersistedSource)) {
-                framesetSourceHint.textContent = 'Source stopped — Apply to resume';
-                framesetSourceHint.hidden = false;
-                framesetSourceHint.className = 'app-meta-chip app-meta-chip--state';
-            } else if (!isAppSource(srcForLabel) && srcForLabel !== 'sensor') {
-                framesetSourceHint.hidden = true;
-                framesetSourceHint.textContent = '';
-            } else {
-                var hint = sourceLabel(srcForLabel, sockForLabel);
-                var chip = 'app-meta-chip app-meta-chip--type';
-                if (srcForLabel === 'sensor') {
-                    if (lastRecord && lastRecord.active) {
-                        hint += ' · recording';
-                        chip = 'app-meta-chip app-meta-chip--usage';
-                    } else if (recordDraftEnabled()) {
-                        hint += ' · record pending Apply';
+    function applySourceRuntime(rt) {
+        lastRuntime = rt || {};
+        var cfg = Object.assign({}, lastPersistedSource || {});
+        cfg.runtime = lastRuntime;
+        cfg.discovery = lastDiscovery;
+        applySourceState(cfg);
+    }
+
+    function applySensorDiscovery(discovery) {
+        discovery = discovery || {};
+        lastDiscovery = discovery;
+        if (sensorCandidateSelect) {
+            var selectedId = sensorCandidateSelect.value;
+            var candidates = Array.isArray(discovery.candidates) ? discovery.candidates : [];
+            var candidateKey = JSON.stringify(candidates.length ? candidates : discovery.status || '');
+            if (candidateKey !== lastCandidateKey) {
+                lastCandidateKey = candidateKey;
+                sensorCandidateSelect.innerHTML = '';
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = candidates.length
+                    ? 'Choose a detected sensor…'
+                    : discovery.status === 'no_sensors' ? 'No detected sensors'
+                    : discovery.status === 'unavailable' ? 'Sensor discovery unavailable'
+                    : 'Discovering sensors…';
+                sensorCandidateSelect.appendChild(placeholder);
+                candidates.slice().sort(function (a, b) {
+                    return (a.targets_this_device ? 0 : 1) - (b.targets_this_device ? 0 : 1)
+                        || (Number(a.serial) || Infinity) - (Number(b.serial) || Infinity)
+                        || a.id.localeCompare(b.id);
+                }).forEach(function (candidate) {
+                    var option = document.createElement('option');
+                    option.value = candidate.id;
+                    var label = candidate.hostname || candidate.target || candidate.id;
+                    var details = [candidate.model, candidate.firmware].filter(Boolean);
+                    if (details.length) label += ' · ' + details.join(' · ');
+                    option.textContent = (candidate.targets_this_device ? '*' : '\u00a0') + '\u00a0' + label;
+                    if (candidate.targets_this_device) {
+                        option.title = 'Preferred: already configured to stream lidar data to this device';
                     }
+                    sensorCandidateSelect.appendChild(option);
+                });
+                if (candidates.some(function (candidate) { return candidate.id === selectedId; })) {
+                    sensorCandidateSelect.value = selectedId;
                 }
-                if (isAppSource(srcForLabel)) {
-                    var bridge = rt.bridge || '';
-                    if (bridge === 'connected') {
-                        hint += ' · connected';
-                    } else if (bridge === 'disconnected') {
-                        hint += ' · disconnected (waiting)';
-                    } else if (bridge === 'waiting') {
-                        hint += ' · waiting for app';
-                    } else {
-                        hint += sockAvailable
-                            ? ' · socket ready'
-                            : ' · socket missing (start producer)';
-                    }
-                }
-                framesetSourceHint.textContent = hint;
-                framesetSourceHint.hidden = false;
-                if (isAppSource(srcForLabel)) {
-                    var st = rt.bridge || '';
-                    if (st === 'connected') chip = 'app-meta-chip app-meta-chip--usage';
-                    else if (st === 'disconnected' || st === 'waiting') chip = 'app-meta-chip app-meta-chip--state';
-                    else if (!sockAvailable) chip = 'app-meta-chip app-meta-chip--ro';
-                }
-                framesetSourceHint.className = chip;
             }
         }
-        setPeerSourceUi({
-            source: srcForLabel,
-            app_socket_available: sockAvailable,
-            runtime: rt,
-        });
+    }
+
+    function sensorPickerUrl() {
+        var path = api('/sensors/picker');
+        var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return proto + '//' + location.host + path;
+    }
+
+    function openSensorPicker() {
+        if (guestView) return;
+        if (sensorPickerSocket && sensorPickerSocket.readyState < WebSocket.CLOSING) return;
+        var socket = new WebSocket(sensorPickerUrl());
+        sensorPickerSocket = socket;
+        socket.onclose = function () {
+            if (sensorPickerSocket === socket) sensorPickerSocket = null;
+        };
+    }
+
+    function closeSensorPicker() {
+        if (!sensorPickerSocket) return;
+        try {
+            sensorPickerSocket.close();
+        } catch (_) {}
+        sensorPickerSocket = null;
     }
 
     function applyDisplayStatus(d) {
@@ -1125,6 +1177,9 @@
         if (lastRecord.error) {
             showError(lastRecord.error);
         }
+        if (!sourceDraftDirty && !sourceBusy && recordEnabledToggle) {
+            recordEnabledToggle.checked = !!lastRecord.active;
+        }
         updateSourceFieldsUi();
         applySourceRuntime(lastRuntime);
         if (!lastRecord.active && lidarKind === 'osf') {
@@ -1140,7 +1195,6 @@
         var data = t === 'snapshot' ? msg.data : msg.patch;
         if (!data) return;
         if (data.source) applyPersistedSource(data.source);
-        if (data.runtime) applySourceRuntime(data.runtime);
         if (data.display) applyDisplayStatus(data.display);
         if (data.record) applyRecordStatus(data.record);
     }
@@ -1159,12 +1213,9 @@
         var wantRecord = stoppingAll ? false : recordDraftEnabled();
         if (wantRecord) {
             lidarKind = 'sensor';
-            if (viaDynamoToggle) viaDynamoToggle.checked = false;
-            syncVizSourceSelect();
             normalizeRecordFilenameInput();
         }
         var src = vizSource();
-        var sock = DYNAMO_APP_SOCKET;
         var osfPath = selectedOsfPath();
         if (!wantRecord && !stoppingAll && lidarKind === 'osf' && !osfPath) {
             var seed = selectedSeedName();
@@ -1183,17 +1234,20 @@
         }
         pendingApplyOpts = null;
         var host = cfgSensorHost ? cfgSensorHost.value.trim() : '';
-        if (!stoppingAll && (wantRecord || lidarKind === 'sensor') && !host) {
-            showError('Enter sensor hostname or IP');
+        if (!stoppingAll && wantRecord && !host) {
+            showError('Select or enter a sensor before enabling recording');
+            return;
+        }
+        var duration = recordDuration ? Number(recordDuration.value) : 120;
+        if (!stoppingAll && (!Number.isInteger(duration) || duration < 1 || duration > 3600)) {
+            showError('Record duration must be between 1 and 3600 seconds');
             return;
         }
         var body = {
+            record_duration_seconds: stoppingAll ? ((lastPersistedSource && lastPersistedSource.record_duration_seconds) || 120) : duration,
             source: src,
             osf_path: osfPath,
             sensor_hostname: cfgSensorHost ? cfgSensorHost.value : '',
-            app_socket: sock,
-            producer_kind: wantRecord ? 'sensor' : lidarKind,
-            via_dynamo: wantRecord || stoppingAll ? false : viaDynamo(),
             record_enabled: wantRecord,
             source_enabled: !stoppingAll,
             record_filename: wantRecord ? normalizeRecordFilenameInput() : (
@@ -1212,26 +1266,9 @@
                 sourceDraftDirty = false;
                 if (resp.config) {
                     applyPersistedSource(resp.config);
-                    if (resp.config.runtime) {
-                        applySourceRuntime(resp.config.runtime);
-                    } else if (isAppSource(resp.config.source)) {
-                        applySourceRuntime({
-                            bridge: 'waiting',
-                            message:
-                                'Waiting for app FrameSets on '
-                                + (resp.config.app_socket || sock)
-                                + '. Visualization starts automatically when connected.',
-                        });
-                    }
                 }
                 if (resp.record) applyRecordStatus(resp.record);
                 showError('');
-                if (resp.dynamo && resp.dynamo.ok === false) {
-                    showError(
-                        'Source saved; Dynamo not updated: '
-                        + (resp.dynamo.error || resp.dynamo.status || 'unreachable')
-                    );
-                }
                 if (sourceBusyTimer) clearTimeout(sourceBusyTimer);
                 sourceBusyTimer = setTimeout(function () {
                     sourceBusyTimer = null;
@@ -1251,10 +1288,8 @@
     }
 
     function hydrateStatus() {
-        return fetchAppJson(api('/status')).then(function (st) {
-            if (st && st.source) applyPersistedSource(st.source);
-            if (st && st.display) applyDisplayStatus(st.display);
-            if (st && st.record) applyRecordStatus(st.record);
+        return fetchAppJson(api('/display/status')).then(function (st) {
+            if (st) applyDisplayStatus(st);
             return st;
         });
     }
@@ -1287,6 +1322,7 @@
     }
 
     hdmiToggle.addEventListener('change', function () {
+        if (guestView) return;
         if (hdmiToggle.disabled) return;
         var enabled = hdmiToggle.checked;
         setHdmiLabel(enabled);
@@ -1300,6 +1336,7 @@
     });
 
     streamToggle.addEventListener('change', function () {
+        if (guestView) return;
         var enabled = streamToggle.checked;
         setStreamLabel(enabled);
         if (!enabled) clearStreamBlack();
@@ -1314,6 +1351,7 @@
     });
 
     wrap.addEventListener('pointerenter', function () {
+        if (guestView) return;
         hoverStream = true;
         try {
             wrap.focus({ preventScroll: true });
@@ -1332,6 +1370,7 @@
     });
 
     wrap.addEventListener('pointerdown', function (ev) {
+        if (guestView) return;
         if (!controlling && hoverStream) {
             // Race: enter acquire reply not yet applied — still send input after forcing acquire.
             requestAcquire();
@@ -1432,8 +1471,17 @@
     }
 
     function onKey(ev, state) {
+        if (keybindingsDialog.open) return;
+        if (!isTypingTarget(ev.target) && wrap.contains(document.activeElement)
+            && (ev.key === '?' || (ev.code === 'Slash' && ev.shiftKey))
+            && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+            ev.preventDefault();
+            if (state === 'down' && !ev.repeat) keybindingsDialog.showModal();
+            return;
+        }
         if (!controlling) return;
         if (isTypingTarget(ev.target)) return;
+        if (ev.key === 'Escape') return;
         ev.preventDefault();
         sendJson({
             type: 'key',
@@ -1455,7 +1503,8 @@
     var ptyWs = null;
     var ptyReconnectTimer = null;
     var ptyReconnectAttempt = 0;
-    var ptyWantConnected = true;
+    var ptyWantConnected = false;
+    var terminalLibs = null;
 
     function showConsoleError(msg) {
         window.showInlineError('console-error', msg || '');
@@ -1480,42 +1529,11 @@
         sendPty({ type: 'resize', cols: term.cols, rows: term.rows });
     }
 
-    function setReconnectUi(connected) {
-        if (!reconnectBtn) return;
-        if (connected) {
-            reconnectBtn.textContent = 'Connected';
-            reconnectBtn.disabled = true;
-            reconnectBtn.setAttribute('aria-disabled', 'true');
-        } else {
-            reconnectBtn.textContent = 'Reconnect';
-            reconnectBtn.disabled = false;
-            reconnectBtn.removeAttribute('aria-disabled');
-        }
-    }
-
-    function setCwdDisplay(path) {
-        var el = document.getElementById('meta-cwd');
-        if (!el || !path) return;
-        el.innerHTML = '';
-        var code = document.createElement('code');
-        code.textContent = path;
-        el.appendChild(code);
-    }
-
-    function parseOsc7Path(data) {
-        // OSC 7: file://hostname/path  or file:///path
-        if (!data || data.indexOf('file://') !== 0) return null;
-        var rest = data.slice('file://'.length);
-        // Drop hostname if present (file://host/path)
-        if (rest.charAt(0) !== '/') {
-            var slash = rest.indexOf('/');
-            if (slash < 0) return null;
-            rest = rest.slice(slash);
-        }
-        try {
-            return decodeURIComponent(rest);
-        } catch (_) {
-            return rest;
+    function setConsoleOpen(open) {
+        if (consoleCard) consoleCard.classList.toggle('how-console-collapsed', !open);
+        if (consoleToggleBtn) {
+            consoleToggleBtn.textContent = open ? 'Close' : 'Open';
+            consoleToggleBtn.setAttribute('aria-expanded', String(open));
         }
     }
 
@@ -1527,6 +1545,7 @@
     }
 
     function schedulePtyReconnect(reason) {
+        if (guestView) return;
         if (!ptyWantConnected) return;
         clearPtyReconnect();
         var attempt = ptyReconnectAttempt;
@@ -1537,7 +1556,6 @@
             ? (reason + ' — reconnecting…')
             : 'Console disconnected — reconnecting…';
         showConsoleError(msg);
-        setReconnectUi(false);
         if (term && attempt === 0) {
             term.writeln('\r\n\x1b[90mDisconnected — reconnecting…\x1b[0m');
         }
@@ -1558,10 +1576,10 @@
             ptyWs.close();
         } catch (_) {}
         ptyWs = null;
-        setReconnectUi(false);
     }
 
     function connectPty() {
+        if (guestView) return;
         if (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
             showConsoleError('Terminal library failed to load');
             return;
@@ -1580,7 +1598,6 @@
             ptyWs = null;
         }
         clearPtyReconnect();
-        setReconnectUi(false);
 
         if (!term) {
             term = new Terminal({
@@ -1599,16 +1616,6 @@
             term.onData(function (data) {
                 sendPty({ type: 'input', data: data });
             });
-            // Track cwd from shell PROMPT_COMMAND OSC 7.
-            try {
-                if (term.parser && typeof term.parser.registerOscHandler === 'function') {
-                    term.parser.registerOscHandler(7, function (data) {
-                        var path = parseOsc7Path(data);
-                        if (path) setCwdDisplay(path);
-                        return true;
-                    });
-                }
-            } catch (_) {}
             window.addEventListener('resize', fitAndResize);
             if (window.ResizeObserver && consoleCard) {
                 var ro = new ResizeObserver(function () {
@@ -1627,7 +1634,6 @@
             ptyReconnectAttempt = 0;
             clearPtyReconnect();
             showConsoleError('');
-            setReconnectUi(true);
             term.writeln('\x1b[90mConnected.\x1b[0m\r\n');
             fitAndResize();
         };
@@ -1649,17 +1655,9 @@
             }
         };
 
-        ptyWs.onerror = function () {
-            // onclose usually follows; avoid double-scheduling.
-            setReconnectUi(false);
-        };
-
         ptyWs.onclose = function () {
             ptyWs = null;
-            if (!ptyWantConnected) {
-                setReconnectUi(false);
-                return;
-            }
+            if (!ptyWantConnected) return;
             schedulePtyReconnect('Console disconnected');
         };
     }
@@ -1685,28 +1683,46 @@
         return '/app/' + encodeURIComponent(appApi.appId) + '/static/' + name;
     }
 
-    function bootConsole() {
-        setReconnectUi(false);
-        if (reconnectBtn) {
-            reconnectBtn.addEventListener('click', function () {
-                if (reconnectBtn.disabled) return;
-                ptyReconnectAttempt = 0;
-                clearPtyReconnect();
-                connectPty();
-            });
+    function loadTerminalLibs() {
+        if (!terminalLibs) {
+            loadCss(staticUrl('xterm.css'));
+            terminalLibs = loadScript(staticUrl('xterm.js'))
+                .then(function () { return loadScript(staticUrl('xterm-addon-fit.js')); })
+                .catch(function (e) {
+                    terminalLibs = null;
+                    throw e;
+                });
         }
-        loadCss(staticUrl('xterm.css'));
-        Promise.resolve()
-            .then(function () { return loadScript(staticUrl('xterm.js')); })
-            .then(function () { return loadScript(staticUrl('xterm-addon-fit.js')); })
-            .then(connectPty)
-            .catch(function (e) {
-                showConsoleError(e.message || String(e));
-                schedulePtyReconnect(e.message || 'Terminal library failed');
-            });
+        return terminalLibs;
     }
 
-    if (controlStatus) controlStatus.textContent = LABEL_WATCHING;
+    function openConsole() {
+        setConsoleOpen(true);
+        ptyWantConnected = true;
+        ptyReconnectAttempt = 0;
+        loadTerminalLibs().then(function () {
+            if (ptyWantConnected) connectPty();
+        }).catch(function (e) {
+            showConsoleError(e.message || String(e));
+        });
+    }
+
+    function closeConsole() {
+        ptyWantConnected = false;
+        closePty();
+        showConsoleError('');
+        setConsoleOpen(false);
+    }
+
+    function bootConsole() {
+        if (consoleToggleBtn) {
+            consoleToggleBtn.addEventListener('click', function () {
+                if (ptyWantConnected) closeConsole();
+                else openConsole();
+            });
+        }
+    }
+
     setHdmiLabel(!!hdmiToggle.checked);
     setStreamLabel(!!streamToggle.checked);
     updateIdleHint();
@@ -1722,12 +1738,6 @@
             updateSourceFieldsUi();
         });
     });
-    if (viaDynamoToggle) {
-        viaDynamoToggle.addEventListener('change', function () {
-            sourceDraftDirty = true;
-            updateSourceFieldsUi();
-        });
-    }
     updateSourceFieldsUi();
     if (cfgSensorHost) {
         cfgSensorHost.addEventListener('input', function () {
@@ -1743,7 +1753,6 @@
     if (btnStopSource) {
         btnStopSource.addEventListener('click', function () {
             if (recordEnabledToggle) recordEnabledToggle.checked = false;
-            if (viaDynamoToggle) viaDynamoToggle.checked = false;
             recordFilenameUserEdited = false;
             sourceDraftDirty = true;
             updateSourceFieldsUi();
@@ -1755,11 +1764,13 @@
             sourceDraftDirty = true;
             if (recordDraftEnabled()) {
                 lidarKind = 'sensor';
-                if (viaDynamoToggle) viaDynamoToggle.checked = false;
                 suggestRecordFilenameIfNeeded();
             }
             updateSourceFieldsUi();
         });
+    }
+    if (recordDuration) {
+        recordDuration.addEventListener('input', function () { sourceDraftDirty = true; });
     }
     if (recordFilename) {
         recordFilename.addEventListener('input', function () {
@@ -1792,14 +1803,156 @@
             updateOsfActionBtns();
         });
     }
+    if (sensorPicker) {
+        sensorPicker.addEventListener('focusin', openSensorPicker);
+        sensorPicker.addEventListener('focusout', function () {
+            setTimeout(function () {
+                if (!sourceBusy && !sensorPicker.contains(document.activeElement)) {
+                    closeSensorPicker();
+                }
+            }, 0);
+        });
+    }
+    if (sensorCandidateSelect) {
+        sensorCandidateSelect.addEventListener('change', function () {
+            var candidate = (lastDiscovery.candidates || []).find(function (item) {
+                return item.id === sensorCandidateSelect.value;
+            });
+            if (candidate && cfgSensorHost) {
+                cfgSensorHost.value = candidate.hostname || candidate.target;
+                sourceDraftDirty = true;
+            }
+        });
+    }
     if (btnOsfDownload) {
         btnOsfDownload.addEventListener('click', downloadOsfToBrowser);
+    }
+    // Fit the stream between its top edge and the bottom of the viewport.
+    function fitStream() {
+        var top = wrap.getBoundingClientRect().top + window.scrollY;
+        var pad = parseFloat(getComputedStyle(wrap).paddingTop) * 2;
+        // Tall source controls must leave a usable viewer after scrolling.
+        var height = Math.max(1, window.innerHeight - Math.min(top, window.innerHeight / 2) - pad - 16);
+        wrap.style.setProperty('--stream-max-h', height + 'px');
+        wrap.style.setProperty('--stream-max-w', (height * canvas.width / canvas.height + pad) + 'px');
+    }
+    window.addEventListener('resize', fitStream);
+    if (window.ResizeObserver) new ResizeObserver(fitStream).observe(document.body);
+    fitStream();
+    var btnKeybindings = document.getElementById('btn-keybindings');
+    btnScreenshot.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    var screenshotStatus = document.getElementById('screenshot-status');
+    var screenshotStatusTimer;
+    function showScreenshotStatus(message) {
+        clearTimeout(screenshotStatusTimer);
+        screenshotStatus.textContent = message;
+        screenshotStatus.hidden = false;
+        screenshotStatusTimer = setTimeout(function () { screenshotStatus.hidden = true; }, 8000);
+    }
+    btnScreenshot.addEventListener('click', async function () {
+        if (btnScreenshot.disabled) return;
+        var png = new Promise(function (resolve, reject) {
+            canvas.toBlob(function (blob) {
+                if (blob) resolve(blob);
+                else reject(new Error('Screenshot capture failed'));
+            }, 'image/png');
+        });
+        var fallback = window.isSecureContext ? 'Clipboard unavailable' : 'Clipboard needs HTTPS';
+        if (navigator.clipboard && window.ClipboardItem) {
+            try {
+                // Start the write during the click; encoding can finish asynchronously.
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+                showScreenshotStatus('Screenshot copied');
+                return;
+            } catch (err) {
+                fallback = 'Clipboard blocked';
+            }
+        }
+        try {
+            var blob = await png;
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = 'ouster-' + new Date().toISOString().replace(/[:.]/g, '-') + '.png';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            showScreenshotStatus(fallback + ' — PNG downloaded');
+        } catch (err) {
+            showScreenshotStatus('Screenshot capture failed');
+        }
+    });
+    btnKeybindings.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    btnKeybindings.addEventListener('click', function () {
+        keybindingsDialog.showModal();
+    });
+    function updateKeybindings(controls, source) {
+        controls = controls || {};
+        var replay = controls.replay && source === 'local_file';
+        document.getElementById('keybindings-playback').hidden = !replay;
+        document.getElementById('keybindings-advanced').hidden = !replay;
+        document.getElementById('keybindings-objects').hidden = !controls.objects;
+        document.getElementById('keybindings-zones').hidden = !controls.zones;
+        var count = Math.min(9, controls.sensor_count || 0);
+        var rows = document.getElementById('keybindings-sensor-rows');
+        if (rows.childElementCount !== count) {
+            rows.replaceChildren();
+            for (var i = 1; i <= count; i++) {
+                var row = document.createElement('tr');
+                var keys = document.createElement('td');
+                var key = document.createElement('kbd');
+                key.textContent = 'Ctrl+' + i;
+                keys.appendChild(key);
+                var action = document.createElement('td');
+                action.textContent = 'Show / hide sensor ' + i;
+                row.append(keys, action);
+                rows.appendChild(row);
+            }
+        }
+        document.getElementById('keybindings-sensors').hidden = !count;
+    }
+    ['pointerdown', 'pointermove', 'wheel'].forEach(function (name) {
+        keybindingsDialog.addEventListener(name, function (ev) { ev.stopPropagation(); });
+    });
+    document.getElementById('btn-close-keybindings').addEventListener('click', function () {
+        keybindingsDialog.close();
+    });
+    if (btnSourceToggle) {
+        btnSourceToggle.addEventListener('click', function () {
+            setSourceCollapsed(!sourceBlock.classList.contains('how-source-collapsed'));
+        });
+    }
+    var btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+        btnFullscreen.hidden = !document.fullscreenEnabled;
+        // Inside the stream: keep clicks from reaching the viz.
+        btnFullscreen.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+        btnFullscreen.addEventListener('click', function () {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(function () {});
+                return;
+            }
+            wrap.requestFullscreen({ navigationUI: 'hide' }).then(function () {
+                wrap.focus();
+            }).catch(function () {});
+        });
     }
     if (btnOsfDelete) {
         btnOsfDelete.addEventListener('click', deleteSelectedOsf);
     }
-    hydrateStatus().finally(connect);
-    bootStatusStream();
-    loadOsfLibrary();
-    bootConsole();
+    if (guestAccessToggle) {
+        guestAccessToggle.addEventListener('change', function () {
+            saveGuestAccess(guestAccessToggle.checked);
+        });
+    }
+    loadGuestAccess().then(function () {
+        if (!streamAllowed()) return;
+        hydrateStatus().finally(connect);
+        if (!guestView) bootStatusStream();
+        if (!guestView) {
+            loadOsfLibrary();
+            bootConsole();
+        }
+    });
 })();
