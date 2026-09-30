@@ -1,7 +1,7 @@
 """Ouster Dynamo API: heartbeat & telemetry + FrameSet dynamo_objects (V1).
 
-Consumer copy owned by hello-ouster-world (this tree). Compatible with the
-ouster-dynamo producer FrameSet / EventPublisher contract. hello-ouster-world
+Consumer copy owned by hello-ouster-dynamo (this tree). Compatible with the
+ouster-dynamo producer FrameSet / EventPublisher contract. hello-ouster-dynamo
 builds without any producer app checkout.
 
 V1 channels:
@@ -29,7 +29,7 @@ class OusterDynamoApiVersion(IntEnum):
 SUPPORTED_API_VERSIONS: list[int] = [int(OusterDynamoApiVersion.V1)]
 
 PROP_OUSTER_DYNAMO_API_VERSION = "ouster_dynamo_api_version"
-# One-shot: hello-ouster-world / SimpleViz should clear MAP+ACCUM after reset ego.
+# One-shot: hello-ouster-dynamo / SimpleViz should clear MAP+ACCUM after reset ego.
 PROP_CLEAR_SLAM_VIZ = "clear_slam_viz"
 
 # FrameSet.objects content + meta keys (V1 dynamo_objects).

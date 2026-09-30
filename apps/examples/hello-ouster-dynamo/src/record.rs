@@ -1,4 +1,4 @@
-//! In-process OSF save: SimpleViz writes `/srv/recordings/hello-ouster-world-YYYYMMDD-HHMMSS.osf`.
+//! In-process OSF save: SimpleViz writes `/srv/recordings/hello-ouster-dynamo-YYYYMMDD-HHMMSS.osf`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -118,8 +118,8 @@ impl RecordHandle {
 
 fn write_runtime(status: &RecordStatus) -> Result<(), String> {
     let dir = PathBuf::from(
-        std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| "/run/hello-ouster-world".into()),
+        std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into()),
     );
     fs::create_dir_all(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
     let path = dir.join(RUNTIME_FILE_NAME);
@@ -168,12 +168,12 @@ fn allocate_recording_path(filename_override: &str) -> Result<(PathBuf, String),
     let secs = unix_now();
     let (y, mo, d, h, mi, s) = utc_ymd_hms(secs);
     let date = format!("{y:04}{mo:02}{d:02}");
-    let name = format!("hello-ouster-world-{date}-{h:02}{mi:02}{s:02}.osf");
+    let name = format!("hello-ouster-dynamo-{date}-{h:02}{mi:02}{s:02}.osf");
     let path = dir.join(&name);
     if !path.exists() {
         return Ok((path, name));
     }
-    let alt = format!("hello-ouster-world-{date}-{h:02}{mi:02}{s:02}-2.osf");
+    let alt = format!("hello-ouster-dynamo-{date}-{h:02}{mi:02}{s:02}-2.osf");
     Ok((dir.join(&alt), alt))
 }
 

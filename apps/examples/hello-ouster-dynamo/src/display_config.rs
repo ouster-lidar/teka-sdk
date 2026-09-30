@@ -1,6 +1,6 @@
 //! Persisted HDMI/browser display toggles — `{state_dir}/display-config.json`.
 //!
-//! Survives reboots via systemd `StateDirectory=hello-ouster-world`.
+//! Survives reboots via systemd `StateDirectory=hello-ouster-dynamo`.
 //! The Sway/SimpleViz unit starts with the app; disable the app to stop it.
 
 use std::fs;

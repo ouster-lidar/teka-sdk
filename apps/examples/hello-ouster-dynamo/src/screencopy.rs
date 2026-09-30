@@ -95,7 +95,7 @@ impl Drop for MappedShm {
 
 pub fn spawn_capture(display: DisplayState) {
     thread::Builder::new()
-        .name("hello-ouster-world-screencopy".into())
+        .name("hello-ouster-dynamo-screencopy".into())
         .spawn(move || {
             if let Err(e) = run_capture_loop(display) {
                 tracing::warn!(?e, "screencopy thread exited");
@@ -105,9 +105,9 @@ pub fn spawn_capture(display: DisplayState) {
 }
 
 pub(crate) fn apply_wayland_env() {
-    let xdg = std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-        .unwrap_or_else(|_| "/run/hello-ouster-world".into());
-    let wd = std::env::var("HELLO_OUSTER_WORLD_WAYLAND_DISPLAY").unwrap_or_else(|_| {
+    let xdg = std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+        .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into());
+    let wd = std::env::var("HELLO_OUSTER_DYNAMO_WAYLAND_DISPLAY").unwrap_or_else(|_| {
         for name in ["wayland-1", "wayland-0"] {
             if std::path::Path::new(&xdg).join(name).exists() {
                 return name.to_string();
@@ -736,7 +736,7 @@ impl WaylandCapture {
             old.destroy();
         }
         let xdg = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
-        let path = PathBuf::from(&xdg).join(format!("how-scrcpy-{}", std::process::id()));
+        let path = PathBuf::from(&xdg).join(format!("dynamo-scrcpy-{}", std::process::id()));
         let file = OpenOptions::new()
             .read(true)
             .write(true)

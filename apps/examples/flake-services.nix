@@ -7,6 +7,7 @@
   hello-firefox = ./hello-firefox;
   hello-ouster-terminal = ./hello-ouster-terminal;
   hello-ouster-world = ./hello-ouster-world;
+  hello-ouster-dynamo = ./hello-ouster-dynamo;
   hello-pub = ./hello-pub;
   hello-sub = ./hello-sub;
   hello-llm = ./hello-llm;

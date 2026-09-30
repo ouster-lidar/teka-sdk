@@ -68,6 +68,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "app-runtime"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "parking_lot",
+ "reqwest 0.13.4",
+ "sd-notify",
+ "serde",
+ "serde_json",
+ "socket2",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -660,10 +675,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hello-ouster-world"
+name = "hello-ouster-dynamo"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "app-runtime",
  "axum",
  "clap",
  "drm-fourcc",
@@ -671,7 +687,6 @@ dependencies = [
  "gstreamer",
  "gstreamer-app",
  "inotify",
- "app-runtime",
  "parking_lot",
  "reqwest 0.12.28",
  "serde",
@@ -1020,21 +1035,6 @@ name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
-
-[[package]]
-name = "app-runtime"
-version = "0.1.0"
-dependencies = [
- "axum",
- "parking_lot",
- "reqwest 0.13.4",
- "sd-notify",
- "serde",
- "serde_json",
- "socket2",
- "tokio",
- "tracing",
-]
 
 [[package]]
 name = "memchr"

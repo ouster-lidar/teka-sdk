@@ -63,7 +63,7 @@ All erofs app images use `ps.makeAppImage`:
 
 | Group | Services |
 |-------|----------|
-| Examples | `hello-world`, `hello-http`, `hello-webui`, `hello-wayland-gpu`, `hello-firefox`, `hello-firefox-kiosk`, `hello-ouster-terminal`, `hello-ouster-world`, `hello-pub`, `hello-sub`, `hello-llm`, `hello-slidev`, `nvidia-devtools` |
+| Examples | `hello-world`, `hello-http`, `hello-webui`, `hello-wayland-gpu`, `hello-firefox`, `hello-firefox-kiosk`, `hello-ouster-terminal`, `hello-ouster-world`, `hello-ouster-dynamo`, `hello-pub`, `hello-sub`, `hello-llm`, `hello-slidev`, `nvidia-devtools` |
 
 ## Verify
 

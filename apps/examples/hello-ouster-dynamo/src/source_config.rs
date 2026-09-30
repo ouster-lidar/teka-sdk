@@ -39,7 +39,7 @@ pub struct PersistedSourceConfig {
     /// Apply with sensor source: SimpleViz saves frames to ``record_filename`` (or auto name).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub record_enabled: Option<bool>,
-    /// Basename under ``/srv/recordings/``; empty = ``hello-ouster-world-YYYYMMDD-HHMMSS.osf``.
+    /// Basename under ``/srv/recordings/``; empty = ``hello-ouster-dynamo-YYYYMMDD-HHMMSS.osf``.
     #[serde(default)]
     pub record_filename: String,
     /// When false, SimpleViz idles until Apply re-enables (Stop button).
@@ -156,8 +156,8 @@ fn default_bridge_na() -> String {
 
 fn runtime_dir() -> PathBuf {
     PathBuf::from(
-        std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| "/run/hello-ouster-world".into()),
+        std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into()),
     )
 }
 
@@ -254,14 +254,14 @@ pub fn save(state_dir: &Path, cfg: &PersistedSourceConfig) -> Result<(), String>
 
 /// POST Dynamo `/source-config` when SimpleViz is consuming Dynamo FrameSets.
 ///
-/// hello-ouster-world save must succeed even if Dynamo is down. Direct lidar (via off) skips
+/// hello-ouster-dynamo save must succeed even if Dynamo is down. Direct lidar (via off) skips
 /// the POST so UDP/OSF is not opened twice.
 pub async fn push_to_dynamo(cfg: &PersistedSourceConfig) -> serde_json::Value {
     if !cfg.is_via_dynamo() {
         return json!({
             "ok": true,
             "skipped": true,
-            "reason": "how_owns_lidar",
+            "reason": "dynamo_owns_lidar",
         });
     }
     let kind = normalize_producer_kind(&cfg.producer_kind);

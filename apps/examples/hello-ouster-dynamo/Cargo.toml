@@ -1,14 +1,14 @@
 [package]
-name = "hello-ouster-world"
+name = "hello-ouster-dynamo"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "hello_ouster_world"
+name = "hello_ouster_dynamo"
 path = "src/lib.rs"
 
 [[bin]]
-name = "hello-ouster-world"
+name = "hello-ouster-dynamo"
 path = "src/main.rs"
 
 [dependencies]

@@ -30,7 +30,7 @@ const ALLOWED_FPS: &[u64] = &[2, 5, 10, 20];
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
 /// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
-const VIZ_APP_ID: &str = "hello-ouster-world";
+const VIZ_APP_ID: &str = "hello-ouster-dynamo";
 
 #[derive(Debug)]
 enum InjectCmd {
@@ -626,11 +626,11 @@ fn map_button(button: &str) -> anyhow::Result<VPtrButton> {
 
 fn wayland_env() -> HashMap<String, String> {
     let mut env = HashMap::new();
-    let xdg = std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-        .unwrap_or_else(|_| "/run/hello-ouster-world".into());
-    let wd = std::env::var("HELLO_OUSTER_WORLD_WAYLAND_DISPLAY")
+    let xdg = std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+        .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into());
+    let wd = std::env::var("HELLO_OUSTER_DYNAMO_WAYLAND_DISPLAY")
         .unwrap_or_else(|_| discover_wayland_display(&xdg));
-    let path = std::env::var("HELLO_OUSTER_WORLD_PATH").unwrap_or_else(|_| {
+    let path = std::env::var("HELLO_OUSTER_DYNAMO_PATH").unwrap_or_else(|_| {
         std::env::var("PATH").unwrap_or_else(|_| "/bin:/usr/bin".into())
     });
     env.insert("XDG_RUNTIME_DIR".into(), xdg.clone());
@@ -653,7 +653,7 @@ fn discover_wayland_display(xdg: &str) -> String {
 }
 
 fn discover_sway_sock(xdg: &str) -> Option<String> {
-    if let Ok(sock) = std::env::var("HELLO_OUSTER_WORLD_SWAYSOCK") {
+    if let Ok(sock) = std::env::var("HELLO_OUSTER_DYNAMO_SWAYSOCK") {
         if !sock.is_empty() && std::path::Path::new(&sock).exists() {
             return Some(sock);
         }
@@ -679,7 +679,7 @@ fn tool(name: &str, env_key: &str) -> String {
 
 async fn run_swaymsg(args: &[&str]) -> anyhow::Result<String> {
     let env = wayland_env();
-    let bin = tool("swaymsg", "HELLO_OUSTER_WORLD_SWAYMSG");
+    let bin = tool("swaymsg", "HELLO_OUSTER_DYNAMO_SWAYMSG");
     let mut cmd = Command::new(&bin);
     cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
     for (k, v) in &env {
@@ -1058,8 +1058,8 @@ fn send_viz_key(code: &str, key: &str, mods: u32) {
 
 fn runtime_dir() -> PathBuf {
     PathBuf::from(
-        std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-            .unwrap_or_else(|_| "/run/hello-ouster-world".into()),
+        std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+            .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into()),
     )
 }
 
@@ -1226,4 +1226,3 @@ fn spawn_output_manager(display: DisplayState) {
         }
     });
 }
-

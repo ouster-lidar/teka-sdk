@@ -10,7 +10,7 @@ export LIBSEAT_BACKEND=seatd
 _ld_sw=""
 [[ -d /run/current-system/sw/lib ]] && _ld_sw=:/run/current-system/sw/lib
 
-log() { echo "hello-ouster-world: $*" >&2; }
+log() { echo "hello-ouster-dynamo: $*" >&2; }
 die() { log "$*"; exit 1; }
 
 libdir_has_client_egl() {
@@ -67,7 +67,7 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:@clientLd@"
 
 @ldPreloadExport@
 
-export XDG_RUNTIME_DIR=/run/hello-ouster-world
+export XDG_RUNTIME_DIR=/run/hello-ouster-dynamo
 export HOME="$XDG_RUNTIME_DIR"
 export SHELL=@bash@/bin/bash
 export FONTCONFIG_FILE=@fontsConf@
@@ -102,7 +102,7 @@ filter_wlroots_stderr() {
 }
 
 # Mirror stdout/stderr into the MC Console log (also still hits the journal).
-CONSOLE_LOG="${HELLO_OUSTER_WORLD_CONSOLE_LOG:-$XDG_RUNTIME_DIR/console.log}"
+CONSOLE_LOG="${HELLO_OUSTER_DYNAMO_CONSOLE_LOG:-$XDG_RUNTIME_DIR/console.log}"
 : >>"$CONSOLE_LOG"
 exec > >(tee -a "$CONSOLE_LOG")
 exec 2> >(tee -a "$CONSOLE_LOG" >&2)

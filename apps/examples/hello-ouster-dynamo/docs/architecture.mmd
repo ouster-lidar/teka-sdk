@@ -7,15 +7,15 @@ flowchart TB
         end
         OSF["OSF File"] --> SRC
 
-        subgraph how ["H-O-W"]
+        subgraph dynamo_viewer ["H-O-D"]
             direction LR
             RXFS["RX"] --> SV["SimpleViz"] --> SWAY["Sway"]
-	    HOWSC["Source Config</br>/var/lib/hello-ouster-world/source-config.json"]
+	    HODSC["Source Config</br>/var/lib/hello-ouster-dynamo/source-config.json"]
             SWAY --> NVJPG["nvjpeg encoder"]
         end
 
         TXFS -->|"IPC<br/>/run/ouster-dynamo/frameset.sock"| RXFS
-        HOWSC -->|"HTTP POST</br>api/v1/app/ouster-dynamo/source-config"| SRC
+        HODSC -->|"HTTP POST</br>api/v1/app/ouster-dynamo/source-config"| SRC
 
         subgraph peripherals ["Local Peripherals"]
             MONITOR["Display Monitor"]
@@ -26,13 +26,13 @@ flowchart TB
     subgraph remote ["Remote"]
         BR["Browser"]
     end
-    
+
     LIDAR["LiDAR"] --> SRC
     SWAY -->|"HDMI"| MONITOR
     MKBD --> SV
     NVJPG -->|"WebSocket"| BR
-    BR -->|"HTTP POST</br>/api/v1/app/hello-ouster-world/source_config"| HOWSC
+    BR -->|"HTTP POST</br>/api/v1/app/hello-ouster-dynamo/source_config"| HODSC
     BR -->|"WS JSON: mouse / keys"| SV
 
     style dyn stroke-dasharray: 5 5
-    style how stroke-dasharray: 5 5
+    style dynamo_viewer stroke-dasharray: 5 5

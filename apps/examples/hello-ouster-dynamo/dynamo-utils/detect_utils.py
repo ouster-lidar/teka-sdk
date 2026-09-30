@@ -1,4 +1,4 @@
-"""Class maps for Dynamo-parity SimpleViz (no ML engine in hello-ouster-world)."""
+"""Class maps for Dynamo-parity SimpleViz (no ML engine in hello-ouster-dynamo)."""
 from __future__ import annotations
 
 import json

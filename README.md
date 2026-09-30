@@ -10,6 +10,7 @@ Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBo
 | `hello-firefox-kiosk`   | Firefox kiosk                                        |
 | `hello-http`            | Python HTTP on 8000                                  |
 | `hello-llm`             | LLM guide in Jetstream; chat on host `:8080`         |
+| `hello-ouster-dynamo`   | Optional advanced viewer with FrameSet input and overlays; Ouster Dynamo installs separately |
 | `hello-ouster-terminal` | Terminal lidar viewer (ouster-cli viz)               |
 | `hello-ouster-world`    | SimpleViz + Display; FrameSet / OSF / sensor sources |
 | `hello-pub`             | Event publisher demo                                 |

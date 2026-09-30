@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = jetstreamAppApi('hello-ouster-world');
+    var appApi = jetstreamAppApi('hello-ouster-dynamo');
     var ws = null;
     var controlling = false;
     var hoverStream = false;
@@ -59,7 +59,7 @@
         var m = /too many display viewers \(max (\d+)\)/i.exec(raw || '');
         if (!m) return '';
         return 'Display stream is limited to ' + m[1] +
-            ' connections. Close other hello-ouster-world tabs.';
+            ' connections. Close other hello-ouster-dynamo tabs.';
     }
 
     function api(path) {
@@ -914,7 +914,7 @@
         var h = ('0' + d.getHours()).slice(-2);
         var mi = ('0' + d.getMinutes()).slice(-2);
         var s = ('0' + d.getSeconds()).slice(-2);
-        return 'hello-ouster-world-' + y + m + day + '-' + h + mi + s + '.osf';
+        return 'hello-ouster-dynamo-' + y + m + day + '-' + h + mi + s + '.osf';
     }
 
     function ensureOsfFilename(name) {

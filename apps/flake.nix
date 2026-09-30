@@ -92,6 +92,7 @@
         "examples/hello-sub"
         "examples/hello-slidev"
         "examples/hello-ouster-world"
+        "examples/hello-ouster-dynamo"
         "examples/nvidia-devtools"
       ];
     in

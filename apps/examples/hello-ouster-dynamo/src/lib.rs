@@ -1,4 +1,4 @@
-//! hello-ouster-world MC backend: PTY console + display stream + HDMI viz.
+//! hello-ouster-dynamo MC backend: PTY console + display stream + HDMI viz.
 
 pub mod api;
 pub mod display;
@@ -10,7 +10,7 @@ pub mod source_config;
 pub mod ui_state;
 pub mod vpointer;
 
-::app_runtime::declare_app_runtime!("hello-ouster-world");
+::app_runtime::declare_app_runtime!("hello-ouster-dynamo");
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

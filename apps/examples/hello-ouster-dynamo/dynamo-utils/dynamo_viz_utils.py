@@ -67,7 +67,7 @@ def clear_slam_viz_accumulators(simple_viz: Any) -> None:
         if callable(clear_traj):
             clear_traj()
     except Exception as exc:  # noqa: BLE001
-        print(f"hello-ouster-world: clear pose/trajectory failed: {exc!r}", flush=True)
+        print(f"hello-ouster-dynamo: clear pose/trajectory failed: {exc!r}", flush=True)
 
     accum = getattr(fv, "_frames_accum", None)
     if accum is None:
@@ -77,7 +77,7 @@ def clear_slam_viz_accumulators(simple_viz: Any) -> None:
         if callable(clear_track):
             clear_track()
     except Exception as exc:  # noqa: BLE001
-        print(f"hello-ouster-world: clear_track failed: {exc!r}", flush=True)
+        print(f"hello-ouster-dynamo: clear_track failed: {exc!r}", flush=True)
 
     ma = getattr(accum, "_ma", None)
     if ma is not None:
@@ -96,7 +96,7 @@ def clear_slam_viz_accumulators(simple_viz: Any) -> None:
             if callable(draw):
                 draw()
         except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: clear MAP failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: clear MAP failed: {exc!r}", flush=True)
 
     sa = getattr(accum, "_sa", None)
     if sa is None:
@@ -109,7 +109,7 @@ def clear_slam_viz_accumulators(simple_viz: Any) -> None:
                 if callable(remove):
                     remove(i)
     except Exception as exc:  # noqa: BLE001
-        print(f"hello-ouster-world: clear ACCUM failed: {exc!r}", flush=True)
+        print(f"hello-ouster-dynamo: clear ACCUM failed: {exc!r}", flush=True)
 
 
 _DEFAULT_BILLBOARD_BG_RGBA = (0.0, 0.0, 0.0, 0.60)
@@ -918,7 +918,7 @@ def enable_object_labels(
                 _reproject_all_screen_labels(refresh_scale=True)
             except Exception as exc:  # noqa: BLE001
                 print(
-                    "hello-ouster-world: label reproject after camera "
+                    "hello-ouster-dynamo: label reproject after camera "
                     f"pose failed: {exc!r}",
                     flush=True,
                 )
@@ -928,7 +928,7 @@ def enable_object_labels(
         )
     else:
         print(
-            "hello-ouster-world: no _draw_update_camera_pose on frame viz; "
+            "hello-ouster-dynamo: no _draw_update_camera_pose on frame viz; "
             "screen labels may drift while FOLLOW camera moves",
             flush=True,
         )
@@ -948,7 +948,7 @@ def enable_object_labels(
             _note_capture_dirty()
         except Exception as exc:  # noqa: BLE001
             print(
-                f"hello-ouster-world: screen-label reproject failed: {exc!r}",
+                f"hello-ouster-dynamo: screen-label reproject failed: {exc!r}",
                 flush=True,
             )
         finally:
@@ -994,7 +994,7 @@ def enable_object_labels(
     model._viz.push_mouse_pos_handler(_orbit_reproject_mouse)
     model._viz.push_scroll_handler(_orbit_reproject_scroll)
     print(
-        "hello-ouster-world: screen-space labels use orbit-intercept + "
+        "hello-ouster-dynamo: screen-space labels use orbit-intercept + "
         "post-FOLLOW reproject",
         flush=True,
     )
@@ -1166,7 +1166,7 @@ def enable_app_source_overlays(
         configure_dynamo_parity_viz(simple)
     except Exception as exc:  # noqa: BLE001
         print(
-            f"hello-ouster-world: peer overlay setup failed: {exc!r}",
+            f"hello-ouster-dynamo: peer overlay setup failed: {exc!r}",
             flush=True,
         )
 
@@ -1177,12 +1177,12 @@ def configure_dynamo_parity_viz(
     """Apply ouster-dynamo SimpleViz overlays (tracked objects, ego, colors).
 
     Enables labels (L), font toggle (SHIFT+T), and box colormap (V) so
-    hello-ouster-world matches Dynamo's run_session viz setup.
+    hello-ouster-dynamo matches Dynamo's run_session viz setup.
     """
     cfg = viz_cfg or VIZ_CONFIG
     frame_viz = getattr(simple, "_frame_viz", None) or getattr(simple, "_scan_viz", None)
     if frame_viz is None:
-        print("hello-ouster-world: dynamo parity: no frame_viz on SimpleViz", flush=True)
+        print("hello-ouster-dynamo: dynamo parity: no frame_viz on SimpleViz", flush=True)
         return
     model = getattr(frame_viz, "_model", None)
     if model is not None:
@@ -1218,7 +1218,7 @@ def configure_dynamo_parity_viz(
     else:
         enable_mono_font(simple)
     print(
-        "hello-ouster-world: Dynamo SimpleViz parity enabled "
+        "hello-ouster-dynamo: Dynamo SimpleViz parity enabled "
         "(L labels, SHIFT+T font, V box colormap; "
         "screen-space Image label panels)",
         flush=True,

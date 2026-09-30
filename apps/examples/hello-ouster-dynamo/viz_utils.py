@@ -28,9 +28,9 @@ from source_config import (
     set_runtime_status,
 )
 
-# Shared with Rust via HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR (systemd).
+# Shared with Rust via HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR (systemd).
 RUNTIME_DIR = Path(
-    os.environ.get("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR", "/run/hello-ouster-world")
+    os.environ.get("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR", "/run/hello-ouster-dynamo")
 )
 # str(): Python 3.10 AF_UNIX bind/connect reject pathlib.Path.
 VIZKEYS_SOCK = str(RUNTIME_DIR / "vizkeys.sock")
@@ -138,7 +138,7 @@ class VizPid:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(str(os.getpid()), encoding="utf-8")
         except OSError as exc:
-            print(f"hello-ouster-world: pid file write failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: pid file write failed: {exc!r}", flush=True)
 
     def clear(self) -> None:
         try:
@@ -215,7 +215,7 @@ class DemandController:
                         self._set_paused(simple, False)
                         if self._idle:
                             print(
-                                "hello-ouster-world: resume SimpleViz (need_render)",
+                                "hello-ouster-dynamo: resume SimpleViz (need_render)",
                                 flush=True,
                             )
                         self._idle = False
@@ -223,13 +223,13 @@ class DemandController:
                         self._set_paused(simple, True)
                         if not self._idle:
                             print(
-                                "hello-ouster-world: pause SimpleViz (no display consumers)",
+                                "hello-ouster-dynamo: pause SimpleViz (no display consumers)",
                                 flush=True,
                             )
                         self._idle = True
                     last_need = need
                 except Exception as exc:  # noqa: BLE001
-                    print(f"hello-ouster-world: demand control error: {exc!r}", flush=True)
+                    print(f"hello-ouster-dynamo: demand control error: {exc!r}", flush=True)
             self._stop.wait(0.25)
 
 
@@ -379,13 +379,13 @@ class KeyBridge:
             try:
                 self._apply_default_controls(viz, int(key), int(mods))
             except Exception as exc:  # noqa: BLE001
-                print(f"hello-ouster-world: camera key inject error: {exc!r}", flush=True)
+                print(f"hello-ouster-dynamo: camera key inject error: {exc!r}", flush=True)
             ctx = WindowCtx()
             for handler in list(self._handlers):
                 try:
                     keep = handler(ctx, int(key), int(mods))
                 except Exception as exc:  # noqa: BLE001
-                    print(f"hello-ouster-world: key handler error: {exc!r}", flush=True)
+                    print(f"hello-ouster-dynamo: key handler error: {exc!r}", flush=True)
                     break
                 if keep is False:
                     break
@@ -404,7 +404,7 @@ class KeyBridge:
             srv.bind(self._sock_path)
             srv.listen(4)
             srv.settimeout(1.0)
-            print(f"hello-ouster-world: vizkeys listening on {self._sock_path}", flush=True)
+            print(f"hello-ouster-dynamo: vizkeys listening on {self._sock_path}", flush=True)
             while not self._stop.is_set():
                 try:
                     conn, _ = srv.accept()
@@ -501,10 +501,10 @@ class VizProxy:
 
 
 class JetstreamDisplayBridge:
-    """Bridges between the browser's display panel and the HDMI output, 
-       allowing the browser's display panel to mirror the HDMI output 
+    """Bridges between the browser's display panel and the HDMI output,
+       allowing the browser's display panel to mirror the HDMI output
        and control it via mouse/keyboard.
-    
+
         -Creates a shared PointViz (with remote mouse/keyboard)
         -Sets playback rate / EOF behavior from the source type
         -Publishes app-socket waiting/connected status for the UI
@@ -583,7 +583,7 @@ class JetstreamDisplayBridge:
         try:
             viz.running(False)
         except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: request_stop failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: request_stop failed: {exc!r}", flush=True)
 
     def _destroy_pointviz(self) -> None:
         viz = self.pointviz
@@ -607,21 +607,21 @@ class JetstreamDisplayBridge:
             bridge.start()
 
     def _build_pointviz(self) -> VizProxy:
-        print("hello-ouster-world: constructing PointViz proxy", flush=True)
+        print("hello-ouster-dynamo: constructing PointViz proxy", flush=True)
         real = PointViz("Ouster Viz", maximized=True, fullscreen=False)
         # OS pointer is a second cursor on top of SimpleViz crosshairs and
         # JPEG-smears in the browser stream. Keep the crosshairs only.
         try:
             real.cursor_visible(False)
         except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: cursor_visible failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: cursor_visible failed: {exc!r}", flush=True)
         assert self._keys is not None
         return VizProxy(real, self._run_with_capture, self._keys)
 
     def _run_with_capture(self, viz: Any) -> None:
         """PointViz.run + config-reload watcher (browser capture is Rust screencopy)."""
         print(
-            "hello-ouster-world: PointViz.run (browser capture is Rust screencopy)",
+            "hello-ouster-dynamo: PointViz.run (browser capture is Rust screencopy)",
             flush=True,
         )
         stop = threading.Event()
@@ -634,21 +634,21 @@ class JetstreamDisplayBridge:
                     watch = self._config_watch
                     if watch is not None and watch.reload_requested():
                         print(
-                            "hello-ouster-world: source-config changed; stopping viz",
+                            "hello-ouster-dynamo: source-config changed; stopping viz",
                             flush=True,
                         )
                         try:
                             viz.running(False)
                         except Exception as exc:  # noqa: BLE001
                             print(
-                                f"hello-ouster-world: reload stop failed: {exc!r}",
+                                f"hello-ouster-dynamo: reload stop failed: {exc!r}",
                                 flush=True,
                             )
                         break
                     time.sleep(0.2)
                 except Exception as exc:  # noqa: BLE001
                     print(
-                        f"hello-ouster-world: viz watch loop error: {exc!r}",
+                        f"hello-ouster-dynamo: viz watch loop error: {exc!r}",
                         flush=True,
                     )
                     time.sleep(0.2)
@@ -658,7 +658,7 @@ class JetstreamDisplayBridge:
             viz.running(True)
             viz.visible(True)
         except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: visible/running failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: visible/running failed: {exc!r}", flush=True)
 
         watch_thread = threading.Thread(
             name="viz-config-watch", target=watch_loop, daemon=True
@@ -674,7 +674,7 @@ class JetstreamDisplayBridge:
                 glfw.glfwSwapInterval(1)
             except Exception as exc:  # noqa: BLE001
                 print(
-                    f"hello-ouster-world: glfwSwapInterval failed: {exc!r}",
+                    f"hello-ouster-dynamo: glfwSwapInterval failed: {exc!r}",
                     flush=True,
                 )
             type(viz).run(viz)

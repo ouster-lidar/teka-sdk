@@ -51,13 +51,13 @@ from source_config import (
 from viz_utils import JetstreamDisplayBridge, VizPid
 
 SOURCE_DEFAULTS = SourceDefaults(
-    config_path="/var/lib/hello-ouster-world/source-config.json",
+    config_path="/var/lib/hello-ouster-dynamo/source-config.json",
     osf_path="",
     app_socket="/run/ouster-dynamo/frameset.sock",
     sensor_hostname="",
 )
 
-# Written by ouster-dynamo on Reset ego; hello-ouster-world consumes + unlinks.
+# Written by ouster-dynamo on Reset ego; hello-ouster-dynamo consumes + unlinks.
 _CLEAR_SLAM_VIZ_FLAG = Path("/run/ouster-dynamo/clear_slam_viz")
 
 _active_bridge: Optional[JetstreamDisplayBridge] = None
@@ -67,7 +67,7 @@ _record_runtime_mtime: Optional[float] = None
 
 def _record_runtime_path() -> Path:
     return Path(
-        os.environ.get("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR", "/run/hello-ouster-world")
+        os.environ.get("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR", "/run/hello-ouster-dynamo")
     ) / "record-runtime.json"
 
 
@@ -140,7 +140,7 @@ def main() -> FrameSetSourceType:
                         ):
                             clear_slam_viz_accumulators(viz_holder[0])
                             print(
-                                "hello-ouster-world: cleared SLAM viz accumulators "
+                                "hello-ouster-dynamo: cleared SLAM viz accumulators "
                                 "(Dynamo reset ego)",
                                 flush=True,
                             )
@@ -160,19 +160,19 @@ def main() -> FrameSetSourceType:
                                 _close_osf_writer(osf_writer)
                                 osf_writer = osf.Writer(rec_path, active_src.sensor_info)
                                 osf_writer_path = rec_path
-                                print(f"hello-ouster-world: recording {rec_path}", flush=True)
+                                print(f"hello-ouster-dynamo: recording {rec_path}", flush=True)
                             try:
                                 osf_writer.save(frames)
                             except Exception as exc:  # noqa: BLE001
                                 print(
-                                    f"hello-ouster-world: OSF save failed: {exc!r}",
+                                    f"hello-ouster-dynamo: OSF save failed: {exc!r}",
                                     flush=True,
                                 )
                         elif osf_writer is not None:
                             _close_osf_writer(osf_writer)
                             osf_writer = None
                             osf_writer_path = ""
-                            print("hello-ouster-world: recording closed", flush=True)
+                            print("hello-ouster-dynamo: recording closed", flush=True)
                         yield frames
 
                 return fun
@@ -213,7 +213,7 @@ def _close_osf_writer(writer) -> None:
         try:
             close()
         except Exception as exc:  # noqa: BLE001
-            print(f"hello-ouster-world: OSF writer close failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: OSF writer close failed: {exc!r}", flush=True)
 
 
 def _reexec_viz() -> None:
@@ -235,7 +235,7 @@ if __name__ == "__main__":
                     message="Source stopped — select source and Apply to resume",
                 )
                 print(
-                    "hello-ouster-world: source stopped; waiting for Apply",
+                    "hello-ouster-dynamo: source stopped; waiting for Apply",
                     flush=True,
                 )
                 wait_for_source_config_change(
@@ -244,24 +244,24 @@ if __name__ == "__main__":
                 )
                 continue
             main()
-            print("hello-ouster-world: SimpleViz exited; restarting", flush=True)
+            print("hello-ouster-dynamo: SimpleViz exited; restarting", flush=True)
             _reexec_viz()
         except KeyboardInterrupt:
             print(
-                "hello-ouster-world: interrupted (^C); restarting SimpleViz",
+                "hello-ouster-dynamo: interrupted (^C); restarting SimpleViz",
                 flush=True,
             )
             _reexec_viz()
         except SystemExit as exc:
             if exc.code not in (0, None):
                 print(
-                    f"hello-ouster-world: exit {exc.code!r}; retrying in 5s",
+                    f"hello-ouster-dynamo: exit {exc.code!r}; retrying in 5s",
                     flush=True,
                 )
                 time.sleep(5)
                 _reexec_viz()
             raise
         except Exception as exc:  # noqa: BLE001 — keep HDMI loop alive
-            print(f"hello-ouster-world: error: {exc!r}; retrying in 5s", flush=True)
+            print(f"hello-ouster-dynamo: error: {exc!r}; retrying in 5s", flush=True)
             time.sleep(5)
             _reexec_viz()

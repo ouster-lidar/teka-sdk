@@ -27,7 +27,7 @@
 let
   app = ps.appCrate;
 
-  name = "hello-ouster-world";
+  name = "hello-ouster-dynamo";
 
   pythonForApp = python312Packages.python;
 
@@ -48,7 +48,7 @@ let
   # the display compositor. hello-llm uses the same split.
   jpApi = app.appHostUnitDefaults;
 
-  howSrc = app.appRustSrc { srcDir = ./.; };
+  dynamoSrc = app.appRustSrc { srcDir = ./.; };
 
   gstNative = with pkgs; [
     pkg-config
@@ -67,7 +67,7 @@ let
     "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
   ];
 
-  howBin =
+  dynamoBin =
     let
       crateOverridesForPkgs =
         targetPkgs:
@@ -75,13 +75,13 @@ let
         // (import ./crate-config.nix { pkgs = targetPkgs; })
         // {
           app-runtime = app.strictRustWarnings;
-          hello-ouster-world =
+          hello-ouster-dynamo =
             attrs:
             app.strictRustWarnings attrs
             // {
-              src = howSrc;
+              src = dynamoSrc;
               preBuild = (attrs.preBuild or "") + ''
-                export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_world"}"
+                export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_dynamo"}"
               '';
               nativeBuildInputs = (attrs.nativeBuildInputs or [ ]) ++ [ targetPkgs.pkg-config ];
               buildInputs =
@@ -100,16 +100,16 @@ let
     in
     (cross {
       cargoNix = ./Cargo.nix;
-      packageId = "hello-ouster-world";
+      packageId = "hello-ouster-dynamo";
     }).overrideAttrs
       (old: {
         nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ app.appOpensslNative ++ gstNative;
         meta = (old.meta or { }) // {
-          mainProgram = "hello-ouster-world";
+          mainProgram = "hello-ouster-dynamo";
         };
       });
 
-  howApiCmd = writeShellScript "${name}-api" ''
+  dynamoApiCmd = writeShellScript "${name}-api" ''
     set -euo pipefail
     # Nix GST (appsrc/appsink). Keep generator GST_PLUGIN_PATH
     # (l4t-gstreamer: nvvidconv / nvjpegenc). Do not unset it.
@@ -135,10 +135,10 @@ let
         pkgs.kmod
       ]
     }:/bin:/usr/bin''${PATH:+:$PATH}"
-    exec ${lib.getExe howBin} "$@"
+    exec ${lib.getExe dynamoBin} "$@"
   '';
 
-  helloOusterWorldPy = ./hello_ouster_world.py;
+  helloOusterDynamoPy = ./hello_ouster_dynamo.py;
   ousterVizUtilsPy = ./viz_utils.py;
 
   vizCmd = writeShellScript "${name}-viz" ''
@@ -146,11 +146,11 @@ let
     export PYTHONPATH="/usr/lib/${name}:/usr/lib/${name}/dynamo-utils''${PYTHONPATH:+:$PYTHONPATH}"
     export SSL_CERT_FILE="''${SSL_CERT_FILE:-${ps.caBundlePath}}"
     export GLFW_PLATFORM=wayland
-    export GLFW_WAYLAND_APP_ID=hello-ouster-world
+    export GLFW_WAYLAND_APP_ID=hello-ouster-dynamo
     export __GL_SYNC_TO_VBLANK=1
     unset DISPLAY 2>/dev/null || true
-    echo "hello-ouster-world: starting SimpleViz (GLFW Wayland)" >&2
-    ${pythonEnv}/bin/python3 /usr/lib/${name}/hello_ouster_world.py "$@"
+    echo "hello-ouster-dynamo: starting SimpleViz (GLFW Wayland)" >&2
+    ${pythonEnv}/bin/python3 /usr/lib/${name}/hello_ouster_dynamo.py "$@"
   '';
 
   # HACK (x86 Mesa): same gallium/LLVM preload as hello-ouster-terminal — SimpleViz is
@@ -207,9 +207,9 @@ let
         if [[ -n "$headless_name" ]]; then
           swaymsg output "$headless_name" enable >/dev/null 2>&1 || true
           swaymsg output "$headless_name" resolution 1920x1080 >/dev/null 2>&1 || true
-          echo "hello-ouster-world: headless home output=$headless_name" >&2
+          echo "hello-ouster-dynamo: headless home output=$headless_name" >&2
         else
-          echo "hello-ouster-world: WARNING no HEADLESS output after create_output" >&2
+          echo "hello-ouster-dynamo: WARNING no HEADLESS output after create_output" >&2
         fi
 
         for _ in $(seq 1 100); do
@@ -236,16 +236,16 @@ let
         )"
         if [[ -n "$phys_name" ]]; then
           swaymsg focus output "$phys_name" >/dev/null 2>&1 || true
-          echo "hello-ouster-world: focus physical output=$phys_name for SimpleViz" >&2
+          echo "hello-ouster-dynamo: focus physical output=$phys_name for SimpleViz" >&2
         else
           swaymsg workspace 1 >/dev/null 2>&1 || true
         fi
         sleep 0.5
 
-        echo "hello-ouster-world: launching SimpleViz (GLFW Wayland)" >&2
+        echo "hello-ouster-dynamo: launching SimpleViz (GLFW Wayland)" >&2
         while true; do
           ${vizCmd} || true
-          echo "hello-ouster-world: SimpleViz exited $?; restarting in 2s" >&2
+          echo "hello-ouster-dynamo: SimpleViz exited $?; restarting in 2s" >&2
           sleep 2
         done
   '';
@@ -259,7 +259,7 @@ let
     output * bg #000000 solid_color
     # Do not pin Ouster Viz to HEADLESS here — Display places it on HDMI or
     # HEADLESS based on the HDMI toggle. A for_window move would fight that.
-    for_window [app_id="hello-ouster-world"] border none, fullscreen enable
+    for_window [app_id="hello-ouster-dynamo"] border none, fullscreen enable
     for_window [title="Ouster Viz"] border none, fullscreen enable
     exec ${swayStartup}
   '';
@@ -305,12 +305,12 @@ let
 
   appManifest = writeText "app-manifest.json" ''
     {
-      "id": "hello-ouster-world",
+      "id": "hello-ouster-dynamo",
       "version": "${ps.imageVersion}",
-      "display_name": "hello-ouster-world",
+      "display_name": "hello-ouster-dynamo",
       "nav": {
-        "label": "hello-ouster-world",
-        "path": "/app/hello-ouster-world",
+        "label": "hello-ouster-dynamo",
+        "path": "/app/hello-ouster-dynamo",
         "section": "apps",
         "order": 20,
         "panels": [
@@ -319,7 +319,7 @@ let
       },
       "ui": {
         "mode": "static",
-        "title": "hello-ouster-world",
+        "title": "hello-ouster-dynamo",
         "template": "display.html",
         "styles": ["display.css", "xterm.css"]
       },
@@ -330,15 +330,15 @@ let
         "card_stream_path": "/api/v1/cards/stream"
       },
       "registers": [
-        { "alias": "hello-ouster-world", "panel": "display" }
+        { "alias": "hello-ouster-dynamo", "panel": "display" }
       ],
       "app_cards": [
         {
-          "card_id": "hello-ouster-world",
-          "title": "Hello Ouster World",
+          "card_id": "hello-ouster-dynamo",
+          "title": "Hello Ouster Dynamo",
           "description": "Example visualizer app with Ouster Dynamo integration",
           "icon": "📡",
-          "link_alias": "hello-ouster-world"
+          "link_alias": "hello-ouster-dynamo"
         }
       ],
       "auth": {
@@ -357,15 +357,15 @@ let
   '';
 
   commonEnv = ''
-    Environment=HELLO_OUSTER_WORLD_VIZ=${runLoop}
-    Environment=HELLO_OUSTER_WORLD_SHELL=${bash}/bin/bash
-    Environment=HELLO_OUSTER_WORLD_CWD=/var/lib/${name}
-    Environment=HELLO_OUSTER_WORLD_PATH=${clientPath}
-    Environment=HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR=/run/${name}
-    Environment=HELLO_OUSTER_WORLD_WAYLAND_DISPLAY=wayland-1
-    Environment=HELLO_OUSTER_WORLD_SWAYMSG=${sway}/bin/swaymsg
-    Environment=HELLO_OUSTER_WORLD_WTYPE=${lib.getExe wtype}
-    Environment=HELLO_OUSTER_WORLD_CONSOLE_LOG=/run/${name}/console.log
+    Environment=HELLO_OUSTER_DYNAMO_VIZ=${runLoop}
+    Environment=HELLO_OUSTER_DYNAMO_SHELL=${bash}/bin/bash
+    Environment=HELLO_OUSTER_DYNAMO_CWD=/var/lib/${name}
+    Environment=HELLO_OUSTER_DYNAMO_PATH=${clientPath}
+    Environment=HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR=/run/${name}
+    Environment=HELLO_OUSTER_DYNAMO_WAYLAND_DISPLAY=wayland-1
+    Environment=HELLO_OUSTER_DYNAMO_SWAYMSG=${sway}/bin/swaymsg
+    Environment=HELLO_OUSTER_DYNAMO_WTYPE=${lib.getExe wtype}
+    Environment=HELLO_OUSTER_DYNAMO_CONSOLE_LOG=/run/${name}/console.log
     Environment=STATE_DIRECTORY=/var/lib/${name}
     Environment=APP_ID=${name}
     Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
@@ -379,8 +379,8 @@ let
 
   libPyFiles = [
     {
-      path = "usr/lib/${name}/hello_ouster_world.py";
-      source = helloOusterWorldPy;
+      path = "usr/lib/${name}/hello_ouster_dynamo.py";
+      source = helloOusterDynamoPy;
     }
     {
       path = "usr/lib/${name}/viz_utils.py";
@@ -426,7 +426,7 @@ let
 
   displayUnit = writeText "${name}-display.service" ''
     [Unit]
-    Description=hello-ouster-world display (Sway + SimpleViz)
+    Description=hello-ouster-dynamo display (Sway + SimpleViz)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
     X-Jetstream-PortableGPU=wayland
     After=${name}.service seatd.service
@@ -464,7 +464,7 @@ in
 ps.makeAppImage {
   inherit name;
   copyFiles =
-    ps.mkPasswdGroupStubCopyFiles "how"
+    ps.mkPasswdGroupStubCopyFiles "hod"
     ++ ps.waylandAppBaseCopyFiles
     ++ app.appManifestCopyFiles {
       inherit name appManifest webTree;
@@ -482,7 +482,7 @@ ps.makeAppImage {
     ];
   unit = writeText "${name}.service" ''
     [Unit]
-    Description=hello-ouster-world (MC Console/Display API)
+    Description=hello-ouster-dynamo (MC Console/Display API)
     Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
     # Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
     # Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.
@@ -497,7 +497,7 @@ ps.makeAppImage {
     ${jpApi.serviceFragment}
     ${commonEnv}
     Environment=RUST_LOG=info
-    ExecStart=${howApiCmd}
+    ExecStart=${dynamoApiCmd}
     SyslogIdentifier=${name}
     Restart=always
     RestartSec=3
@@ -519,8 +519,8 @@ ps.makeAppImage {
     WantedBy=jetstream-apps.target
   '';
   runtimeClosures = [
-    howBin
-    howApiCmd
+    dynamoBin
+    dynamoApiCmd
     runLoopPack
     vizCmd
     pythonEnv

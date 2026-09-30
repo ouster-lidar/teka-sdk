@@ -84,7 +84,7 @@ impl VirtualPointer {
     pub fn spawn_for_output(preferred_output: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel();
         thread::Builder::new()
-            .name("hello-ouster-world-vpointer".into())
+            .name("hello-ouster-dynamo-vpointer".into())
             .spawn(move || {
                 if let Err(e) = run_loop(rx, preferred_output) {
                     tracing::warn!(?e, "virtual pointer thread exited");
@@ -179,9 +179,9 @@ impl Dispatch<zwlr_virtual_pointer_v1::ZwlrVirtualPointerV1, ()> for State {
 }
 
 fn apply_wayland_env() {
-    let xdg = std::env::var("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR")
-        .unwrap_or_else(|_| "/run/hello-ouster-world".into());
-    let wd = std::env::var("HELLO_OUSTER_WORLD_WAYLAND_DISPLAY").unwrap_or_else(|_| {
+    let xdg = std::env::var("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR")
+        .unwrap_or_else(|_| "/run/hello-ouster-dynamo".into());
+    let wd = std::env::var("HELLO_OUSTER_DYNAMO_WAYLAND_DISPLAY").unwrap_or_else(|_| {
         for name in ["wayland-1", "wayland-0"] {
             if std::path::Path::new(&xdg).join(name).exists() {
                 return name.to_string();

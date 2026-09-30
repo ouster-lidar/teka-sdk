@@ -41,8 +41,8 @@ class AppSocketStatus(str, Enum):
 class SourceDefaults:
     """Paths for source selection JSON and field fallbacks when omitted."""
 
-    config_path: str = "/var/lib/hello-ouster-world/source-config.json"
-    runtime_status_path: str = "/run/hello-ouster-world/source-runtime.json"
+    config_path: str = "/var/lib/hello-ouster-dynamo/source-config.json"
+    runtime_status_path: str = "/run/hello-ouster-dynamo/source-runtime.json"
     osf_path: str = ""
     app_socket: str = ""
     sensor_hostname: str = ""
@@ -76,7 +76,7 @@ def set_runtime_status(
         tmp.write_text(json.dumps(payload), encoding="utf-8")
         os.replace(tmp, status_path)
     except OSError as exc:
-        print(f"hello-ouster-world: source-runtime write failed: {exc!r}", flush=True)
+        print(f"hello-ouster-dynamo: source-runtime write failed: {exc!r}", flush=True)
 
 
 def parse_source(src: Union[FrameSetSourceType, str, None] = None) -> FrameSetSourceType:
@@ -111,7 +111,7 @@ def wait_for_osf(path: str, *, defaults: Optional[SourceDefaults] = None) -> str
         if resolved and _file_ok(resolved):
             return resolved
         print(
-            "hello-ouster-world: waiting for OSF "
+            "hello-ouster-dynamo: waiting for OSF "
             f"({resolved or 'none selected'}); upload or pick a catalog example in the Display UI",
             flush=True,
         )
@@ -130,7 +130,7 @@ def resolve_source(
         sock = str(cfg.get("app_socket") or "").strip()
         if not sock:
             raise SystemExit(
-                "hello-ouster-world: source=app requires app_socket "
+                "hello-ouster-dynamo: source=app requires app_socket "
                 "(e.g. /run/<app-id>/frameset.sock)"
             )
         return mode, sock
@@ -138,7 +138,7 @@ def resolve_source(
         host = str(cfg.get("sensor_hostname") or "").strip()
         if not host:
             raise SystemExit(
-                "hello-ouster-world: source=sensor requires sensor_hostname "
+                "hello-ouster-dynamo: source=sensor requires sensor_hostname "
                 "(set in source-config.json)"
             )
         return mode, host
@@ -158,7 +158,7 @@ def load(*, defaults: Optional[SourceDefaults] = None) -> Dict[str, Any]:
             if isinstance(raw, dict):
                 cfg.update(raw)
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"hello-ouster-world: source-config load failed: {exc!r}", flush=True)
+            print(f"hello-ouster-dynamo: source-config load failed: {exc!r}", flush=True)
 
     cfg["source"] = parse_source(str(cfg.get("source", ""))).value
     if not cfg.get("osf_path"):
@@ -296,7 +296,7 @@ class _LinuxInotify:
 
 
 def load_record_runtime() -> Dict[str, Any]:
-    path = Path(os.environ.get("HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR", "/run/hello-ouster-world"))
+    path = Path(os.environ.get("HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR", "/run/hello-ouster-dynamo"))
     path = path / "record-runtime.json"
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))

@@ -39,7 +39,7 @@ rec {
   #
 
   rootCrate = rec {
-    packageId = "hello-ouster-world";
+    packageId = "hello-ouster-dynamo";
 
     # Use this attribute to refer to the derivation building your root crate package.
     # You can override the features with rootCrate.build.override { features = [ "default" "feature1" ... ]; }.
@@ -55,10 +55,10 @@ rec {
   # You can override the features with
   # workspaceMembers."${crateName}".build.override { features = [ "default" "feature1" ... ]; }.
   workspaceMembers = {
-    "hello-ouster-world" = rec {
-      packageId = "hello-ouster-world";
+    "hello-ouster-dynamo" = rec {
+      packageId = "hello-ouster-dynamo";
       build = internal.buildRustCrateWithFeatures {
-        packageId = "hello-ouster-world";
+        packageId = "hello-ouster-dynamo";
       };
 
       # Debug support which might change between releases.
@@ -2200,19 +2200,19 @@ rec {
         sha256 = "1sjmpsdl8czyh9ywl3qcsfsq9a307dg4ni2vnlwgnzzqhc4y0113";
 
       };
-      "hello-ouster-world" = rec {
-        crateName = "hello-ouster-world";
+      "hello-ouster-dynamo" = rec {
+        crateName = "hello-ouster-dynamo";
         version = "0.1.0";
         edition = "2021";
         crateBin = [
           {
-            name = "hello-ouster-world";
+            name = "hello-ouster-dynamo";
             path = "src/main.rs";
             requiredFeatures = [ ];
           }
         ];
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./.; };
-        libName = "hello_ouster_world";
+        libName = "hello_ouster_dynamo";
         dependencies = [
           {
             name = "anyhow";
@@ -10294,4 +10294,3 @@ rec {
   #
   };
 }
-

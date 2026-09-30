@@ -27,7 +27,7 @@ use crate::ui_state;
 use crate::AppState;
 
 const DEFAULT_SHELL: &str = "/bin/bash";
-const DEFAULT_CWD: &str = "/var/lib/hello-ouster-world";
+const DEFAULT_CWD: &str = "/var/lib/hello-ouster-dynamo";
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -48,7 +48,7 @@ async fn status(State(state): State<AppState>) -> Json<serde_json::Value> {
     let cfg = source_config::load(&display_config::state_dir());
     Json(json!({
         "ok": true,
-        "app": "hello-ouster-world",
+        "app": "hello-ouster-dynamo",
         "pty_sessions": state.pty_sessions.load(std::sync::atomic::Ordering::Relaxed),
         "pty_max": crate::MAX_PTY_SESSIONS,
         "shell": shell_path(),
@@ -144,7 +144,7 @@ async fn post_source_config(
     })?;
     let dynamo = source_config::push_to_dynamo(&cfg).await;
     if dynamo.get("ok") == Some(&json!(false)) {
-        tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-world save kept)");
+        tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-dynamo save kept)");
     }
     let record = if want_record {
         if cfg.sensor_hostname.trim().is_empty() {
@@ -254,11 +254,11 @@ enum ServerMsg {
 }
 
 fn shell_path() -> String {
-    std::env::var("HELLO_OUSTER_WORLD_SHELL").unwrap_or_else(|_| DEFAULT_SHELL.to_string())
+    std::env::var("HELLO_OUSTER_DYNAMO_SHELL").unwrap_or_else(|_| DEFAULT_SHELL.to_string())
 }
 
 fn cwd_path() -> String {
-    let cwd = std::env::var("HELLO_OUSTER_WORLD_CWD").unwrap_or_else(|_| DEFAULT_CWD.to_string());
+    let cwd = std::env::var("HELLO_OUSTER_DYNAMO_CWD").unwrap_or_else(|_| DEFAULT_CWD.to_string());
     if Path::new(&cwd).is_dir() {
         cwd
     } else {
@@ -446,12 +446,12 @@ fn note_ctrl_c(log_path: &str, _state: &AppState) {
     if source_config::save(&state_dir, &cfg).is_ok() {
         let _ = append_console_note(
             log_path,
-            "hello-ouster-world: ^C — re-saved source-config; SimpleViz will reload",
+            "hello-ouster-dynamo: ^C — re-saved source-config; SimpleViz will reload",
         );
     } else {
         let _ = append_console_note(
             log_path,
-            "hello-ouster-world: ^C — failed to re-save source-config",
+            "hello-ouster-dynamo: ^C — failed to re-save source-config",
         );
     }
 }
@@ -488,8 +488,8 @@ fn append_console_note(path: &str, line: &str) -> std::io::Result<()> {
 }
 
 fn console_log_path() -> String {
-    std::env::var("HELLO_OUSTER_WORLD_CONSOLE_LOG").unwrap_or_else(|_| {
-        "/run/hello-ouster-world/console.log".to_string()
+    std::env::var("HELLO_OUSTER_DYNAMO_CONSOLE_LOG").unwrap_or_else(|_| {
+        "/run/hello-ouster-dynamo/console.log".to_string()
     })
 }
 

@@ -1,4 +1,4 @@
-/* hello-ouster-world: Display card, then Console card */
+/* hello-ouster-dynamo: Display card, then Console card */
 
 .how-stack {
     display: flex;
@@ -359,4 +359,3 @@
 .how-terminal .xterm-viewport {
     overflow-y: auto !important;
 }
-
