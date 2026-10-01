@@ -4,9 +4,7 @@ Naming layers for `apps/` app image DDIs and host platform integration.
 
 ## Host contract
 
-Install the app manifest at host path `usr/lib/jetstream/mission-control/manifest.json`.
-Web assets install under `usr/lib/jetstream/mission-control/web/`.
-Systemd portable-service mechanics (`portablectl`, `/var/lib/portables/`, `mission-control.service`) live in [jetstream-os](https://github.com/ouster-lidar/jetstream-os) — this repo builds app images only.
+Install the app manifest at host path `usr/lib/jetstream/mission-control/manifest.json`. Web assets install under `usr/lib/jetstream/mission-control/web/`. Systemd portable-service mechanics (`portablectl`, `/var/lib/portables/`, `mission-control.service`) live in [jetstream-os](https://github.com/ouster-lidar/jetstream-os) — this repo builds app images only.
 
 ## Layers
 
@@ -17,6 +15,8 @@ Systemd portable-service mechanics (`portablectl`, `/var/lib/portables/`, `missi
 | Shared web helper (source) | `apps/web/app-api.js` | — |
 | Shared web helper (DDI install) | `usr/lib/jetstream/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
 | App panel JS global | `jetstreamAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
+
+The Ouster viewers use distinct IDs and roles: `hello-ouster-world` is the direct SDK viewer, and `hello-ouster-dynamo` preserves the advanced FrameSet and tracked-object workflow. See [hello-ouster-viewers.md](hello-ouster-viewers.md).
 
 ## Distributable artifact vs install identity
 
