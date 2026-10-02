@@ -26,6 +26,36 @@ Open `http://HOST/app/hello-ouster-world` to control the display. The tested nat
 
 The measured Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi.md`](../../specs/erofs-ddi.md).
 
+## Device tests
+
+From the repository root, build, deploy and test on a Jetstream device:
+
+```sh
+nix run ./apps/examples/hello-ouster-world/tests#test-hello-ouster-world -- --host "$HOST"
+```
+
+The standalone [`tests/`](tests/) flake pins Python, pytest, Playwright and Chromium. Set `JETSTREAM_MC_PASSWORD` when Mission Control requires login. The existing deploy script builds the correct native/cross image from the checkout's `apps/flake.nix`; use `--apps-flake PATH` when running outside the checkout.
+
+Tests are grouped into four modules:
+
+| Module | Coverage |
+|--------|----------|
+| `test_discovery.py` | Sensor roster and picker selection |
+| `test_recording.py` | Cloud download, timed/manual recording, active-file protection, recording download/delete/re-upload and byte integrity |
+| `test_visualization.py` | Live sensor, recording and cloud playback; pause/step/resume and camera input |
+| `test_ui.py` | Display controls, fullscreen, help modal, PNG screenshots, console and guest restrictions |
+| `test_security.py` | Signed-out, guest and signed-in route access; source and OSF input confinement |
+
+Pass `--sensor SENSOR_HOST` to enable discovery, recording and live-sensor checks. These tests skip when no hostname is supplied; existing device settings are not used to choose a sensor. UI and cloud playback checks run without a sensor, sharing one sample per session. Discovery checks the roster and picker, not cold-boot auto-selection. HDMI checks require a monitor; guest restrictions are skipped in open mode.
+
+Run against an idle viewer. Tests refuse to interrupt an active or configured recording, restore settings at session teardown and remove their own device files. Studio import can download several gigabytes; `--skip-import` uses cached samples and skips sample-dependent tests if none are available. `--skip-deploy` uses the installed image.
+
+Standard pytest options work, including `-k discovery`, `-k recording`, `-k visualization`, `-k ui`, `--collect-only`, `--junitxml FILE`, `--output DIR`, and `--tracing on`. Failure screenshots and traces default to ignored `tmp/test-hello-ouster-world/` and contain device URLs. For example:
+
+```sh
+nix run ./apps/examples/hello-ouster-world/tests -- --host "$HOST" --sensor "$SENSOR_HOST" --skip-deploy -k recording
+```
+
 ## Sources
 
 A fresh installation starts enabled in sensor mode with no selected host and recording disabled. The backend subscribes to the Jetstream `sensors` app roster, even before a browser connects. A sensor whose UDP destination is this device is applied immediately; otherwise it scans for 30 seconds after the first snapshot, then applies a sole usable sensor. Multiple sensors with none streaming here require an explicit selection. The viz placeholder shows the scan countdown and auto-configuration progress. An empty roster leaves manual hostname entry available; unavailable discovery is shown separately and retries. The sensor picker freezes its displayed rows during selection, while the backend keeps consuming roster updates. Discovery stays available while a source is selected or stopped. Choose a dropdown entry to fill the hostname/IP field, then **Apply** to start it. Sensors whose UDP destination is this device are starred and listed first when Jetstream's sensors app reports `udp_dest`.

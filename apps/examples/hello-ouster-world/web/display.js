@@ -1819,7 +1819,7 @@
                 return item.id === sensorCandidateSelect.value;
             });
             if (candidate && cfgSensorHost) {
-                cfgSensorHost.value = candidate.hostname || candidate.target;
+                cfgSensorHost.value = candidate.target;
                 sourceDraftDirty = true;
             }
         });
