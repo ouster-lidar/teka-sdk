@@ -149,6 +149,34 @@ def _validated_source(cfg: dict) -> tuple[FrameSetSourceType, str]:
     return source, target
 
 
+def _configure_sensor_with_retry(hostname: str, config_watch: SourceConfigWatch) -> None:
+    deadline = time.monotonic() + 60
+    while True:
+        if config_watch.reload_requested():
+            raise SourceConfigChanged
+        try:
+            _configure_sensor(hostname)
+            return
+        except RuntimeError as exc:
+            # The SDK exposes curl transport failures as untyped RuntimeError strings.
+            message = str(exc)
+            transient = message.startswith("CurlClient::execute_request failed for the url: [") and any(
+                message.endswith("] with the error message: " + reason)
+                for reason in ("Could not connect to server", "Couldn't connect to server", "Timeout was reached")
+            )
+            if not transient or time.monotonic() >= deadline:
+                raise
+            set_runtime_status("configuring", f"Waiting for sensor connection to {hostname}")
+            print(f"hello-ouster-world: sensor connection failed: {exc}; retrying in 2s", flush=True)
+            retry_at = min(deadline, time.monotonic() + 2)
+            while time.monotonic() < retry_at:
+                if config_watch.reload_requested():
+                    raise SourceConfigChanged
+                time.sleep(max(0, min(0.2, retry_at - time.monotonic())))
+            if time.monotonic() >= deadline:
+                raise
+
+
 def _start_sensor_reader(src):
     frames = queue.Queue(maxsize=2)
 
@@ -203,7 +231,9 @@ def main(cfg: dict, config_watch: SourceConfigWatch) -> FrameSetSourceType:
     if source_type is FrameSetSourceType.SENSOR:
         set_runtime_status("configuring", f"Applying supported defaults to {target}")
         try:
-            _configure_sensor(target)
+            _configure_sensor_with_retry(target, config_watch)
+        except SourceConfigChanged:
+            raise
         except Exception as exc:  # noqa: BLE001
             set_runtime_status("configuration_error", str(exc))
             print(f"hello-ouster-world: sensor configuration failed: {exc!r}; waiting for Apply", flush=True)

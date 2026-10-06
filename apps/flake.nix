@@ -119,6 +119,10 @@
               ${pkgs.python3}/bin/python3 ${./.}/examples/hello-llm/tests/runtime.py
             touch "$out"
           '';
+          hello-ouster-world-startup = pkgs.runCommand "hello-ouster-world-startup-check" { } ''
+            ${pkgs.python3}/bin/python3 ${./.}/examples/hello-ouster-world/tests/startup.py
+            touch "$out"
+          '';
         }
       );
       lib = appLib // {
