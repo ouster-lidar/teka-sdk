@@ -41,6 +41,20 @@ Those are source paths, not `packages.${system}` derivations. App `default.nix` 
 
 Install app manifests and web assets at host paths under `usr/lib/jetstream/mission-control/…`. Unit files reference `mission-control.service`; portable host checks use `jetstream-portable-check-*` and `ID_LIKE=jetstream-portable` in `os-release`. See jetstream-os for portable-service mechanics.
 
+## Runtime nftables leases
+
+- Apps request generic native nftables resources through the fallible `sync_nftables` SDK helper after devres activation and before work that depends on those leases or readiness.
+- `PUT /api/v1/manager/runtime/{id}/nftables` replaces the app's complete nftables lease list with `{ "leases": [...] }`; an empty list releases nftables leases while preserving ports and the HTTP allocation.
+- Each lease contains `id`, `hook`, `priority`, `sets`, and `rules`. Sets contain local `name`, `type`, `flags`, and optional native nftables JSON `timeout`, `gc-interval`, and `size`; rules are arrays of native nftables JSON statements referencing only lease-local sets.
+- Jetstream validates requests and assigns table, chain, and set ownership. Resources are holder- and lease-local, with no shared named policies. Apps supply packet policy without invoking firewall tools or selecting host-defined policy IDs.
+- Compatible updates preserve existing set elements and attached state. Compatibility includes the set schema, writer key expression, and attached stateful statement configuration. Incompatible changes atomically reset only affected sets; conflicting writers to one set are rejected without changing accepted resources.
+- The SDK caches only successfully accepted nftables requests. Rejected requests preserve the accepted replay state; reconnect reactivates devres and replays the current accepted nftables leases before ports, retrying failures without replaying stale snapshots.
+- A disconnected registration stream or unreachable control plane never triggers SDK release. Transient reconnect preserves installed kernel state; actual Jetstream restart cleanup resets ephemeral state, and replay recreates the accepted resources.
+- The SDK exposes resource-loss and restored notifications. Notify apps whenever the control-plane stream is lost, even transiently; this reports uncertain resource availability without assuming kernel resources are absent. Retain accepted lease caches throughout recovery.
+- Running apps that depend on leases pause dependent work until all accepted resource replay succeeds, or exit if they cannot pause. The SDK retries and reports replay failures; failed nftables replay prevents port replay and restored notification. Notify restored only after the full accepted replay succeeds.
+- Acquisition, reconnect replay, and final release are serialized. Final release prevents later reactivation or replay and releases all runtime resources.
+- SDK lifecycle tests cover rejected updates, transient reconnect preserving state, resource-loss and restored notifications during failed replay and recovery, replay order and retry, current accepted state during concurrent updates, and final-release races. Kernel behavior is verified separately in disposable host VM tests.
+
 ## Flake input `follows`
 
 This flake pins `nixpkgs`, `crate2nix`, and `jetpack`. Downstream flakes should use `inputs.<this-flake>.inputs.*.follows` so app builds inherit the consumer's toolchain pins.
