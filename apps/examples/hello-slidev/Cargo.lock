@@ -646,6 +646,7 @@ name = "app-runtime"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "libc",
  "parking_lot",
  "reqwest",
  "sd-notify",

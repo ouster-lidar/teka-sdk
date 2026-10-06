@@ -3,6 +3,7 @@
 # cache, /bin bash+busybox, systemd-run README).
 {
   ps,
+  pkgs,
   lib,
   stdenv,
   bash,
@@ -19,7 +20,6 @@
   glfw,
   libxkbcommon,
   libdecor,
-  firewalld,
   foot,
   dejavu_fonts,
   python3,
@@ -30,7 +30,7 @@
 let
   name = "hello-ouster-terminal";
 
-  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
+  appRuntime = pkgs.callPackage ../../nix/app-runtime.nix { };
 
   ousterCommon = ps.callOusterCommon {
     logTag = name;
@@ -102,7 +102,7 @@ let
 
     ## Network
 
-    - UDP ${ousterUdpFirewallRange} opened on the host via firewalld.
+    - UDP ${ousterUdpFirewallRange} leased from Jetstream for the kiosk lifetime.
     - Point the sensor at this host (ports +100 vs appliance defaults 7502–7504):
       - Lidar ${toString ousterLidarDataPort}/udp
       - IMU ${toString ousterImuDataPort}/udp
@@ -293,6 +293,18 @@ let
   };
   runLoop = "${runLoopPack}/run";
 
+  appManifest = writeText "${name}-app-manifest.json" ''
+    {
+      "id": "${name}",
+      "version": "${ps.imageVersion}",
+      "display_name": "Hello Ouster Terminal",
+      "nav": { "label": "Hello Ouster Terminal", "path": "/app/${name}" },
+      "ui": { "mode": "external" },
+      "backend": { "mode": "none" },
+      "portable": { "displayService": true, "gpu": "wayland" }
+    }
+  '';
+
   rootExtensionRelease = writeText "${name}-extension-release" ''
     ID=${name}
     VERSION_ID=1
@@ -303,11 +315,11 @@ ps.makeAppImage {
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "hot"
     ++ ps.waylandAppBaseCopyFiles
-    ++ ps.appGpuManifestCopyFiles {
-      inherit name;
-      gpu = "wayland";
-    }
     ++ [
+      {
+        path = "usr/lib/jetstream/mission-control/manifest.json";
+        source = appManifest;
+      }
       {
         path = "usr/lib/extension-release.d/extension-release.hello-ouster-terminal";
         source = rootExtensionRelease;
@@ -332,26 +344,25 @@ ps.makeAppImage {
   unit = ps.mkGpuWaylandUnit {
     inherit name jp;
     description = "hello-ouster-terminal (Sway Wayland kiosk + foot; native GLFW Wayland viz; systemd-run /bin)";
-    execStart = runLoop;
+    execStart = "${appRuntime}/bin/app-runtime-process ${name} udp ${ousterUdpFirewallRange} ${runLoop}";
+    serviceType = "notify";
     runtimeDirectory = name;
     useTty = true;
     bindHostEtc = true;
     user = "js";
     extraUnit = ''
-      After=firewalld.service
-      Wants=firewalld.service
+      After=mission-control.service
+      Wants=mission-control.service
     '';
     extraService = ''
       SupplementaryGroups=tty seat
-      ExecStartPre=+${firewallCmd} --add-port=${ousterUdpFirewallRange}/udp
-      ExecStopPost=+${firewallCmd} --remove-port=${ousterUdpFirewallRange}/udp
-      BindPaths=-/run/dbus/system_bus_socket
+      TimeoutStartSec=90
       RuntimeDirectoryMode=0700
     '';
   };
   runtimeClosures = [
     runLoopPack
-    firewalldCli
+    appRuntime
     ouster-sdk
     rootInteractiveBin
   ]

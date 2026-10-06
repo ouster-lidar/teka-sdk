@@ -2,7 +2,8 @@
 
 ## Goal
 
-Portable **Sway** kiosk with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Opens a UDP port range via **firewalld** for lidar/IMU traffic when using custom sensor ports.
+**Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](../../lib/app-runtime/runtime-process.md) for lidar/IMU traffic.
+The manifest uses `backend.mode = none`; the host must support resource-only activation.
 
 ## Build
 
@@ -36,3 +37,8 @@ host; do not document `nsenter`):
     systemd-run -tp JoinsNamespaceOf=hello-ouster-terminal.service bash
 
 The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that shell.
+
+## Verify
+
+Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk.
+Override these ports and the lease range through `callOusterCommon`.

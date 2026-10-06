@@ -2,7 +2,8 @@
 
 ## Goal
 
-Portable **Python 3** HTTP server on **0.0.0.0:8000** returning a small HTML page. Uses host **firewalld** to open/close the port while the service runs.
+**Python 3** HTTP server app on **0.0.0.0:8000** returning a small HTML page.
+Jetstream proxies directly to this fixed listener and manages its TCP 8000 lease through the [SDK runtime](../../lib/app-runtime/runtime-process.md).
 
 ## Build
 
@@ -10,11 +11,12 @@ Portable **Python 3** HTTP server on **0.0.0.0:8000** returning a small HTML pag
 
 ## Deploy
 
-`./scripts/jsd-app-deploy.sh hello-http http://HOST/` from `apps/` (host **firewalld** must be active).
+`./scripts/jsd-app-deploy.sh hello-http http://HOST/` from `apps/`.
 
 ## Verify
 
-`curl http://<host>:8000/` → 200 and `Hello world` body. `firewall-cmd --query-port=8000/tcp` is **yes** while the unit is active.
+`curl http://<host>:8000/` → 200 and `Hello world` body.
+Check `/app/hello-http` through Jetstream as well.
 
 ## App UI
 

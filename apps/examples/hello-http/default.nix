@@ -1,12 +1,12 @@
 {
   ps,
+  pkgs,
   writeText,
   python3Minimal,
-  firewalld,
 }:
 
 let
-  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
+  appRuntime = pkgs.callPackage ../../nix/app-runtime.nix { };
 
   name = "hello-http";
   port = 8000;
@@ -56,6 +56,10 @@ let
     HTTPServer(("0.0.0.0", ${toString port}), Handler).serve_forever()
   '';
 
+  panelHtml = writeText "hello-http.html" ''
+    <iframe src="/app/hello-http/view" title="Hello HTTP" style="width:100%;height:20rem;border:0"></iframe>
+  '';
+
   appManifest = writeText "app-manifest.json" ''
     {
       "id": "hello-http",
@@ -65,9 +69,10 @@ let
         "label": "Hello HTTP",
         "path": "/app/hello-http",
         "section": "apps",
-        "order": 10
+        "order": 10,
+        "panels": [{ "label": "Hello HTTP", "panel": "hello-http" }]
       },
-      "ui": { "mode": "proxy", "title": "Hello HTTP" },
+      "ui": { "mode": "static", "title": "Hello HTTP", "template": "hello-http.html" },
       "backend": { "mode": "proxy", "upstream": "http://127.0.0.1:${toString port}" },
       "auth": {
         "scheme": "ojs-proxy-identity",
@@ -82,25 +87,27 @@ ps.makeAppImage {
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-http (python http.server)
-    After=firewalld.service
-    Wants=firewalld.service
+    After=mission-control.service
+    Wants=mission-control.service
 
     [Service]
-    Type=simple
+    Type=notify
     ${jp.serviceFragment}
-    ExecStartPre=${firewallCmd} --add-port=${toString port}/tcp
-    ExecStart=${python3Minimal}/bin/python3 /usr/lib/hello-http/server.py
-    ExecStopPost=${firewallCmd} --remove-port=${toString port}/tcp
+    ExecStart=${appRuntime}/bin/app-runtime-process ${name} tcp ${toString port} ${python3Minimal}/bin/python3 /usr/lib/hello-http/server.py
     SyslogIdentifier=${name}
     StandardOutput=journal
     StandardError=journal
-    BindPaths=-/run/dbus/system_bus_socket
     Restart=on-failure
+    TimeoutStartSec=90
 
     [Install]
     WantedBy=jetstream-apps.target
   '';
   copyFiles = [
+    {
+      path = "usr/lib/jetstream/mission-control/web/hello-http.html";
+      source = panelHtml;
+    }
     {
       path = "usr/lib/hello-http/server.py";
       source = serverPy;
@@ -112,6 +119,6 @@ ps.makeAppImage {
   ];
   runtimeClosures = [
     python3Minimal
-    firewalldCli
+    appRuntime
   ];
 }

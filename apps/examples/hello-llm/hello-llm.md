@@ -68,7 +68,9 @@ nix build .#hello-llm-cross-aarch64-linux   # from x86_64 → ZED Box Mini
 ## App UI
 
 Guide panel at `/app/hello-llm` in Jetstream (how it works, first-boot tips).
-Chat UI: `http://<host>:8080/` (firewalld opens the port while the unit runs).
+Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](../../lib/app-runtime/runtime-process.md)).
+Ollama stays on loopback 11434 without a public lease; Jetstream must use a different port from Open WebUI.
+Open WebUI's sandbox receives a read-only snapshot of the service's resolver configuration at launch so host file replacement cannot break startup.
 
 First boot downloads the model (network required; `TimeoutStartSec=900`). Open WebUI data
 lives under `/var/lib/hello-llm/open-webui`.

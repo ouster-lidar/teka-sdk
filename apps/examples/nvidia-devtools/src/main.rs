@@ -60,7 +60,14 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
+    let result = main_result();
+    if result.is_err() {
+        nvidia_devtools::app_runtime::release();
+    }
+    result
+}
 
+fn main_result() -> anyhow::Result<()> {
     let args = Args::parse();
     setup_sshd()?;
 
@@ -88,7 +95,9 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
     let listener = nvidia_devtools::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("nvidia-devtools listening on http://{local}");
-    nvidia_devtools::app_runtime::sync_tcp_ports(&[SSH_PORT]);
+    tokio::task::spawn_blocking(|| nvidia_devtools::app_runtime::sync_tcp_ports(&[SSH_PORT]))
+        .await?
+        .map_err(anyhow::Error::msg)?;
     nvidia_devtools::app_runtime::notify_systemd_ready();
 
     tokio::select! {

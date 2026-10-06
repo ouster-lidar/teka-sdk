@@ -6,7 +6,6 @@
   writeText,
   writeShellScript,
   runCommand,
-  firewalld,
   curl,
   coreutils,
   gnugrep,
@@ -15,7 +14,7 @@
 let
   app = ps.appCrate;
 
-  inherit (ps.callAppFirewalld firewalld) firewallCmd firewalldCli;
+  appRuntime = pkgs.callPackage ../../nix/app-runtime.nix { };
 
   name = "hello-llm";
   webPort = 8080;
@@ -235,7 +234,7 @@ let
   runtimeClosures = [
     ollamaBackend
     openWebUi
-    firewalldCli
+    appRuntime
     curl
     coreutils
     gnugrep
@@ -250,11 +249,11 @@ ps.makeAppImage {
     [Unit]
     Description=hello-llm (Open WebUI + Ollama/${modelTag})
     ${lib.optionalString isAarch64 "X-Jetstream-PortableGPU=cuda"}
-    After=firewalld.service network-online.target
-    Wants=firewalld.service network-online.target
+    After=mission-control.service network-online.target
+    Wants=mission-control.service network-online.target
 
     [Service]
-    Type=simple
+    Type=notify
     PrivateNetwork=no
     ProtectSystem=no
     ProtectHome=no
@@ -263,13 +262,10 @@ ps.makeAppImage {
     ${jp.serviceFragment}
     PrivateDevices=no
     SupplementaryGroups=video render
-    ExecStartPre=${firewallCmd} --add-port=${toString webPort}/tcp
-    ExecStart=/usr/lib/${name}/start.sh
-    ExecStopPost=${firewallCmd} --remove-port=${toString webPort}/tcp
+    ExecStart=${appRuntime}/bin/app-runtime-process ${name} tcp ${toString webPort} /usr/lib/${name}/start.sh
     SyslogIdentifier=${name}
     StandardOutput=journal
     StandardError=journal
-    BindPaths=-/run/dbus/system_bus_socket
     BindReadOnlyPaths=-/etc/resolv.conf
     ${lib.optionalString isAarch64 ''
       # DDI stub for bind target (read-only erofs cannot mkdir at runtime).

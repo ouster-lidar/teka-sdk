@@ -2144,6 +2144,7 @@ rec {
         crateName = "app-runtime";
         version = "0.1.0";
         edition = "2021";
+        crateBin = [];
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ../../lib/app-runtime; };
         libName = "app_runtime";
         dependencies = [
@@ -2151,6 +2152,10 @@ rec {
             name = "axum";
             packageId = "axum";
             features = [ "ws" ];
+          }
+          {
+            name = "libc";
+            packageId = "libc";
           }
           {
             name = "parking_lot";
@@ -2183,7 +2188,7 @@ rec {
           {
             name = "tokio";
             packageId = "tokio";
-            features = [ "sync" "time" "signal" "rt" ];
+            features = [ "sync" "time" "signal" "rt-multi-thread" "process" ];
           }
           {
             name = "tracing";

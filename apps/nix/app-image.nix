@@ -18,8 +18,6 @@ let
 
       hostGpuChecks = pkgs.callPackage ./host-gpu-checks.nix { };
 
-      callAppFirewalld = firewalld: import ./app-firewalld-cmd.nix { inherit lib firewalld; };
-
       ousterSdk =
         if ousterSdkSrc != null then
           pkgs.callPackage ousterSdkNix {
@@ -448,7 +446,6 @@ let
         // {
           inherit
             hostGpuChecks
-            callAppFirewalld
             ousterSdk
             callOusterCommon
             hostUnitDefaults
@@ -824,6 +821,15 @@ let
               exit 1
             }
           }
+          ${lib.optionalString (serviceName == "hello-ouster-terminal") ''
+            ${pkgs.erofs-utils}/bin/dump.erofs --cat --path=usr/lib/jetstream/mission-control/manifest.json "$raw" >manifest.json
+            ${pkgs.jq}/bin/jq -e '
+              .id == "hello-ouster-terminal" and .version == "${imageVersion}" and
+              .nav.label == "Hello Ouster Terminal" and .nav.path == "/app/hello-ouster-terminal" and
+              .ui.mode == "external" and .backend.mode == "none" and
+              .portable.displayService == true and .portable.gpu == "wayland"
+            ' manifest.json >/dev/null
+          ''}
           expect_line "ID=${serviceName}"
           expect_line "IMAGE_ID=${serviceName}"
           expect_line 'IMAGE_VERSION="${imageVersion}"'

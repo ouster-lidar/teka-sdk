@@ -18,6 +18,14 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+    let result = main_result();
+    if result.is_err() {
+        hello_ouster_world::app_runtime::release();
+    }
+    result
+}
+
+fn main_result() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let bind =
@@ -62,9 +70,9 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
     let listener = hello_ouster_world::app_runtime::bind_listener(bind).await?;
     let local = listener.local_addr()?;
     tracing::info!("hello-ouster-world listening on http://{local}");
-    // Lidar / IMU (MC default sensor dest). Manifest lists the same ports;
-    // firewalld opens via PUT …/runtime/hello-ouster-world/ports, not the JSON.
-    hello_ouster_world::app_runtime::sync_udp_ports(&[7502, 7503]);
+    tokio::task::spawn_blocking(|| hello_ouster_world::app_runtime::sync_udp_ports(&[7502, 7503]))
+        .await?
+        .map_err(anyhow::Error::msg)?;
     hello_ouster_world::app_runtime::notify_systemd_ready();
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

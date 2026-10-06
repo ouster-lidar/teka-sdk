@@ -107,9 +107,18 @@
       packages = infraPackages;
       checks = nixpkgs.lib.genAttrs systems (
         system:
+        let
+          pkgs = nixpkgsPkgs.legacyPackages.${system};
+          runtime = (infraPkgsFor system).app-runtime;
+        in
         appOutputs.checks.${system}
-        // nixpkgs.lib.optionalAttrs (nixpkgs.lib.hasSuffix "-linux" system) {
-          app-runtime = (infraPkgsFor system).app-runtime;
+        // nixpkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          app-runtime = runtime;
+          hello-llm-runtime = pkgs.runCommand "hello-llm-runtime-check" { } ''
+            APP_RUNTIME_PROCESS=${runtime}/bin/app-runtime-process \
+              ${pkgs.python3}/bin/python3 ${./.}/examples/hello-llm/tests/runtime.py
+            touch "$out"
+          '';
         }
       );
       lib = appLib // {
