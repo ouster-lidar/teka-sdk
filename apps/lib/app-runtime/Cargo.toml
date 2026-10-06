@@ -5,11 +5,12 @@ edition = "2021"
 
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
+libc = "0.2"
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 socket2 = "0.6"
-tokio = { version = "1", features = ["sync", "time", "signal", "rt"] }
+tokio = { version = "1", features = ["sync", "time", "signal", "rt-multi-thread", "process"] }
 tracing = "0.1"
 reqwest = { version = "0.13", features = ["json", "blocking"], default-features = false }
 

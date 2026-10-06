@@ -105,6 +105,13 @@
     appOutputs
     // {
       packages = infraPackages;
+      checks = nixpkgs.lib.genAttrs systems (
+        system:
+        appOutputs.checks.${system}
+        // nixpkgs.lib.optionalAttrs (nixpkgs.lib.hasSuffix "-linux" system) {
+          app-runtime = (infraPkgsFor system).app-runtime;
+        }
+      );
       lib = appLib // {
         inherit (version) appArtifactRawName imageVersion buildId compose;
       };

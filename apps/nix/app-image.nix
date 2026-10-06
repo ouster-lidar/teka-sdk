@@ -338,6 +338,7 @@ let
           jp,
           runtimeDirectory,
           useTty ? false,
+          serviceType ? "simple",
           bindHostEtc ? true,
           extraUnit ? "",
           extraService ? "",
@@ -353,7 +354,7 @@ let
           ${extraUnit}
 
           [Service]
-          Type=simple
+          Type=${serviceType}
           User=${user}
           ${jp.serviceFragment}
           ExecStart=${execStart}

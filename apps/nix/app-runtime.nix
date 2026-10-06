@@ -1,5 +1,10 @@
 # Standalone nix build of the shared app runtime crate (for flake consumers).
-{ rustPlatform, lib }:
+{
+  rustPlatform,
+  lib,
+  python3,
+  stdenv,
+}:
 
 rustPlatform.buildRustPackage rec {
   pname = "app-runtime";
@@ -11,9 +16,12 @@ rustPlatform.buildRustPackage rec {
     outputHashes = { };
   };
 
-  dontCargoInstall = true;
-
   RUSTFLAGS = "-Dwarnings";
+
+  postCheck = lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
+    APP_RUNTIME_PROCESS="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/app-runtime-process" \
+      ${python3}/bin/python3 tests/resource_process.py
+  '';
 
   postInstall = ''
     mkdir -p $out/lib
