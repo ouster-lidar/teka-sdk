@@ -53,16 +53,27 @@ macro_rules! declare_app_runtime {
                 $crate::runtime::notify_ready();
             }
 
-            pub fn sync_udp_ports(ports: &[u16]) {
+            pub fn sync_udp_ports(ports: &[u16]) -> Result<(), String> {
                 $crate::runtime::sync_udp_ports(APP_ID, ports)
             }
 
-            pub fn sync_tcp_ports(ports: &[u16]) {
+            pub fn sync_tcp_ports(ports: &[u16]) -> Result<(), String> {
                 $crate::runtime::sync_tcp_ports(APP_ID, ports)
             }
 
+            pub fn sync_nftables(leases: &[$crate::devres::NftablesLease]) -> Result<(), String> {
+                $crate::runtime::sync_nftables(APP_ID, leases)
+            }
+
+            pub fn resource_availability(
+            ) -> tokio::sync::watch::Receiver<$crate::runtime::ResourceAvailability> {
+                $crate::runtime::resource_availability()
+            }
+
             pub fn release() {
-                $crate::runtime::release(APP_ID)
+                if let Err(error) = $crate::runtime::stop_and_release(APP_ID) {
+                    eprintln!("app-runtime: {error}");
+                }
             }
 
             pub async fn release_async() {

@@ -31,9 +31,18 @@ pub async fn bind_http_listener(
                 "bind in use; releasing devres and retrying"
             );
             let app_id = app_id.to_string();
-            let release_id = app_id.clone();
-            let _ = tokio::task::spawn_blocking(move || crate::runtime::release(&release_id)).await;
-            let bind = crate::runtime::activate_http_listen(&app_id).map_err(io::Error::other)?;
+            let bind = tokio::task::spawn_blocking(move || {
+                crate::runtime::release(&app_id);
+                let bind = crate::runtime::activate_http_listen(&app_id)?;
+                if let Err(error) = crate::runtime::replay_resources(&app_id) {
+                    crate::runtime::release(&app_id);
+                    return Err(error);
+                }
+                Ok(bind)
+            })
+            .await
+            .map_err(io::Error::other)?
+            .map_err(io::Error::other)?;
             bind_tcp_listener(bind).await
         }
         Err(e) => Err(e),
