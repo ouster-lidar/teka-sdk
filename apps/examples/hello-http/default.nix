@@ -6,6 +6,8 @@
 }:
 
 let
+  app = ps.appCrate;
+
   appRuntime = pkgs.callPackage ../../nix/app-runtime.nix { };
 
   name = "hello-http";
@@ -23,14 +25,12 @@ let
     _BODY = (
         b"<!DOCTYPE html><html><head>"
         b'<meta charset="utf-8">'
-        b'<link rel="stylesheet" href="/static/css/app.css">'
-        b"<title>Hello HTTP</title></head>"
-        b'<body style="background:transparent;min-height:auto">'
-        b'<div class="main" style="padding:1.5rem">'
-        b'<div class="stat-card">'
-        b"<h2>Hello world</h2>"
-        b"<p>Proxy example app using Jetstream shared styles.</p>"
-        b"</div></div></body></html>\n"
+        b"<title>Hello HTTP</title>"
+        b"</head>"
+        b"<body><main>"
+        b"<h1>Hello world</h1>"
+        b"<p>Python HTTP server reached on the app's direct TCP port.</p>"
+        b"</main></body></html>\n"
     )
 
     class Handler(BaseHTTPRequestHandler):
@@ -56,9 +56,17 @@ let
     HTTPServer(("0.0.0.0", ${toString port}), Handler).serve_forever()
   '';
 
-  panelHtml = writeText "hello-http.html" ''
-    <iframe src="/app/hello-http/view" title="Hello HTTP" style="width:100%;height:20rem;border:0"></iframe>
-  '';
+  webTree = app.appWebTree {
+    inherit name;
+    webSrc = ./web;
+    webFiles = [
+      "hello-http.html"
+      "hello-http.js"
+    ];
+    extraInstall = ''
+      substituteInPlace "$out/web/hello-http.js" --replace-fail "__HELLO_HTTP_PORT__" "${toString port}"
+    '';
+  };
 
   appManifest = writeText "app-manifest.json" ''
     {
@@ -103,20 +111,16 @@ ps.makeAppImage {
     [Install]
     WantedBy=jetstream-apps.target
   '';
-  copyFiles = [
-    {
-      path = "usr/lib/jetstream/mission-control/web/hello-http.html";
-      source = panelHtml;
+  copyFiles =
+    app.appManifestCopyFiles {
+      inherit name appManifest webTree;
     }
-    {
-      path = "usr/lib/hello-http/server.py";
-      source = serverPy;
-    }
-    {
-      path = "usr/lib/jetstream/mission-control/manifest.json";
-      source = appManifest;
-    }
-  ];
+    ++ [
+      {
+        path = "usr/lib/hello-http/server.py";
+        source = serverPy;
+      }
+    ];
   runtimeClosures = [
     python3Minimal
     appRuntime

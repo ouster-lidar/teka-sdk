@@ -16,7 +16,7 @@ Jetstream proxies directly to this fixed listener and manages its TCP 8000 lease
 ## Verify
 
 `curl http://<host>:8000/` → 200 and `Hello world` body.
-Check `/app/hello-http` through Jetstream as well.
+Check `/app/hello-http` through Jetstream as well; its **Direct endpoint** link opens the same service on `http://<host>:8000/`.
 
 ## App UI
 
