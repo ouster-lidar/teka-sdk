@@ -548,12 +548,38 @@ class VizProxy:
         return getattr(self._real, name)
 
 
+class LatestLiveConsumer(viz_core.LiveConsumer):
+    def _LiveConsumer__consume(self):
+        for frames in self._iterable:
+            if self._stopped.is_set():
+                break
+            try:
+                self._queue.put_nowait(frames)
+            except queue.Full:
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    pass
+                else:
+                    if self._should_count_dropped_frame_method():
+                        self._dropped_frames += 1
+                # Only this thread enqueues; the viewer can only free space.
+                self._queue.put_nowait(frames)
+        self._stopped.set()
+
+
+# SimpleViz has no consumer factory; confine these SDK overrides to the app process.
+viz_core.LiveConsumer = LatestLiveConsumer
+
+
 class JetstreamDisplayBridge:
     """Share one PointViz window between the browser and HDMI output."""
 
     def __init__(self, source_type: FrameSetSourceType) -> None:
         self.source_type = FrameSetSourceType(source_type)
-        self.rate: float = 1.0
+        self.rate: Optional[float] = (
+            1.0 if self.source_type is FrameSetSourceType.LOCAL_FILE else None
+        )
         self.pointviz: Any = None
         self._source: Any = None
         self._keys: Optional[KeyBridge] = None
