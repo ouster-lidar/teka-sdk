@@ -18,7 +18,9 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 import ouster.sdk.viz.core as viz_core
-from ouster.sdk.viz import PointViz, WindowCtx
+from ouster.sdk.viz import PointViz, WindowCtx, model as viz_model
+from ouster.sdk.viz.view_mode import ReflMode
+import numpy as np
 
 from source_config import FrameSetSourceType
 
@@ -568,8 +570,18 @@ class LatestLiveConsumer(viz_core.LiveConsumer):
         self._stopped.set()
 
 
+class ReflectivityMode(ReflMode):
+    def _prepare_data(self, frame, return_num=0):
+        if self._normalized_refl and self.enabled(frame, return_num):
+            field = frame.field(self._fields[return_num])
+            if field.dtype == np.uint8:
+                return field
+        return super()._prepare_data(frame, return_num)
+
+
 # SimpleViz has no consumer factory; confine these SDK overrides to the app process.
 viz_core.LiveConsumer = LatestLiveConsumer
+viz_model.ReflMode = ReflectivityMode
 
 
 class PointCloudViz(viz_core.LidarFrameViz):
