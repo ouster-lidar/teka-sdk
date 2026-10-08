@@ -572,6 +572,37 @@ class LatestLiveConsumer(viz_core.LiveConsumer):
 viz_core.LiveConsumer = LatestLiveConsumer
 
 
+class PointCloudViz(viz_core.LidarFrameViz):
+    def __init__(self, metadata, point_viz):
+        # Default SimpleViz accumulators grow trajectory buffers even with accumulation off.
+        super().__init__(
+            metadata, point_viz,
+            imu_viz_config=viz_core.ImuVisualizationConfig("none"),
+            _buflen=0,
+            _add_default_controls=False,
+        )
+
+        discover_modes = self._model._amend_view_modes_all
+        known_fields = [set() for _ in metadata]
+
+        def amend_view_modes(frames):
+            fields = [
+                set(frame.fields) if frame is not None else set() for frame in frames
+            ]
+            # Non-pixel fields never get view modes, so the SDK retries them every scan.
+            if any(current - known for current, known in zip(fields, known_fields)):
+                discover_modes(frames)
+                for known, current in zip(known_fields, fields):
+                    known.update(current)
+
+        self._model._amend_view_modes_all = amend_view_modes
+
+    def _update_fine_frame_trajectory(self):
+        # The SDK allocates clouds and axes even when their display is disabled.
+        if self._track_view_mode == self.TrackViewMode.TRACK_PLUS_PER_FRAME_TRAJECTORY:
+            super()._update_fine_frame_trajectory()
+
+
 class JetstreamDisplayBridge:
     """Share one PointViz window between the browser and HDMI output."""
 

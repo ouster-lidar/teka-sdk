@@ -24,7 +24,7 @@ from source_config import (
     set_runtime_status,
     wait_for_source_config_change,
 )
-from viz_utils import JetstreamDisplayBridge, VizPid
+from viz_utils import JetstreamDisplayBridge, PointCloudViz, VizPid
 
 SOURCE_DEFAULTS = SourceDefaults(
     config_path="/var/lib/hello-ouster-world/source-config.json",
@@ -339,6 +339,7 @@ def _run_viz(cfg, config_watch, source_type, target, src):
             rate=display_ctx.rate,
             on_eof="loop" if loop_osf else "stop",
             _override_pointviz=display_ctx.pointviz,
+            _override_lidar_frame_viz=PointCloudViz(viz_sensor_info, display_ctx.pointviz),
         )
         display_ctx.prepare(viz, src, config_watch=config_watch)
         set_runtime_status(

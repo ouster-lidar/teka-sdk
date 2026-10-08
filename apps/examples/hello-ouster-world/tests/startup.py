@@ -16,6 +16,7 @@ viz = ModuleType("ouster.sdk.viz")
 viz.SimpleViz = mock.Mock()
 bridge = ModuleType("viz_utils")
 bridge.JetstreamDisplayBridge = mock.Mock()
+bridge.PointCloudViz = mock.Mock()
 bridge.VizPid = mock.Mock()
 with mock.patch.dict(sys.modules, {"ouster": ModuleType("ouster"), "ouster.sdk": sdk,
                                   "ouster.sdk.viz": viz, "viz_utils": bridge}):
