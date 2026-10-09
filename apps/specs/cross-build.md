@@ -42,4 +42,4 @@ Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, â€
 
 `nix/app-image.nix` derives Linux targets from `systems` via the `*-linux` suffix.
 
-`scripts/jsd-app-deploy.sh` uses short names when the builder can produce the host system (native Linux or darwin same-CPU alias); otherwise `*-cross-<host-sys>`.
+`teka deploy` uses short names when the builder can produce the host system (native Linux or darwin same-CPU alias); otherwise `*-cross-<host-sys>`.
