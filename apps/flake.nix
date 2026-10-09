@@ -105,6 +105,7 @@
     appOutputs
     // {
       packages = infraPackages;
+      teka.apps = nixpkgs.lib.mapAttrs (_: _: { }) services;
       checks = nixpkgs.lib.genAttrs systems (
         system:
         let

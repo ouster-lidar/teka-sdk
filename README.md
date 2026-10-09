@@ -25,8 +25,8 @@ Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBo
 
 1. Complete the [Linux host setup](docs/linux.md).
 2. Clone this repository.
-3. Build an app.
-4. Upload to the web UI.
+3. [Install the CLI](tools/teka/README.md#install), or run `nix develop` at the repo root for `teka` on `PATH` without installing.
+4. Build and deploy an app, or upload its image in the web UI.
 
 From `apps/`:
 
