@@ -34,14 +34,14 @@ From `apps/`:
 
 ```bash
 cd jetstream-example-apps/apps
-nix build .#hello-world-cross-aarch64-linux
+teka app build hello-world --arch aarch64
 ```
 
 **Build + Deploy** (normal workflow — build for the device, upload, sample logs):
 
 ```bash
 cd jetstream-example-apps/apps
-./scripts/jsd-app-deploy.sh hello-world http://<device>/
+teka app deploy --build hello-world --host http://<device>/
 ```
 
 Full procedures: [Developer Guide](docs/developer-guide.md).

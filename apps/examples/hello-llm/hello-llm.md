@@ -62,7 +62,7 @@ nix build .#hello-llm-cross-aarch64-linux   # from x86_64 → ZED Box Mini
 ## Deploy
 
 ```bash
-./scripts/jsd-app-deploy.sh hello-llm http://HOST/
+teka app deploy --build hello-llm --host http://HOST/
 ```
 
 ## App UI

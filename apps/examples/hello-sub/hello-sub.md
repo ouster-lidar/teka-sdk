@@ -185,6 +185,6 @@ cd apps
 nix build .#hello-sub
 ```
 
-Deploy with `./scripts/jsd-app-deploy.sh hello-sub http://HOST/` (and `hello-pub`). Open `/app/hello-sub` while hello-pub is running.
+Deploy with `teka app deploy --build hello-sub --host http://HOST/` (and `hello-pub`). Open `/app/hello-sub` while hello-pub is running.
 
 Remote example: on the publisher UI, copy the Publisher URL (browser origin + `/api/v1/app/hello-pub`), paste into hello-sub on the other box, Add + Apply.

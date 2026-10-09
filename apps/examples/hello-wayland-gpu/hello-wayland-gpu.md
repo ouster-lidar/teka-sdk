@@ -14,7 +14,7 @@ Requires **`/run/opengl-driver`** on the appliance. **`WLR_BACKENDS=drm,libinput
 
 ## Deploy
 
-`./scripts/jsd-app-deploy.sh hello-wayland-gpu http://HOST/`
+`teka app deploy --build hello-wayland-gpu --host http://HOST/`
 
 ## Verify
 

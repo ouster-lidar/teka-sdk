@@ -11,7 +11,7 @@ Jetstream proxies directly to this fixed listener and manages its TCP 8000 lease
 
 ## Deploy
 
-`./scripts/jsd-app-deploy.sh hello-http http://HOST/` from `apps/`.
+`teka app deploy --build hello-http --host http://HOST/` from `apps/`.
 
 ## Verify
 

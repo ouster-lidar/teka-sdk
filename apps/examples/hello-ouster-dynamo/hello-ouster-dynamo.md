@@ -26,8 +26,8 @@ The Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi.md`](../
 ### 1. Deploy to device
 
 ```bash
-export JETSTREAM_MC_PASSWORD='…'   # when the device requires Jetstream authentication
-./scripts/jsd-app-deploy.sh hello-ouster-dynamo http://HOST/
+export TEKA_PASSWORD='…'   # when the device requires authentication
+teka app deploy --build hello-ouster-dynamo --host http://HOST/
 ```
 
 See the [Developer Guide](../../../docs/developer-guide.md) for the normal build and deploy workflow.

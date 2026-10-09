@@ -8,7 +8,7 @@ Static web UI demo: animated hero, counters, and a Snake game panel. No backend.
 
 ## Deploy
 
-`./scripts/jsd-app-deploy.sh hello-webui http://HOST/`
+`teka app deploy --build hello-webui --host http://HOST/`
 
 ## Verify
 

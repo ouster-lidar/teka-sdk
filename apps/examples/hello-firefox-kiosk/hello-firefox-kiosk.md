@@ -41,7 +41,7 @@ An **app image** DDI (read-only erofs **`.raw`**) that runs **Cage** (single-cli
 ## Operator flow
 
 - Build the **`.raw`** on a workstation (`nix build` / cross like other **app** images).
-- Attach on a Jetstream host with **`portablectl`** or **`./scripts/jsd-app-deploy.sh hello-firefox-kiosk http://HOST/`**.
+- Attach on a Teka host with **`portablectl`** or **`teka app deploy --build hello-firefox-kiosk --host http://HOST/`**.
 
 ## Non-goals
 

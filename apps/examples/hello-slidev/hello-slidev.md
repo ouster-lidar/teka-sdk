@@ -29,7 +29,7 @@ Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the app 
 ## Deploy
 
 ```bash
-jetstream/scripts/jsd-app-deploy.sh hello-slidev
+teka app deploy --build hello-slidev --host http://HOST/
 ```
 
 ## Verify

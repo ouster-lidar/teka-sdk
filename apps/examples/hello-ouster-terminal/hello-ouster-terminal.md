@@ -15,7 +15,7 @@ The manifest uses `backend.mode = none`; the host must support resource-only act
 
 ## Deploy
 
-Point viz at a sensor hostname/IP after attach. `./scripts/jsd-app-deploy.sh hello-ouster-terminal http://HOST/`
+Point viz at a sensor hostname/IP after attach. `teka app deploy --build hello-ouster-terminal --host http://HOST/`
 
 ## In-kiosk docs
 

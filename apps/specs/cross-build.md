@@ -42,4 +42,4 @@ Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, â€
 
 `nix/app-image.nix` derives Linux targets from `systems` via the `*-linux` suffix.
 
-`teka deploy` uses short names when the builder can produce the host system (native Linux or darwin same-CPU alias); otherwise `*-cross-<host-sys>`.
+`teka app build` / `deploy` never select `packages.<darwin>.*`. A non-Linux builder asks for `packages.<linux-target>.<app>` so a Linux builder produces it. A Linux builder uses the short name for its own system and `<app>-cross-<target>` for the other Linux system.

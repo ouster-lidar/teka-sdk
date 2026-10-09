@@ -1,8 +1,16 @@
 {
   description = "hello-ouster-world device tests";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/a50de1b7d8a586adc18d2395c19de7d6058e6030";
+  inputs.teka = {
+    url = "path:../../../../tools/teka";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      teka,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -32,17 +40,12 @@
             name = "test-hello-ouster-world";
             runtimeInputs = with pkgs; [
               bash
-              coreutils
-              curl
-              gnugrep
-              gnused
-              jq
               nix
+              teka.packages.${system}.teka
             ];
             text = ''
               export PLAYWRIGHT_BROWSERS_PATH=${browsers}
               export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
-              export JETSTREAM_TEST_DEPLOY_SCRIPT=${../../../scripts}/jsd-app-deploy.sh
               exec ${python}/bin/python -m pytest ${./.} --rootdir ${./.} \
                 -p no:cacheprovider --output tmp/test-hello-ouster-world --tracing retain-on-failure --screenshot only-on-failure "$@"
             '';

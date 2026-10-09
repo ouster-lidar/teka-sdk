@@ -197,7 +197,7 @@ nix build .#hello-slidev
 ```
 
 ```bash
-jetstream/scripts/jsd-app-deploy.sh hello-slidev http://HOST/
+teka app deploy --build hello-slidev --host http://HOST/
 ```
 
 | Step | Command |

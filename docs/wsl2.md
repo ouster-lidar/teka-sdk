@@ -46,4 +46,4 @@ Follow [linux.md](linux.md) for packages and Nix, then the [Developer Guide](dev
 
 Clone and build inside the WSL filesystem (for example `~/src/...`), not under `/mnt/c/`, for reasonable I/O and Unix permissions.
 
-When deploying, pass an explicit routable device URL to `./scripts/jsd-app-deploy.sh`; do not rely on the script default `http://127.0.0.1:80`.
+When deploying, pass an explicit routable `--host` URL to `teka app deploy`.

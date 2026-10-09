@@ -133,4 +133,4 @@ cd apps
 nix build .#hello-pub
 ```
 
-Deploy with `./scripts/jsd-app-deploy.sh hello-pub http://HOST/`. Open `/app/hello-pub`. Pair with `hello-sub` for the subscriber demo.
+Deploy with `teka app deploy --build hello-pub --host http://HOST/`. Open `/app/hello-pub`. Pair with `hello-sub` for the subscriber demo.

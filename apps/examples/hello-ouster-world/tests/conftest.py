@@ -45,8 +45,8 @@ def app(browser, pytestconfig):
         assert response.ok, response.text()
         auth = response.json()
         if not auth["auth_disabled"] and not auth["authenticated"]:
-            password = os.environ.get("JETSTREAM_MC_PASSWORD")
-            assert password, "Set JETSTREAM_MC_PASSWORD"
+            password = os.environ.get("TEKA_PASSWORD")
+            assert password, "Set TEKA_PASSWORD"
             response = context.request.post(
                 "/api/v1/auth/login", data={"password": password}
             )
@@ -75,17 +75,17 @@ def app(browser, pytestconfig):
             assert checkout and (checkout / "flake.nix").is_file(), (
                 "Use --apps-flake PATH"
             )
-            env = os.environ | {
-                "JETSTREAM_FLAKE_ROOT": str(checkout.resolve()),
-                "JETSTREAM_APPS_FLAKE_ROOT": str(checkout.resolve()),
-            }
-            env.setdefault("E2E_POST_DEPLOY_SEC", "0")
-            env.setdefault("E2E_LOG_SEC", "2")
+            env = {"TEKA_POST_DEPLOY_SEC": "0", "TEKA_LOG_SEC": "2"} | os.environ
             subprocess.run(
                 [
-                    "bash",
-                    env["JETSTREAM_TEST_DEPLOY_SCRIPT"],
+                    "teka",
+                    "app",
+                    "deploy",
+                    "--build",
                     "hello-ouster-world",
+                    "--flake",
+                    str(checkout.resolve()),
+                    "--host",
                     base,
                 ],
                 env=env,

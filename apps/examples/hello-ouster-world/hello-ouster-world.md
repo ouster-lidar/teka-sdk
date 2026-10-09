@@ -14,7 +14,7 @@ nix build .#hello-ouster-world-cross-aarch64-linux
 Both outputs are `.raw` EROFS DDI images. To build and deploy to an existing Jetstream host, run:
 
 ```sh
-scripts/jsd-app-deploy.sh hello-ouster-world http://HOST/
+teka app deploy --build hello-ouster-world --host http://HOST/
 ```
 
 Open `http://HOST/app/hello-ouster-world` to control the display. The tested native and cross images were built from revision `2be1287c02f934b298ea3324af8ee6a5cc26e577`:
@@ -34,7 +34,7 @@ From the repository root, build, deploy and test on a Jetstream device:
 nix run ./apps/examples/hello-ouster-world/tests#test-hello-ouster-world -- --host "$HOST"
 ```
 
-The standalone [`tests/`](tests/) flake pins Python, pytest, Playwright and Chromium. Set `JETSTREAM_MC_PASSWORD` when Mission Control requires login. The existing deploy script builds the correct native/cross image from the checkout's `apps/flake.nix`; use `--apps-flake PATH` when running outside the checkout.
+The standalone [`tests/`](tests/) flake pins Python, pytest, Playwright and Chromium. Set `TEKA_PASSWORD` when the device requires login. The tests invoke `teka app deploy` against the checkout's `apps/flake.nix`; pass `--apps-flake PATH` to the pytest runner when running outside the checkout.
 
 Tests are grouped into four modules:
 

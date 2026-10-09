@@ -24,5 +24,5 @@ From `apps/`:
 
 ```bash
 nix build .#nvidia-devtools-cross-aarch64-linux
-./scripts/jsd-app-deploy.sh nvidia-devtools http://HOST/
+teka app deploy --build nvidia-devtools --host http://HOST/
 ```

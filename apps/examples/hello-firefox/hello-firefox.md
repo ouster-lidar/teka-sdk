@@ -14,7 +14,7 @@ Portable **Sway** + **Firefox** on Wayland. Default start URL is a Babylon.js 3D
 
 ## Deploy
 
-`./scripts/jsd-app-deploy.sh hello-firefox http://HOST/`
+`teka app deploy --build hello-firefox --host http://HOST/`
 
 ## Non-goals
 

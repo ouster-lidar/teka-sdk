@@ -10,7 +10,7 @@ Minimal app smoke test: a **oneshot** unit that logs `hello world` to the journa
 
 ## Deploy
 
-Attach like any other app image (`portablectl`, or `./scripts/jsd-app-deploy.sh hello-world http://HOST/`).
+Attach like any other app image (`portablectl`, or `teka app deploy --build hello-world --host http://HOST/`).
 
 ## Verify
 

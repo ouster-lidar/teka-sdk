@@ -7,6 +7,7 @@
     crate2nix = {
       url = "github:nix-community/crate2nix/5e1ecfd2d15b34ec90c2e51fdffbe8116595a767";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.cachix.inputs.nixpkgs.follows = "nixpkgs";
     };
     # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
     # apps/nix/ouster-sdk.nix against nixpkgs GLFW.

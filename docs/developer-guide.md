@@ -10,7 +10,8 @@ flowchart TD
         A[x86_64-linux host]
         B[Install Nix + flakes]
         C[Clone repository]
-        A --> B --> C
+        K[Install teka]
+        A --> B --> C --> K
     end
 
     subgraph manual [2. Manual build + web UI install]
@@ -21,38 +22,34 @@ flowchart TD
         D --> E --> F --> G
     end
 
-    subgraph auto [3. jsd-app-deploy auto flow]
-        H[Confirm device web UI loads]
-        I[jsd-app-deploy.sh hello-ouster-terminal http://jetstream-$SN/]
+    subgraph auto [3. teka app deploy auto flow]
+        H[Confirm Teka web UI loads]
+        I[teka app deploy --build hello-ouster-terminal --host http://jetstream-$SN/]
         J[Open app and verify]
         H --> I --> J
     end
 
     C --> D
-    C --> H
+    K --> H
 ```
 
-The first workflow is required once. Choose either manual web UI installation or the automated deploy script afterward.
+The first workflow is required once. Choose either manual web UI installation or the automated deploy command afterward.
 
 ## Workflow 1: One-time install
 
 1. Complete the [Linux host setup](linux.md) and [Nix configuration](nix.md).
-2. Clone the repository:
-
-   ```bash
-   git clone https://gitlab.com/ouster-jetstream/jetstream-example-apps.git
-   ```
-
-3. Change to `apps/`, the directory containing `flake.nix`:
+2. Clone this repository.
+3. [Install the Teka CLI](../tools/teka/README.md#install) from the repository root.
+4. Change to `apps/`, the directory containing `flake.nix`:
 
    ```bash
    cd jetstream-example-apps/apps
    ```
 
-4. List available app ids:
+5. List available app ids:
 
    ```bash
-   ./scripts/jsd-app-deploy.sh --help
+   teka app list
    ```
 
 ## Workflow 2: Manual build + web UI install
@@ -63,20 +60,20 @@ The first workflow is required once. Choose either manual web UI installation or
    nix build .#hello-ouster-terminal-cross-aarch64-linux
    ```
 
-2. In the Jetstream web UI, upload the image from `result/`.
+2. In the web UI, upload the image from `result/`.
 3. Open the app in the web UI and verify it.
 
 Replace `hello-ouster-terminal` with another app id as needed.
 
-## Workflow 3: `jsd-app-deploy` auto flow
+## Workflow 3: `teka app deploy` auto flow
 
 1. Open the Jetstream device web interface in a browser and confirm it loads.
 2. Note the Jetstream administrator password set during initial setup.
 3. From `apps/`, run:
 
    ```bash
-   export JETSTREAM_MC_PASSWORD='…'
-   ./scripts/jsd-app-deploy.sh hello-ouster-terminal http://zedbox-mini-nx-$SN.local/
+   export TEKA_PASSWORD='…'
+   teka app deploy --build hello-ouster-terminal --host http://zedbox-mini-nx-$SN.local/
    ```
 
 ## Verify and iterate
@@ -85,7 +82,7 @@ After deploy:
 
 - Open the device app UI or manager for the installed app.
 - Read app-specific behavior and checks in each app's README or `*.md` under `apps/examples/`.
-- Rerun the same `./scripts/jsd-app-deploy.sh` command from `apps/` to rebuild and replace an existing install.
+- Rerun the same `teka app deploy` command from `apps/` to rebuild and replace an existing install.
 
 ## Troubleshooting
 
