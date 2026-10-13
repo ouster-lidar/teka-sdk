@@ -13,6 +13,9 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 |---------|----------|
 | `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
 | `teka app deploy APP…` / `teka app deploy --build APP…` | Deploy apps linked in `./result`, or build for the device architecture, replace apps, and verify startup logs |
+| `teka system status` | Print the device system status JSON |
+| `teka system update FILE [--no-reboot] [--wait]` | Upload and apply a system update file |
+| `teka <name> ARGS…` | Run plugin `teka-<name>` from `PATH` |
 
 - `teka app build` passes a Nix expression on stdin (`nix build --file -`) whose value is a `linkFarm` of the requested apps (dependencies are the existing flake packages). `./result` is the one out-link, and `./result/<app>` refers to each app's store output. Stdout prints those `./result/<app>` paths. The farm name is `teka-<system>`; a later build replaces `./result`. A failed Nix build includes Nix's stderr in the error.
 
@@ -22,6 +25,28 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - Host precedence is `-H`/`--host`, then `TEKA_HOST`; `deploy` fails with a usage error (exit 2) if neither is set. There is no default host.
 - `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system. `deploy --build` uses the device's architecture.
 - Apps-flake precedence is `--flake`, `TEKA_APPS_FLAKE_ROOT`, then `apps/flake.nix` at the root of the enclosing git checkout. An apps flake exports `teka.apps`, an attrset of per-app metadata keyed by app id; `teka app list` prints its names without forcing values. Builds reject apps missing from `teka.apps`, and unsupported targets fail at build time. Other teka flake data goes under `teka.<name>`. CLI-specific environment variables use `TEKA_*`.
+
+## System
+
+- `teka system` uses `GET /api/v1/app/jetstream/status` and `POST /api/v1/app/jetstream/sysupdate/apply`.
+- `update` streams `FILE` as `application/octet-stream`, adds `?reboot=false` with `--no-reboot`, and prints the apply response JSON. The response `result` is `REBOOTING`, `INSTALLED_NO_REBOOT`, or `NO_UPDATE_NEEDED`.
+- `--wait` records the status `version` before upload. For `REBOOTING`, it reauthenticates and polls `update.commit_state`:
+    - `COMMITTED` or `NONE` with a changed `version`: success; print the final status JSON.
+    - `ABORTED_UNHEALTHY` or `FAILED_SET_DEFAULT`: error listing `update.failed_units`.
+    - Original `version` after observing a changed version: error (rolled back).
+    - No result within `TEKA_UPDATE_WAIT_SEC` (default 900): error.
+    - Polls every `TEKA_UPDATE_POLL_MS` (default 1000) and retries failed polls until the deadline.
+- The library exposes the update and wait steps.
+
+## Plugins
+
+- An unknown command `<name>` runs `teka-<name>` from `PATH` with the remaining arguments; the plugin's exit status is teka's exit status. On Unix, teka replaces itself with the plugin.
+- Built-in commands and `help` always win over plugins.
+- An unknown command with no plugin on `PATH` is a usage error.
+- `teka --help` lists plugins discovered on `PATH`, excluding built-ins; the first match on `PATH` wins.
+
+## Output and exit codes
+
 - Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, and 2 for usage errors. Do not ask for confirmation.
 
 ## Packaging and checks
