@@ -2,6 +2,7 @@ pub mod build;
 pub mod deploy;
 pub mod device;
 pub mod plugins;
+pub mod system;
 
 pub use reqwest;
 
@@ -27,6 +28,11 @@ pub enum Command {
         #[command(subcommand)]
         command: AppCommand,
     },
+    /// Device system image status and updates
+    System {
+        #[command(subcommand)]
+        command: system::SystemCommand,
+    },
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
@@ -47,6 +53,10 @@ pub fn run(command: Command) -> Result<()> {
             AppCommand::Deploy(args) => deploy::run(args),
             AppCommand::Build(args) => build::run(args),
             AppCommand::List(args) => build::list(args),
+        },
+        Command::System { command } => match command {
+            system::SystemCommand::Status(args) => system::run_status(args),
+            system::SystemCommand::Update(args) => system::run_update(args),
         },
         Command::External(args) => plugins::run_external(args),
     }

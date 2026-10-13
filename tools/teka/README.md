@@ -48,9 +48,15 @@ From the repository root or `apps/`:
 teka app list
 teka app build hello-world --arch aarch64
 teka app deploy --build hello-world --host http://device.local
+teka system status --host http://device.local
+teka system update ./image.bin --wait --host http://device.local
 ```
 
 `build` links `./result/<app>` at the requested images and prints those paths. `deploy` uploads from `./result`; `deploy --build` selects the device architecture automatically.
+
+`system update --wait` waits for a rebooting update to commit or fail.
+
+Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
 App builds use `apps/flake.nix` at the root of the enclosing git checkout; it must export `teka.apps`. Outside the checkout, use `--flake /path/to/apps` or set `TEKA_APPS_FLAKE_ROOT` to that directory.
 

@@ -549,6 +549,14 @@ exit 0"#,
     assert_eq!(out.status.code(), Some(2));
 }
 
+fn system_cli(dir: &Path) -> Command {
+    let mut command = cli(dir);
+    command
+        .env("TEKA_UPDATE_POLL_MS", "10")
+        .env("TEKA_UPDATE_WAIT_SEC", "5");
+    command
+}
+
 #[test]
 fn plugins_in_empty_path_entries_are_listed_and_dispatched() {
     let d = TempDir::new().unwrap();
@@ -568,4 +576,220 @@ fn plugins_in_empty_path_entries_are_listed_and_dispatched() {
             .unwrap();
         assert_eq!(out.status.code(), Some(7));
     }
+}
+
+#[test]
+fn system_status_prints_json_and_update_streams() {
+    let d = TempDir::new().unwrap();
+    let image = d.path().join("update.bin");
+    fs::write(&image, b"sysimage").unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"1.0","ok":true}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"result":"INSTALLED_NO_REBOOT"}"#),
+    ]);
+    let out = system_cli(d.path())
+        .args(["system", "status", "--host", &url])
+        .output()
+        .unwrap();
+    success(&out);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["ok"],
+        true
+    );
+    let out = system_cli(d.path())
+        .args([
+            "system",
+            "update",
+            "--no-reboot",
+            "--host",
+            &url,
+            image.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    success(&out);
+    let requests = server.join().unwrap();
+    assert_eq!(
+        requests[1].line,
+        "GET /api/v1/app/jetstream/status HTTP/1.1"
+    );
+    assert_eq!(
+        requests[3].line,
+        "POST /api/v1/app/jetstream/sysupdate/apply?reboot=false HTTP/1.1"
+    );
+    assert_eq!(requests[3].body, b"sysimage");
+}
+
+#[test]
+fn system_update_login_and_http_errors() {
+    let d = TempDir::new().unwrap();
+    let image = d.path().join("update.bin");
+    fs::write(&image, b"x").unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"enforcement":true}"#),
+        ("200 OK", "{}"),
+        ("200 OK", r#"{"result":"INSTALLED_NO_REBOOT"}"#),
+    ]);
+    success(
+        &system_cli(d.path())
+            .env("TEKA_PASSWORD", "secret")
+            .args(["system", "update", "--host", &url, image.to_str().unwrap()])
+            .output()
+            .unwrap(),
+    );
+    let requests = server.join().unwrap();
+    assert_eq!(requests[1].line, "POST /api/v1/auth/login HTTP/1.1");
+    let (url, server) = serve(vec![("401 Unauthorized", "nope")]);
+    let out = system_cli(d.path())
+        .args(["system", "status", "--host", &url])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("401"));
+    server.join().unwrap();
+}
+
+#[test]
+fn system_update_wait_commits_after_reboot() {
+    let d = TempDir::new().unwrap();
+    let image = d.path().join("update.bin");
+    fs::write(&image, b"payload").unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"old"}"#),
+        ("200 OK", r#"{"result":"REBOOTING"}"#),
+        ("503 Service Unavailable", "restarting"),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"old","update":{"commit_state":"NONE"}}"#,
+        ),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"old","update":{"commit_state":"COMMITTED"}}"#,
+        ),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"old","update":{"commit_state":"PENDING"}}"#,
+        ),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"new","update":{"commit_state":"PENDING"}}"#,
+        ),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"new","update":{"commit_state":"PENDING"}}"#,
+        ),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"new","update":{"commit_state":"COMMITTED"}}"#,
+        ),
+    ]);
+    let out = system_cli(d.path())
+        .args([
+            "system",
+            "update",
+            "--wait",
+            "--host",
+            &url,
+            image.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    success(&out);
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(stdout.contains("REBOOTING"));
+    assert!(stdout.contains("COMMITTED"));
+    server.join().unwrap();
+}
+
+#[test]
+fn system_update_wait_aborts_on_unhealthy() {
+    let d = TempDir::new().unwrap();
+    let image = d.path().join("update.bin");
+    fs::write(&image, b"x").unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"old"}"#),
+        ("200 OK", r#"{"result":"REBOOTING"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"new"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"new"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"new","update":{"commit_state":"ABORTED_UNHEALTHY","failed_units":["a.service","b.service"]}}"#,
+        ),
+    ]);
+    let out = system_cli(d.path())
+        .args([
+            "system",
+            "update",
+            "--wait",
+            "--host",
+            &url,
+            image.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("a.service"));
+    assert!(stderr.contains("b.service"));
+    server.join().unwrap();
+}
+
+#[test]
+fn system_update_wait_detects_rollback() {
+    let d = TempDir::new().unwrap();
+    let image = d.path().join("update.bin");
+    fs::write(&image, b"x").unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"same"}"#),
+        ("200 OK", r#"{"result":"REBOOTING"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"same"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"new"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"version":"new"}"#),
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        (
+            "200 OK",
+            r#"{"version":"same","update":{"commit_state":"COMMITTED"}}"#,
+        ),
+    ]);
+    let out = system_cli(d.path())
+        .args([
+            "system",
+            "update",
+            "--wait",
+            "--host",
+            &url,
+            image.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("rolled back"));
+    server.join().unwrap();
+}
+
+#[test]
+fn system_requires_host() {
+    let d = TempDir::new().unwrap();
+    let out = system_cli(d.path())
+        .args(["system", "status"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
 }

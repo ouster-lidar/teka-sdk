@@ -142,14 +142,23 @@ impl DeviceClient {
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    pub fn install(&self, path: &Path, profile: &str) -> Result<Value> {
-        let mut url = self.endpoint("api/v1/manager/install")?;
-        if !profile.is_empty() && profile != "default" {
-            url.query_pairs_mut().append_pair("profile", profile);
+    pub fn jetstream_status(&self) -> Result<Value> {
+        self.get_json("api/v1/app/jetstream/status")
+    }
+
+    pub fn sysupdate_apply(&self, path: &Path, reboot: bool) -> Result<Value> {
+        let mut url = self.endpoint("api/v1/app/jetstream/sysupdate/apply")?;
+        if !reboot {
+            url.query_pairs_mut().append_pair("reboot", "false");
         }
+        self.upload(url, path, "applying system update")
+    }
+
+    /// Streams `path` to `url` and prints the response body on stdout.
+    fn upload(&self, url: Url, path: &Path, action: &str) -> Result<Value> {
         let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
         let size = file.metadata()?.len();
-        eprintln!("teka: installing {} ({size} bytes)", path.display());
+        eprintln!("teka: {action} {} ({size} bytes)", path.display());
         let upload_timeout = Duration::from_secs(size / (1024 * 1024) + 600);
         let response = Self::response(
             self.client
@@ -166,6 +175,14 @@ impl DeviceClient {
             println!("{text}");
         }
         Ok(response)
+    }
+
+    pub fn install(&self, path: &Path, profile: &str) -> Result<Value> {
+        let mut url = self.endpoint("api/v1/manager/install")?;
+        if !profile.is_empty() && profile != "default" {
+            url.query_pairs_mut().append_pair("profile", profile);
+        }
+        self.upload(url, path, "installing")
     }
 }
 
