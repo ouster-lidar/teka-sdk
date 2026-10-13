@@ -19,6 +19,10 @@
       url = "github:anduril/jetpack-nixos";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    teka = {
+      url = "path:../tools/teka";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -28,6 +32,7 @@
       crate2nix,
       ouster-sdk,
       jetpack,
+      teka,
       ...
     }:
     let
@@ -107,6 +112,11 @@
     // {
       packages = infraPackages;
       teka.apps = nixpkgs.lib.mapAttrs (_: _: { }) services;
+      devShells = nixpkgs.lib.genAttrs systems (system: {
+        default = nixpkgs.legacyPackages.${system}.mkShell {
+          packages = [ teka.packages.${system}.teka ];
+        };
+      });
       checks = nixpkgs.lib.genAttrs systems (
         system:
         let
