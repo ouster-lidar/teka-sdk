@@ -1,9 +1,13 @@
 pub mod build;
 pub mod deploy;
 pub mod device;
+pub mod plugins;
+
+pub use reqwest;
 
 use anyhow::{bail, Context, Result};
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use std::ffi::OsString;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -23,6 +27,8 @@ pub enum Command {
         #[command(subcommand)]
         command: AppCommand,
     },
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[derive(Debug, Subcommand)]
@@ -42,11 +48,19 @@ pub fn run(command: Command) -> Result<()> {
             AppCommand::Build(args) => build::run(args),
             AppCommand::List(args) => build::list(args),
         },
+        Command::External(args) => plugins::run_external(args),
     }
 }
 
+fn parse_cli() -> Result<Cli, clap::Error> {
+    let mut cmd = Cli::command();
+    plugins::augment_help(&mut cmd);
+    let matches = cmd.try_get_matches()?;
+    Cli::from_arg_matches(&matches)
+}
+
 pub fn main_entry() -> i32 {
-    let cli = match Cli::try_parse() {
+    let cli = match parse_cli() {
         Ok(cli) => cli,
         Err(e) => {
             let code = if e.use_stderr() { 2 } else { 0 };
@@ -55,14 +69,20 @@ pub fn main_entry() -> i32 {
         }
     };
     match cli.command.map(|c| run(c).map(|_| 0)).unwrap_or_else(|| {
-        Cli::command().print_help()?;
+        let mut cmd = Cli::command();
+        plugins::augment_help(&mut cmd);
+        cmd.print_help()?;
         println!();
         Ok(0)
     }) {
         Ok(code) => code,
         Err(e) => {
             eprintln!("teka: error: {e:#}");
-            1
+            if plugins::is_usage(&e) {
+                2
+            } else {
+                1
+            }
         }
     }
 }

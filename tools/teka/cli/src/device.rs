@@ -40,7 +40,13 @@ impl DeviceClient {
         Ok(self.base.join(path)?)
     }
 
-    fn response(response: Response) -> Result<Response> {
+    /// Session-carrying client for device endpoints without a wrapper here.
+    pub fn http(&self) -> &Client {
+        &self.client
+    }
+
+    /// Rejects unsuccessful responses, including the body in the error.
+    pub fn response(response: Response) -> Result<Response> {
         if !response.status().is_success() {
             let status = response.status();
             let mut body = String::new();

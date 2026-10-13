@@ -505,3 +505,67 @@ fn host_flag_overrides_environment() {
     );
     server.join().unwrap();
 }
+
+fn plugin_bin(dir: &Path, name: &str, body: &str) {
+    script(&dir.join("bin").join(format!("teka-{name}")), body);
+}
+
+#[test]
+fn plugin_dispatches_and_lists_in_help() {
+    let d = TempDir::new().unwrap();
+    fs::create_dir(d.path().join("bin")).unwrap();
+    plugin_bin(
+        d.path(),
+        "foo",
+        r#"printf '%s\n' "$@" >> "$TEKA_PLUGIN_LOG"
+exit 7"#,
+    );
+    plugin_bin(
+        d.path(),
+        "system",
+        r#"echo ran-system >> "$TEKA_PLUGIN_LOG"
+exit 0"#,
+    );
+    let log = d.path().join("plugin-log");
+    let out = cli(d.path())
+        .env("TEKA_PLUGIN_LOG", &log)
+        .args(["foo", "a", "b"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(7));
+    assert_eq!(fs::read_to_string(&log).unwrap(), "a\nb\n");
+    let out = cli(d.path())
+        .env("TEKA_PLUGIN_LOG", &log)
+        .args(["system"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(!fs::read_to_string(&log).unwrap().contains("ran-system"));
+    let out = cli(d.path()).args(["--help"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    let help = String::from_utf8_lossy(&out.stdout);
+    assert!(help.contains("on PATH):\n  foo\n"));
+    let out = cli(d.path()).args(["nope"]).output().unwrap();
+    assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn plugins_in_empty_path_entries_are_listed_and_dispatched() {
+    let d = TempDir::new().unwrap();
+    script(&d.path().join("teka-local"), "exit 7");
+    for path in ["", ":/usr/bin", "/usr/bin:"] {
+        let out = cli(d.path())
+            .env("PATH", path)
+            .arg("--help")
+            .output()
+            .unwrap();
+        success(&out);
+        assert!(String::from_utf8_lossy(&out.stdout).contains("on PATH):\n  local\n"));
+        let out = cli(d.path())
+            .env("PATH", path)
+            .arg("local")
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(7));
+    }
+}
