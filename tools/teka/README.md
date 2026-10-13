@@ -6,7 +6,7 @@ Build app images and deploy them to Teka devices.
 
 ### Shell only (Nix)
 
-Run `nix develop` at the repository root to put `teka` on `PATH` without installing anything.
+Run `nix develop` at the repository root or in `apps/` to put `teka` on `PATH` without installing anything.
 
 ### Persistent install
 
