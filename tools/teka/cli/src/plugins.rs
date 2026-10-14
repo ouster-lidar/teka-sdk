@@ -24,7 +24,7 @@ pub fn is_usage(err: &anyhow::Error) -> bool {
         .any(|source| source.downcast_ref::<UsageError>().is_some())
 }
 
-fn usage(msg: impl std::fmt::Display) -> anyhow::Error {
+pub(crate) fn usage(msg: impl std::fmt::Display) -> anyhow::Error {
     UsageError(msg.to_string()).into()
 }
 
@@ -56,6 +56,13 @@ fn is_executable(path: &Path) -> bool {
 
 /// First `teka-<name>` on PATH wins per name when scanning PATH order.
 pub fn discover_plugins() -> Vec<String> {
+    discover_plugin_paths()
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect()
+}
+
+pub(crate) fn discover_plugin_paths() -> Vec<(String, PathBuf)> {
     let mut seen = BTreeSet::new();
     let mut names = Vec::new();
     for dir in path_entries() {
@@ -73,7 +80,7 @@ pub fn discover_plugins() -> Vec<String> {
                 continue;
             }
             if seen.insert(name.to_string()) {
-                names.push(name.to_string());
+                names.push((name.to_string(), entry.path()));
             }
         }
     }

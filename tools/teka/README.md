@@ -62,6 +62,53 @@ App builds use `apps/flake.nix` at the root of the enclosing git checkout; it mu
 
 Set `TEKA_PASSWORD` to the device administrator password. Use `TEKA_BOOTSTRAP_TOKEN` when initial setup requires a token. Host URLs accept HTTP and HTTPS; `TEKA_HOST` supplies a default for `--host`.
 
+## Shell completion
+
+`teka completion [bash|fish|zsh]` prints completion code. Without an argument, it detects the invoking shell, then falls back to `$SHELL`. If neither identifies a supported shell, pass one explicitly.
+
+Load completion once per shell. Run the same line again after updating Teka or adding or removing plugins to refresh the snapshot.
+
+```bash
+# Bash: add to ~/.bashrc
+eval "$(teka completion)"
+
+# Zsh: add to ~/.zshrc
+eval "$(teka completion)"
+```
+
+```fish
+# Fish: put this line in ~/.config/fish/completions/teka.fish
+teka completion | source
+```
+
+Nix packages include completion loaders for all three shells. Enable your shell's completion support in NixOS or Home Manager to load them. They discover plugins when loaded, including plugins installed after Teka was built. For bootstrap/Cargo installs or `nix develop`, use the activation lines above.
+
+Completion covers built-in commands, flags, architecture choices, paths, and plugin names. App IDs and device addresses are not suggested. Generation does not run plugins, evaluate Nix flakes, or contact devices.
+
+### Plugin completion metadata
+
+A plugin can supply a `teka-<name>.completion.json` file beside its executable on `PATH`:
+
+```json
+{
+  "version": 1,
+  "about": "Example plugin",
+  "options": [
+    { "long": "verbose", "short": "v", "help": "Show more detail" },
+    { "long": "format", "value": { "choices": ["json", "text"] } },
+    { "long": "output", "value": { "hint": "file" } }
+  ]
+}
+```
+
+Options require `long`, `short`, or both, without leading dashes. Without `value`, an option is a boolean flag; `value` makes it take one argument. A value may provide nonempty `choices`, a `file` or `directory` hint, or neither. Set `value.optional` to `true` for an optional argument. Choices and hints cannot be combined. `options` defaults to an empty list; `about` and option `help` are optional. Positional metadata is not supported.
+
+Nested commands use `subcommands`, an optional list of objects with `name`, optional `about`, `options`, and further `subcommands`. Child names follow the plugin-name restrictions and must be unique within their parent; `help` is reserved. For example, `"subcommands": [{"name": "build", "options": [{"long": "verbose"}]}]` adds completion for `teka <plugin> build --verbose`.
+
+Plugin names, long flags, and choices must start with an ASCII letter or digit and contain only ASCII letters, digits, hyphens, or underscores. Plugin names cannot contain `__subcmd__`, which the Bash generator reserves. Short flags must be one ASCII letter or digit. Duplicate flags and `--help`/`-h` are reserved. Unknown metadata fields are rejected. These constraints keep generated shell code safe; plugin names outside this format are omitted from completion but remain dispatchable.
+
+The first executable on `PATH` wins, and its directory supplies the metadata. Built-ins and `help` take precedence over plugins. Missing, unreadable, invalid, unsupported-version, or oversized metadata (over 64 KiB) falls back to plugin-name completion without failing generation. Sidecars must be regular files; symlinks to regular files are supported.
+
 ## Develop
 
 For Rust changes under `tools/teka/`:

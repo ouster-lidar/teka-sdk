@@ -1,4 +1,5 @@
 pub mod build;
+pub mod completion;
 pub mod deploy;
 pub mod device;
 pub mod plugins;
@@ -23,6 +24,17 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Generate shell completion code
+    #[command(after_help = r#"Load once per shell:
+  Bash: eval "$(teka completion bash)"
+  Fish: teka completion fish | source
+  Zsh: eval "$(teka completion zsh)"
+
+Reload after updating Teka or plugins."#)]
+    Completion {
+        #[arg(value_enum)]
+        shell: Option<completion::Shell>,
+    },
     /// Build and deploy app images
     App {
         #[command(subcommand)]
@@ -49,6 +61,7 @@ pub enum AppCommand {
 
 pub fn run(command: Command) -> Result<()> {
     match command {
+        Command::Completion { shell } => completion::run(shell),
         Command::App { command } => match command {
             AppCommand::Deploy(args) => deploy::run(args),
             AppCommand::Build(args) => build::run(args),

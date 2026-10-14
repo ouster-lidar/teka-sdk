@@ -2,6 +2,10 @@
   lib,
   stdenv,
   craneLib,
+  installShellFiles,
+  bash,
+  fish,
+  zsh,
 }:
 let
   common = {
@@ -19,6 +23,18 @@ craneLib.buildPackage (
   common
   // {
     inherit cargoArtifacts;
+    nativeBuildInputs = [ installShellFiles ];
+    nativeCheckInputs = [
+      bash
+      fish
+      zsh
+    ];
+    postInstall = ''
+      printf 'eval "$(%s completion bash)"\n' "$out/bin/teka" > teka.bash
+      printf '%s completion fish | source\n' "$out/bin/teka" > teka.fish
+      printf '#compdef teka\neval "$(%s completion zsh)"\nif [[ $funcstack[1] == _teka ]]; then\n  _teka "$@"\nfi\n' "$out/bin/teka" > teka.zsh
+      installShellCompletion teka.{bash,fish,zsh}
+    '';
     passthru = {
       clippy = craneLib.cargoClippy (
         common

@@ -10,7 +10,7 @@ use std::{
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildSource {
-    #[arg(long, env = "TEKA_APPS_FLAKE_ROOT")]
+    #[arg(long, env = "TEKA_APPS_FLAKE_ROOT", value_hint = clap::ValueHint::DirPath)]
     pub flake: Option<PathBuf>,
 }
 

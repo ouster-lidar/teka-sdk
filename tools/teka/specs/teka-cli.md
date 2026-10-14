@@ -45,6 +45,13 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - An unknown command with no plugin on `PATH` is a usage error.
 - `teka --help` lists plugins discovered on `PATH`, excluding built-ins; the first match on `PATH` wins.
 
+## Shell completion
+
+- `teka completion [bash|fish|zsh]` prints a static completion snapshot composed from built-in Clap definitions and executable plugins on `PATH`. An explicit shell wins; otherwise detect the invoking shell, then fall back to `SHELL`. Failed detection is a usage error. Generation must not execute plugins, evaluate flakes, or contact devices. Reloading replaces the previous snapshot.
+- Optional version-1 `teka-<name>.completion.json` sidecars alongside the winning executable describe nested commands, flags, optional values, fixed choices, and file/directory hints. Missing, unreadable, invalid, unsupported, or oversized metadata falls back to plugin-name completion. See the README for the schema and token restrictions.
+- Completion augments a separate command tree; normal external-command parsing and dispatch remain unchanged. Built-ins and `help` retain precedence. Unsafe plugin names are omitted from shell code.
+- Nix packages install Bash, Fish, and Zsh completion files. Bootstrap/Cargo and development-shell users load them through the documented activation commands and `completion --help`. Dynamic app/device suggestions, plugin callbacks, and positional plugin metadata are deferred.
+
 ## Output and exit codes
 
 - Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, and 2 for usage errors. Do not ask for confirmation.
