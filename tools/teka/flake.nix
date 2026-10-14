@@ -37,7 +37,9 @@
         };
         default = self.apps.${system}.teka;
       });
-      overlays.teka = final: _: { teka = self.packages.${final.stdenv.hostPlatform.system}.teka; };
+      overlays.default = final: _: {
+        teka = self.packages.${final.stdenv.hostPlatform.system}.teka;
+      };
       checks = forAllSystems (system: {
         inherit (self.packages.${system}) teka;
         clippy = self.packages.${system}.teka.clippy;

@@ -31,7 +31,7 @@ inputs.teka = {
 };
 ```
 
-Then apply `overlays.default` and install `pkgs.teka`. Use `overlays.teka` instead to pick overlays individually.
+Then apply `overlays.default` and install `pkgs.teka`:
 
 ```nix
 nixpkgs.overlays = [ inputs.teka.overlays.default ];

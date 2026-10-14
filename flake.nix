@@ -2,9 +2,11 @@
   description = "Teka CLI";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.crane.url = "github:ipetkov/crane/master";
   inputs.teka = {
     url = "path:./tools/teka";
     inputs.nixpkgs.follows = "nixpkgs";
+    inputs.crane.follows = "crane";
   };
 
   outputs =
@@ -18,10 +20,7 @@
         inherit (packages) teka;
         default = packages.teka;
       }) teka.packages;
-      inherit (teka) apps;
-      overlays = teka.overlays // {
-        default = teka.overlays.teka;
-      };
+      inherit (teka) apps overlays;
       devShells = nixpkgs.lib.genAttrs (builtins.attrNames teka.packages) (
         system:
         let
