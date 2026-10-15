@@ -5,6 +5,10 @@
     # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).
     nixpkgs.url = "github:NixOS/nixpkgs/a50de1b7d8a586adc18d2395c19de7d6058e6030";
     crane.url = "github:ipetkov/crane/master";
+    rustsecAdvisoryDb = {
+      url = "github:RustSec/advisory-db";
+      flake = false;
+    };
     # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
     # apps/nix/ouster-sdk.nix against nixpkgs GLFW.
     ouster-sdk = {
@@ -27,6 +31,7 @@
       self,
       nixpkgs,
       crane,
+      rustsecAdvisoryDb,
       ouster-sdk,
       jetpack,
       teka,
@@ -93,6 +98,7 @@
           appOverlays
           version
           ;
+        advisoryDb = rustsecAdvisoryDb;
         ousterSdkSrc = ouster-sdk;
       };
 

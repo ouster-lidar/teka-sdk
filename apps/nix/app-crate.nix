@@ -4,6 +4,7 @@
   lib,
   runCommand,
   craneLib,
+  advisoryDb ? null,
   appApiJs ? ../web/app-api.js,
   appRuntimeSrc ? ../lib/app-runtime,
 }:
@@ -64,6 +65,14 @@ let
           }
         );
         fmt = craneLib.cargoFmt common;
+      }
+      // lib.optionalAttrs (advisoryDb != null) {
+        audit = craneLib.cargoAudit {
+          src = filteredSrc;
+          advisory-db = advisoryDb;
+          pname = crateName;
+          version = common.version;
+        };
       };
     in
     craneLib.buildPackage (

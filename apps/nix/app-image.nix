@@ -4,6 +4,7 @@ let
       pkgs,
       craneLib,
       version,
+      advisoryDb ? null,
       ousterSdkSrc ? null,
       ousterSdkNix ? ./ouster-sdk.nix,
       exampleAppsPkgs ? null,
@@ -478,6 +479,7 @@ let
           ps = psBase;
           inherit pkgs runCommand craneLib;
           lib = pkgs.lib;
+          inherit advisoryDb;
         }
         // lib.optionalAttrs (exampleAppsPkgs != null) {
           appApiJs = exampleAppsPkgs.app-api-js;
@@ -623,6 +625,7 @@ let
       systems,
       services,
       version,
+      advisoryDb ? null,
       ousterSdkSrc ? null,
       ousterSdkNix ? ./ouster-sdk.nix,
       exampleAppsPkgsFor ? null,
@@ -726,6 +729,7 @@ let
                     inherit
                       pkgs
                       version
+                      advisoryDb
                       ousterSdkSrc
                       ousterSdkNix
                       ;
@@ -765,6 +769,7 @@ let
                       pkgs = crossPkgs;
                       inherit
                         version
+                        advisoryDb
                         ousterSdkSrc
                         ousterSdkNix
                         ;
