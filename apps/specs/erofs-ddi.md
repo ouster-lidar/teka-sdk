@@ -29,7 +29,7 @@ mkfs.erofs --all-root -T0 -zlz4hc,level=9 -Efragments -C 16384 <output> <tree>
 fsck.erofs <output>
 ```
 
-**Build wiring (apps flake only):** `nix/erofs-mkfs.nix` emits the shell snippet; `nix/app-image.nix` → `makeAppImage` is the only erofs entry point. App packages must not call `mkfs.erofs` directly.
+**Build wiring (apps flake only):** `nix/erofs-mkfs.nix` emits the shell snippet; `nix/image-builder.nix` → `makeAppImage` is the only erofs entry point. App packages must not call `mkfs.erofs` directly.
 
 The Jetstream appliance rootfs uses the same flag set — keep mkfs flags aligned manually when tuning changes.
 

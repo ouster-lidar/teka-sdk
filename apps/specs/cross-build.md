@@ -40,6 +40,6 @@ Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, â€
 | `aarch64-linux` | native aarch64 | `hello-http-cross-x86_64-linux` |
 | `aarch64-darwin` | cross aarch64-linux | `hello-http-cross-x86_64-linux`, â€¦ |
 
-`nix/app-image.nix` derives Linux targets from `systems` via the `*-linux` suffix.
+`nix/flake-outputs.nix` derives Linux targets from `systems` via the `*-linux` suffix.
 
 `teka app build` / `deploy` never select `packages.<darwin>.*`. A non-Linux builder asks for `packages.<linux-target>.<app>` so a Linux builder produces it. A Linux builder uses the short name for its own system and `<app>-cross-<target>` for the other Linux system.

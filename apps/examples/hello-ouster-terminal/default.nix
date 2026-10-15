@@ -254,7 +254,7 @@ let
   '';
 
   # RootImage `/bin` for debug shell via systemd-run JoinsNamespaceOf (rootInteractiveBin).
-  # Busybox applets are seeded by app-image.nix; list full tools only here.
+  # Busybox applets are seeded by image-builder.nix; list full tools only here.
   rootInteractiveBin = symlinkJoin {
     name = "${name}-root-interactive-bin";
     paths = [
