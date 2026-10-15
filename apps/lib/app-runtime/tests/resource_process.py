@@ -197,7 +197,8 @@ class ResourceTests(ProcessFixture):
 
     def test_spawn_failure_releases(self):
         self.start(["/nonexistent-terminal-child"])
-        self.assertEqual(self.proc.wait(timeout=15), 1)
+        # posix_spawn may report exec failure through child exit status 127.
+        self.assertIn(self.proc.wait(timeout=15), (1, 127))
         self.released()
 
     def test_child_exit_preserves_status_and_releases(self):
