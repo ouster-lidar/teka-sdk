@@ -46,7 +46,6 @@ let
         version = (builtins.fromTOML (builtins.readFile "${filteredSrc}/Cargo.toml")).package.version;
         inherit src nativeBuildInputs buildInputs;
         cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = "${filteredSrc}/Cargo.lock"; };
-        cargoExtraArgs = "--locked";
         postUnpack = "sourceRoot+=/examples/${crateName}";
         strictDeps = true;
         doCheck = pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform;
