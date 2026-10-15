@@ -426,6 +426,7 @@ let
 in
 ps.makeAppImage {
   inherit name;
+  cargoChecks = dynamoBin.passthru.cargoChecks;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "hod"
     ++ ps.waylandAppBaseCopyFiles

@@ -53,13 +53,25 @@ let
         # Cargo caps dependency lints, leaving warnings fatal for our local crates.
         RUSTFLAGS = "-Dwarnings";
       };
+      cargoArtifacts = craneLib.buildDepsOnly (
+        (builtins.removeAttrs common [ "src" ]) // { inherit dummySrc; }
+      );
+      cargoChecks = {
+        clippy = craneLib.cargoClippy (
+          common
+          // {
+            inherit cargoArtifacts;
+            cargoClippyExtraArgs = "--all-targets -- -D warnings";
+          }
+        );
+        fmt = craneLib.cargoFmt common;
+      };
     in
     craneLib.buildPackage (
       common
       // {
-        cargoArtifacts = craneLib.buildDepsOnly (
-          (builtins.removeAttrs common [ "src" ]) // { inherit dummySrc; }
-        );
+        inherit cargoArtifacts;
+        passthru = { inherit cargoChecks; };
         inherit meta;
       }
     );

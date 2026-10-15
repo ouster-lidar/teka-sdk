@@ -116,6 +116,7 @@ in
 
 ps.makeAppImage {
   inherit name;
+  cargoChecks = helloSlidevBin.passthru.cargoChecks;
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-slidev (Slidev presentation demo)

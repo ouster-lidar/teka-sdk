@@ -257,6 +257,7 @@ let
 in
 ps.makeAppImage {
   inherit name unit;
+  cargoChecks = nvidiaDevtoolsBin.passthru.cargoChecks;
   copyFiles =
     app.appManifestCopyFiles {
       inherit name appManifest webTree;

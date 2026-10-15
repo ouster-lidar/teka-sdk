@@ -434,6 +434,7 @@ let
 in
 ps.makeAppImage {
   inherit name;
+  cargoChecks = howBin.passthru.cargoChecks;
   copyFiles =
     ps.mkPasswdGroupStubCopyFiles "how"
     ++ ps.waylandAppBaseCopyFiles

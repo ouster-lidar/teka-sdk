@@ -80,6 +80,7 @@ in
 
 ps.makeAppImage {
   inherit name;
+  cargoChecks = helloSubBin.passthru.cargoChecks;
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-sub (Jetstream hello pub-sub subscriber demo)

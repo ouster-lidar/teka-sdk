@@ -530,6 +530,7 @@ let
           unit ? null,
           copyFiles ? [ ],
           runtimeClosures ? [ ],
+          cargoChecks ? { },
           # Optional merged `bin/` (full tools via symlinkJoin) copied into the image
           # `tree/bin/` after busybox applets so real binaries override applet names
           # (`lsusb`, `grep`, …). Do not list busybox in `paths` — seeding is below.
@@ -552,6 +553,7 @@ let
             # Avoid shipping large .raw DDIs to/from remote x86 builders when inputs are already local.
             preferLocalBuild = true;
             nativeBuildInputs = [ erofs-utils ];
+            passthru = { inherit cargoChecks; };
           }
           ''
             mkdir -p tree/{etc,dev,proc,sys,tmp,var,var/empty,var/tmp,run/dbus,run/systemd/journal,usr/lib/systemd/system,usr/bin,etc/systemd/system,bin}
@@ -876,6 +878,14 @@ let
               ) crossTargets
             ) allServiceNames
           );
+
+          nativeCargoChecks = lib.foldl' (
+            checks: n:
+            checks
+            // lib.mapAttrs' (checkName: drv: lib.nameValuePair "${n}-${checkName}" drv) (
+              hostPkgs.${n}.passthru.cargoChecks or { }
+            )
+          ) { } allServiceNames;
         in
         lib.optionalAttrs (lib.hasSuffix "-linux" system) {
           default = pkgs.runCommand "app-image-check-default" { } ''
@@ -886,7 +896,8 @@ let
           '';
         }
         // nativeChecks
-        // crossChecks;
+        // crossChecks
+        // nativeCargoChecks;
     in
     assert services != { };
     {
