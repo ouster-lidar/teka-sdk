@@ -128,12 +128,13 @@ let
       ${extraInstall}
     '';
 
-  appWebCopyFiles =
-    webTree:
-    lib.map (f: {
-      path = "usr/lib/jetstream/mission-control/web/${f}";
-      source = "${webTree}/web/${f}";
-    }) (lib.attrNames (builtins.readDir "${webTree}/web"));
+  # Keep web assets out of evaluation so other platforms need no native builder.
+  appWebCopyFiles = webTree: [
+    {
+      path = "usr/lib/jetstream/mission-control/web";
+      source = "${webTree}/web/.";
+    }
+  ];
 
   appStateStub = name: builtins.toFile "${name}-state-stub" "";
 
