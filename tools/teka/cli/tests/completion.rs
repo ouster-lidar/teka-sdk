@@ -148,6 +148,7 @@ fn metadata_follows_the_first_executable_on_path() {
 #[test]
 fn detects_shell_and_preserves_explicit_override() {
     let dir = TempDir::new().unwrap();
+    let home = TempDir::new().unwrap();
     for (shell, marker) in [
         ("bash", "_teka()"),
         ("fish", "complete -c teka -e"),
@@ -162,15 +163,19 @@ fn detects_shell_and_preserves_explicit_override() {
         assert!(output.status.success(), "{output:?}");
         assert!(String::from_utf8_lossy(&output.stdout).contains(marker));
 
-        // Keep the shell alive as the parent, even if it optimizes its last command.
         match Command::new(shell)
-            .args(["-c", "\"$TEKA_TEST_BIN\" completion; true"])
+            .args([
+                "-c",
+                "printf x > \"$HOME/.teka-home-write-test\" && \"$TEKA_TEST_BIN\" completion; exit",
+            ])
             .env("TEKA_TEST_BIN", env!("CARGO_BIN_EXE_teka"))
+            .env("HOME", home.path())
             .env("SHELL", "/bin/unsupported")
             .current_dir(dir.path())
             .output()
         {
             Ok(output) => {
+                assert!(output.status.success(), "{shell}: {output:?}");
                 assert!(output.stderr.is_empty(), "{shell}: {output:?}");
                 assert!(String::from_utf8_lossy(&output.stdout).contains(marker));
             }
