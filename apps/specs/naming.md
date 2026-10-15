@@ -12,6 +12,7 @@ Install the app manifest at host path `usr/lib/jetstream/mission-control/manifes
 |-------|---------|---------|
 | App id / flake attr | `hello-{topic}` | `hello-http` |
 | Source dir | topic | `examples/hello-http/` |
+| App guide | `README.md` | `examples/hello-http/README.md` |
 | Shared web helper (source) | `apps/web/app-api.js` | — |
 | Shared web helper (DDI install) | `usr/lib/jetstream/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
 | App panel JS global | `jetstreamAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |

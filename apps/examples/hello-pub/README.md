@@ -2,7 +2,7 @@
 
 Demo publisher app: owns an in-process event ring buffer and current aggregate state. Peers and browsers publish, query, and subscribe at `/api/v1/app/hello-pub/…`.
 
-Companion consumer: [hello-sub.md](../hello-sub/hello-sub.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Jetstream), not a shared platform bus.
+Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Jetstream), not a shared platform bus.
 
 ## Naming
 

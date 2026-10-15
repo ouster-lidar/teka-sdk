@@ -1,4 +1,4 @@
-//! Mirrored multi-publisher feed store — hello-sub.md.
+//! Mirrored multi-publisher feed store — README.md.
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;

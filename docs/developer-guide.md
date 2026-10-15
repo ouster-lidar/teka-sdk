@@ -81,7 +81,7 @@ Replace `hello-ouster-terminal` with another app id as needed.
 After deploy:
 
 - Open the device app UI or manager for the installed app.
-- Read app-specific behavior and checks in each app's README or `*.md` under `apps/examples/`.
+- Read app-specific behavior and checks in the README in that app's directory under `apps/examples/`.
 - Rerun the same `teka app deploy` command from `apps/` to rebuild and replace an existing install.
 
 ## Troubleshooting

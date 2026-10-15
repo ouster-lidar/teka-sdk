@@ -94,7 +94,7 @@ let
     python3
   ];
 
-  # In-kiosk README (bat in foot). See hello-ouster-terminal.md: # headings (not
+  # In-kiosk README (bat in foot). See README.md: # headings (not
   # underline titles), inline `command` OK, no triple-backtick fences (indent examples),
   # no bold; cross-ref sway.md / viz.md for layout and viz details.
   kioskReadme = writeText "${name}-docs-README.md" ''

@@ -2,24 +2,13 @@
 
 Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBox), and run them alongside other appliance apps.
 
-`hello-ouster-terminal` is the simplest lidar app: a terminal-based Ouster CLI viewer. The remaining examples cover HTTP, GPU, Firefox, pub/sub, web UI, Slidev, LLM, and profiling tools.
+## Start here
 
-| App                     | Description                                          |
-| ----------------------- | ---------------------------------------------------- |
-| `hello-firefox`         | Firefox on Wayland                                   |
-| `hello-firefox-kiosk`   | Firefox kiosk                                        |
-| `hello-http`            | Python HTTP on 8000                                  |
-| `hello-llm`             | LLM guide in Jetstream; chat on host `:8080`         |
-| `hello-ouster-dynamo`   | Optional advanced viewer with FrameSet input and overlays; Ouster Dynamo installs separately |
-| `hello-ouster-terminal` | Terminal lidar viewer (ouster-cli viz)               |
-| `hello-ouster-world`    | Direct SDK OSF / sensor viewer with discovery and recording |
-| `hello-pub`             | Event publisher demo                                 |
-| `hello-sub`             | Event subscriber demo                                |
-| `hello-slidev`          | Slidev presentation demo                             |
-| `hello-wayland-gpu`     | Vulkan / OpenGL GPU demos                            |
-| `hello-webui`           | Static web UI demo                                   |
-| `hello-world`           | Minimal oneshot                                      |
-| `nvidia-devtools`       | Nsight / CUDA profiling and debug tools              |
+- **Recommended demo:** [`hello-ouster-world`](apps/examples/hello-ouster-world/README.md) opens OSF files or a live sensor with the Ouster SDK, and supports browser display and recording.
+- [`hello-world`](apps/examples/hello-world/README.md) is a minimal oneshot smoke test.
+- [`hello-webui`](apps/examples/hello-webui/README.md) is a static web UI with no backend.
+
+Browse [all examples](apps/examples/); each app has its own README.
 
 ## Quick start
 
@@ -41,7 +30,7 @@ teka app build hello-world --arch aarch64
 
 ```bash
 cd jetstream-example-apps/apps
-teka app deploy --build hello-world --host http://<device>/
+teka app deploy --build hello-ouster-world --host http://<device>/
 ```
 
 Full procedures: [Developer Guide](docs/developer-guide.md).

@@ -1,4 +1,4 @@
-//! hello-sub HTTP API — see hello-sub.md.
+//! hello-sub HTTP API — see README.md.
 
 use ::app_runtime::resource_stream::send_snapshot;
 use ::app_runtime::status_stream::serve_summary_broadcast_with_initial;

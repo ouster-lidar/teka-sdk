@@ -1,4 +1,4 @@
-//! hello-pub HTTP API — see hello-pub.md.
+//! hello-pub HTTP API — see README.md.
 
 use std::sync::Arc;
 use std::time::Duration;

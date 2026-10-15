@@ -1,6 +1,6 @@
 # hello-ouster-world
 
-`hello-ouster-world` is the direct Ouster SDK viewer. It opens OSF files or a network sensor with SimpleViz, displays on HDMI and in the browser, and can record live sensor frames to OSF. The separate [`hello-ouster-dynamo`](../hello-ouster-dynamo/hello-ouster-dynamo.md) app keeps the advanced workflow with optional Ouster Dynamo FrameSet input and overlays.
+`hello-ouster-world` is the direct Ouster SDK viewer. It opens OSF files or a network sensor with SimpleViz, displays on HDMI and in the browser, and can record live sensor frames to OSF. The separate [`hello-ouster-dynamo`](../hello-ouster-dynamo/README.md) app keeps the advanced workflow with optional Ouster Dynamo FrameSet input and overlays.
 
 ## Build and deploy
 

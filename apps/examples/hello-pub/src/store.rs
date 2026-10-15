@@ -1,4 +1,4 @@
-//! In-memory event ring buffer and generator control — hello-pub.md.
+//! In-memory event ring buffer and generator control — README.md.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -1,6 +1,6 @@
 # hello-sub
 
-Demo subscriber app: connects to one or more [hello-pub](../hello-pub/hello-pub.md) publishers through Jetstream’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
+Demo subscriber app: connects to one or more [hello-pub](../hello-pub/README.md) publishers through Jetstream’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
 
 Supports **remote** publishers by pointing at other hosts’ Jetstream feature URLs (`/api/v1/app/hello-pub`). This demo does **not** perform remote Jetstream password login; use open-mode / unauthenticated peers for now (password auth may return later).
 
