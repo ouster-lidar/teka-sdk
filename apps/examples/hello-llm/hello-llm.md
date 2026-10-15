@@ -5,8 +5,8 @@ default model **`nemotron-3-nano:4b`** pulled on first boot into persistent stat
 
 | Platform | Open WebUI |
 |----------|------------|
-| **aarch64** | `ghcr.io/open-webui/open-webui` rootfs (`nix/open-webui-docker.nix`, `arm64`) |
-| **x86_64** | Same container rootfs (`nix/open-webui-docker.nix`, `amd64`) |
+| **aarch64** | `ghcr.io/open-webui/open-webui` rootfs (`open-webui-docker.nix`, `arm64`) |
+| **x86_64** | Same container rootfs (`open-webui-docker.nix`, `amd64`) |
 
 Image tag and digests live in the Nix expressions, not here. nixpkgs `open-webui` is
 avoided on all platforms (pulls torch; aarch64 also lacks rapidocr-onnxruntime).
@@ -42,7 +42,7 @@ Configured in `hello-llm/default.nix`. Option reference:
 
 | Platform | Ollama | GPU |
 |----------|--------|-----|
-| **aarch64** | Upstream prebuilt (`nix/ollama-aarch64-prebuilt.nix`) | JetPack 6 `cuda_jetpack6` only |
+| **aarch64** | Upstream prebuilt (`ollama-aarch64-prebuilt.nix`) | JetPack 6 `cuda_jetpack6` only |
 | **x86_64** | `pkgs.ollama` | CPU (dev smoke) |
 
 ## DDI size

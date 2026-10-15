@@ -1,4 +1,4 @@
-# Shared Ouster app constants and viz restart loop (Wayland kiosks).
+# Ouster terminal constants and viz restart loop.
 {
   lib,
   writeShellScript,

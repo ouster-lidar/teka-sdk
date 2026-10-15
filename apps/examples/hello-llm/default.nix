@@ -27,10 +27,10 @@ let
 
   # aarch64: upstream prebuilt (nixpkgs ollama does not cross from x86_64).
   ollamaBackend =
-    if isAarch64 then pkgs.callPackage ../../nix/ollama-aarch64-prebuilt.nix { } else pkgs.ollama;
+    if isAarch64 then pkgs.callPackage ./ollama-aarch64-prebuilt.nix { } else pkgs.ollama;
 
   # Container rootfs on all platforms (nixpkgs open-webui pulls torch and is slow to build).
-  openWebUi = pkgs.callPackage ../../nix/open-webui-docker.nix {
+  openWebUi = pkgs.callPackage ./open-webui-docker.nix {
     unpackGnutar = pkgs.buildPackages.gnutar;
     unpackJq = pkgs.buildPackages.jq;
     hostPatchelf = pkgs.buildPackages.patchelf;

@@ -41,4 +41,4 @@ The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that she
 ## Verify
 
 Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk.
-Override these ports and the lease range through `callOusterCommon`.
+Override these ports and the lease range in the local `ouster-app-common.nix` import.

@@ -355,7 +355,7 @@ let
     }
     {
       path = "usr/lib/${name}/osf_socket.py";
-      source = ../../nix/osf-socket/osf_socket.py;
+      source = ./osf-socket/osf_socket.py;
     }
     {
       path = "usr/lib/${name}/dynamo-utils/detect_utils.py";

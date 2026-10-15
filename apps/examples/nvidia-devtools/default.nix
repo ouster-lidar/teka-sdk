@@ -17,7 +17,7 @@ let
   devLibDir = "/usr/lib/nvidia-devtools";
   sshPort = 2223;
 
-  nvidiaDevtools = pkgs.callPackage ../../nix/nvidia-devtools.nix { };
+  nvidiaDevtools = pkgs.callPackage ./nvidia-devtools.nix { };
 
   jp = ps.hostUnitDefaults {
     environmentFileWlroots = false;

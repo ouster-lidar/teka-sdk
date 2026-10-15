@@ -32,7 +32,9 @@ let
 
   appRuntime = pkgs.callPackage ../../nix/app-runtime.nix { };
 
-  ousterCommon = ps.callOusterCommon {
+  ousterCommon = import ./ouster-app-common.nix {
+    inherit lib writeShellScript;
+    pickOusterSensorPy = ./pick_ouster_sensor.py;
     logTag = name;
     useCustomPorts = true;
   };

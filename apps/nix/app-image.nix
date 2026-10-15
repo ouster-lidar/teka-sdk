@@ -28,16 +28,6 @@ let
         else
           null;
 
-      callOusterCommon =
-        args:
-        import ./ouster-app-common.nix (
-          {
-            inherit lib writeShellScript;
-            pickOusterSensorPy = ./pick_ouster_sensor.py;
-          }
-          // args
-        );
-
       mkFirefoxBin = import ./firefox-bin-app.nix;
 
       firefoxAppPrefs = writeText "jetstream-portable-firefox-user.js" ''
@@ -449,7 +439,6 @@ let
           inherit
             hostGpuChecks
             ousterSdk
-            callOusterCommon
             hostUnitDefaults
             dbusSessionConf
             etcHostsStub

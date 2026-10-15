@@ -8,9 +8,9 @@ HDMI GPU apps use Sway and host `/run/opengl-driver` (`X-Jetstream-PortableGPU`)
 - Source build against **nixpkgs** cmake, nanobind, and GLFW
 - Flake input: public `github:ouster-lidar/ouster-sdk` v1.0.1
 - `hello-ouster-world` imports `open_source` directly for sensor and OSF sources.
-- `hello-ouster-dynamo` uses `apps/nix/osf-socket/osf_socket.py` for peer FrameSet sockets; public SDK 1.0.1 has no `IoType.OSF_SOCKET`.
+- `hello-ouster-dynamo` uses `apps/examples/hello-ouster-dynamo/osf-socket/osf_socket.py` for peer FrameSet sockets; public SDK 1.0.1 has no `IoType.OSF_SOCKET`.
 - Python from the one nixpkgs pin
-- `GLFW_PLATFORM=wayland` via `ouster-app-common.nix` (`wayland = true`)
+- `hello-ouster-terminal` sets `GLFW_PLATFORM=wayland` through its local `ouster-app-common.nix` (`wayland = true`).
 - `hello-ouster-terminal` uses `ouster-cli source … viz`.
 
 ## nixpkgs first

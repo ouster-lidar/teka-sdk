@@ -2,6 +2,12 @@
 
 Stable `lib` and `packages` outputs from `apps/flake.nix` for downstream flake consumers.
 
+## Ownership
+
+Keep app-specific build expressions and runtime helpers inside their example.
+Shared implementations under `apps/nix/` need multiple actual consumers or a documented public-library purpose; a central import alone does not establish sharing.
+Group shared browser, SDK, overlay, and Wayland support by domain.
+
 ## `lib` API
 
 | Export | Role |
