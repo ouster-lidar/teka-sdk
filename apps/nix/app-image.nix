@@ -6,7 +6,7 @@ let
       version,
       advisoryDb ? null,
       ousterSdkSrc ? null,
-      ousterSdkNix ? ./ouster-sdk.nix,
+      ousterSdkNix ? ./ouster/ouster-sdk.nix,
       exampleAppsPkgs ? null,
     }:
     let
@@ -18,7 +18,7 @@ let
         writeShellScript
         ;
 
-      hostGpuChecks = pkgs.callPackage ./host-gpu-checks.nix { };
+      hostGpuChecks = pkgs.callPackage ./wayland/host-gpu-checks.nix { };
 
       ousterSdk =
         if ousterSdkSrc != null then
@@ -28,7 +28,7 @@ let
         else
           null;
 
-      mkFirefoxBin = import ./firefox-bin-app.nix;
+      mkFirefoxBin = import ./firefox/firefox-bin-app.nix;
 
       firefoxAppPrefs = writeText "jetstream-portable-firefox-user.js" ''
         user_pref("network.trr.mode", 0);
@@ -163,7 +163,7 @@ let
           bash,
         }:
         let
-          tpl = builtins.readFile ./snippets/wlroots-sway-env.sh;
+          tpl = builtins.readFile ./wayland/wlroots-sway-env.sh;
         in
         lib.replaceStrings
           [
@@ -388,7 +388,7 @@ let
 
       # Jetstream appliance conveniences for app unit snippets: optional
       # `EnvironmentFile=/etc/jetstream/wlroots.env` and fail-fast host GPU path
-      # checks (see `nix/host-gpu-checks.nix`). GPU checks are opt-in.
+      # checks (see `nix/wayland/host-gpu-checks.nix`). GPU checks are opt-in.
       hostUnitDefaults =
         {
           environmentFileWlroots ? true,
@@ -616,7 +616,7 @@ let
       version,
       advisoryDb ? null,
       ousterSdkSrc ? null,
-      ousterSdkNix ? ./ouster-sdk.nix,
+      ousterSdkNix ? ./ouster/ouster-sdk.nix,
       exampleAppsPkgsFor ? null,
       # hello-world/hello-http cross builds use a plain nixpkgs import; the rest
       # need heavyCrossOverlay (PipeWire, onnxruntime, openblas quirks).
@@ -632,7 +632,7 @@ let
       inherit (nixpkgs) lib;
       inherit (version) appArtifactRawName imageVersion buildId;
 
-      waylandCompositorsOverlay = import ./wayland-compositors-overlay.nix;
+      waylandCompositorsOverlay = import ./overlays/wayland-compositors-overlay.nix;
       appPkgsFor = system: nixpkgs.legacyPackages.${system}.extend waylandCompositorsOverlay;
 
       allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
@@ -657,12 +657,12 @@ let
         if cpu == null then null else "${cpu}-linux";
 
       # Cross builds: PipeWire + ModemManager cross quirk — see
-      # nix/pipewire-cross-no-modemmanager-overlay.nix (shared with any separate
+      # nix/overlays/pipewire-cross-no-modemmanager-overlay.nix (shared with any separate
       # nixpkgs import that must match this flake’s cross package set).
       heavyCrossOverlay =
         final: prev:
-        (import ./pipewire-cross-no-modemmanager-overlay.nix) final prev
-        // (import ./wayland-compositors-overlay.nix) final prev
+        (import ./overlays/pipewire-cross-no-modemmanager-overlay.nix) final prev
+        // (import ./overlays/wayland-compositors-overlay.nix) final prev
         // {
           onnxruntime = prev.onnxruntime.overrideAttrs (old: {
             cmakeFlags =

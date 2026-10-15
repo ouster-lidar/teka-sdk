@@ -4,7 +4,7 @@ HDMI GPU apps use Sway and host `/run/opengl-driver` (`X-Jetstream-PortableGPU`)
 
 ## Viz: follow hello-ouster-terminal
 
-- `ouster-sdk = ps.ousterSdk` → `apps/nix/ouster-sdk.nix`
+- `ouster-sdk = ps.ousterSdk` → `apps/nix/ouster/ouster-sdk.nix`
 - Source build against **nixpkgs** cmake, nanobind, and GLFW
 - Flake input: public `github:ouster-lidar/ouster-sdk` v1.0.1
 - `hello-ouster-world` imports `open_source` directly for sensor and OSF sources.

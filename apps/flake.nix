@@ -10,7 +10,7 @@
       flake = false;
     };
     # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
-    # apps/nix/ouster-sdk.nix against nixpkgs GLFW.
+    # apps/nix/ouster/ouster-sdk.nix against nixpkgs GLFW.
     ouster-sdk = {
       url = "github:ouster-lidar/ouster-sdk/v1.0.1";
       flake = false;

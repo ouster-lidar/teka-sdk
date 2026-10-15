@@ -71,7 +71,7 @@ let
     firefox-bin
   ];
 
-  innerRun = replaceVars ./snippets/firefox-wayland-run.sh.in {
+  innerRun = replaceVars ./firefox-wayland-run.sh.in {
     bash = "${bash}";
     wlrootsAppWaylandEnv = ps.wlrootsSwayEnvShSubst {
       bash = "${bash}";

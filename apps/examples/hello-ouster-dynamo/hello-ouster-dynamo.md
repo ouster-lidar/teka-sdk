@@ -62,7 +62,7 @@ Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and 
 
 ## Ouster SDK
 
-Uses `apps/nix/ouster-sdk.nix` (`ps.ousterSdk`) to build Ouster SDK from source (cross compiling if necessary) for Python 3.12.  This app utilizes the SDK to view and interact with LiDAR point clouds and object visualization using SimpleViz.
+Uses `apps/nix/ouster/ouster-sdk.nix` (`ps.ousterSdk`) to build Ouster SDK from source (cross compiling if necessary) for Python 3.12.  This app utilizes the SDK to view and interact with LiDAR point clouds and object visualization using SimpleViz.
 
 Runtime: `GLFW_PLATFORM=wayland`, Sway built without Xwayland. SimpleViz is a native Wayland GLFW client.
 

@@ -158,4 +158,4 @@ flowchart LR
     VIZ -->|optional recording| REC[/srv/recordings]
 ```
 
-The app builds against the public Ouster SDK pinned in `apps/nix/ouster-sdk.nix`. It uses SDK `open_source` directly for sensor and OSF input.
+The app builds against the public Ouster SDK pinned in `apps/nix/ouster/ouster-sdk.nix`. It uses SDK `open_source` directly for sensor and OSF input.

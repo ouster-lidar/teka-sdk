@@ -16,7 +16,7 @@ args@{
   dejavu_fonts,
 }:
 
-import ../../nix/firefox-wayland-app.nix (
+import ../../nix/firefox/firefox-wayland-app.nix (
   (lib.removeAttrs args [ "sway" ])
   // {
     inherit
