@@ -10,8 +10,8 @@
   ousterSdkSrc ? null,
   ousterSdkNix ? ./ouster/ouster-sdk.nix,
   exampleAppsPkgsFor ? null,
-  # hello-world/hello-http cross builds use a plain nixpkgs import; the rest
-  # need heavyCrossOverlay (PipeWire, onnxruntime, openblas quirks).
+  # Services outside this list also receive the PipeWire, onnxruntime,
+  # and openblas cross-build workarounds.
   simpleCrossServices ? [
     "hello-world"
     "hello-http"
@@ -91,7 +91,7 @@ let
         system = target;
       };
       config.allowUnfree = true;
-      overlays = [ heavyCrossOverlay ];
+      overlays = appOverlays ++ [ heavyCrossOverlay ];
     };
 
   perHostPackages =

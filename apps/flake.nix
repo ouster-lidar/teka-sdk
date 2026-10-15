@@ -136,6 +136,14 @@
         appOutputs.checks.${system}
         // nixpkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           app-runtime = runtime;
+          flake-output-overlays = pkgs.callPackage ./nix/tests/flake-output-overlays.nix {
+            inherit
+              appLib
+              crane
+              nixpkgs
+              version
+              ;
+          };
           hello-llm-runtime = pkgs.runCommand "hello-llm-runtime-check" { } ''
             APP_RUNTIME_PROCESS=${runtime}/bin/app-runtime-process \
               ${pkgs.python3}/bin/python3 ${./.}/examples/hello-llm/tests/runtime.py
