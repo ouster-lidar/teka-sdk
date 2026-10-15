@@ -28,6 +28,7 @@ pub struct UpdateOptions {
     /// URL of the Teka device
     #[arg(short = 'H', long, env = "TEKA_HOST", value_name = "URL")]
     pub host: String,
+    /// System update image
     #[arg(value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     pub file: PathBuf,
     /// Apply without rebooting the device

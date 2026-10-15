@@ -10,6 +10,7 @@ use std::{
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildSource {
+    /// Apps flake directory (default: apps/ at checkout root)
     #[arg(long, env = "TEKA_APPS_FLAKE_ROOT", value_hint = clap::ValueHint::DirPath)]
     pub flake: Option<PathBuf>,
 }
@@ -19,6 +20,7 @@ pub const RESULT: &str = "result";
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildOptions {
+    /// App IDs to build
     #[arg(value_name = "APP", required = true)]
     pub apps: Vec<String>,
     /// Architecture to build for

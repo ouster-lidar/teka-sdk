@@ -20,11 +20,13 @@ pub struct DeployOptions {
     /// URL of the Teka device
     #[arg(short = 'H', long, env = "TEKA_HOST", value_name = "URL")]
     pub host: String,
+    /// App IDs to deploy from ./result
     #[arg(value_name = "APP")]
     pub apps: Vec<String>,
     /// Build the named apps for the device before deploying
     #[arg(long, value_name = "APP", num_args = 1..)]
     pub build: Vec<String>,
+    /// App installation profile
     #[arg(long, default_value = "trusted")]
     pub profile: String,
     /// Remove existing apps before install instead of replacing in place

@@ -12,11 +12,7 @@ use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::ffi::OsString;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "teka",
-    version,
-    about = "Build artifacts and deploy to Teka devices"
-)]
+#[command(name = "teka", version, about = "Tools for Teka systems and apps")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -24,7 +20,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Generate shell completion code
+    /// Generate shell completions
     #[command(after_help = r#"Load once per shell:
   Bash: eval "$(teka completion bash)"
   Fish: teka completion fish | source
@@ -32,15 +28,16 @@ pub enum Command {
 
 Reload after updating Teka or plugins."#)]
     Completion {
+        /// Shell to generate completions for (auto-detected if omitted)
         #[arg(value_enum)]
         shell: Option<completion::Shell>,
     },
-    /// Build and deploy app images
+    /// Build, list, and deploy apps
     App {
         #[command(subcommand)]
         command: AppCommand,
     },
-    /// Device system image status and updates
+    /// Inspect and update Teka systems
     System {
         #[command(subcommand)]
         command: system::SystemCommand,
@@ -51,11 +48,14 @@ Reload after updating Teka or plugins."#)]
 
 #[derive(Debug, Subcommand)]
 pub enum AppCommand {
-    /// Build app artifacts locally
+    /// Build app images
     Build(build::BuildOptions),
     /// List available apps
     List(build::BuildSource),
     /// Deploy apps to a device
+    #[command(
+        after_help = "Examples:\n  teka app deploy --host http://device.local my-app\n  teka app deploy --host http://device.local --build my-app"
+    )]
     Deploy(deploy::DeployOptions),
 }
 
