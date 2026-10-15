@@ -10,11 +10,11 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
-use inotify::{EventMask, Inotify, WatchMask};
+use futures_util::StreamExt;
+use inotify::{EventMask, Inotify, WatchMask, Watches};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::fs::File;
-use tokio::io::unix::AsyncFd;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::display;
@@ -316,11 +316,11 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
     let mut pos = file.metadata().await?.len();
     file.seek(SeekFrom::Start(pos)).await?;
 
-    let mut inotify = Inotify::init()?;
-    watch_console_log(&mut inotify, &log_pathbuf)?;
-    let mut afd = AsyncFd::new(inotify)?;
+    let inotify = Inotify::init()?;
+    let mut watches = inotify.watches();
+    watch_console_log(&mut watches, &log_pathbuf)?;
+    let mut events = inotify.into_event_stream(vec![0u8; 4096])?;
     let mut buf = vec![0u8; 8192];
-    let mut evbuf = [0u8; 4096];
 
     loop {
         tokio::select! {
@@ -358,28 +358,20 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
                     Some(Err(_)) => break,
                 }
             }
-            ready = afd.readable() => {
-                let mut guard = ready?;
-                guard.clear_ready();
-                drop(guard);
-                let events = match afd.get_mut().read_events(&mut evbuf) {
-                    Ok(it) => it.collect::<Vec<_>>(),
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
-                    Err(e) => return Err(e.into()),
+            event = events.next() => {
+                let event = match event {
+                    Some(Ok(event)) => event,
+                    Some(Err(error)) => return Err(error.into()),
+                    None => return Ok(()),
                 };
-                let mut recreate = false;
-                for ev in &events {
-                    if ev.mask.intersects(
-                        EventMask::DELETE_SELF | EventMask::MOVE_SELF | EventMask::IGNORED,
-                    ) || (ev.mask.intersects(EventMask::CREATE | EventMask::MOVED_TO)
-                        && ev.name.as_deref() == Some(log_name.as_os_str()))
-                    {
-                        recreate = true;
-                    }
-                }
+                let recreate = event.mask.intersects(
+                    EventMask::DELETE_SELF | EventMask::MOVE_SELF | EventMask::IGNORED,
+                ) || (event.mask.intersects(EventMask::CREATE | EventMask::MOVED_TO)
+                    && event.name.as_deref() == Some(log_name.as_os_str()));
                 if recreate {
                     ensure_console_log(&log_path);
-                    let _ = watch_console_log(afd.get_mut(), &log_pathbuf);
+                    let mut watches = events.watches();
+                    let _ = watch_console_log(&mut watches, &log_pathbuf);
                     file = File::open(&log_path).await?;
                     pos = 0;
                     file.seek(SeekFrom::Start(0)).await?;
@@ -393,15 +385,13 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
     Ok(())
 }
 
-fn watch_console_log(inotify: &mut Inotify, log_path: &Path) -> std::io::Result<()> {
-    inotify.watches().add(
+fn watch_console_log(watches: &mut Watches, log_path: &Path) -> std::io::Result<()> {
+    watches.add(
         log_path,
         WatchMask::MODIFY | WatchMask::ATTRIB | WatchMask::DELETE_SELF | WatchMask::MOVE_SELF,
     )?;
     if let Some(parent) = log_path.parent() {
-        inotify
-            .watches()
-            .add(parent, WatchMask::CREATE | WatchMask::MOVED_TO)?;
+        watches.add(parent, WatchMask::CREATE | WatchMask::MOVED_TO)?;
     }
     Ok(())
 }
