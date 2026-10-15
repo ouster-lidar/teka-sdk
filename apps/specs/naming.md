@@ -18,6 +18,10 @@ Install the app manifest at host path `usr/lib/jetstream/mission-control/manifes
 
 The Ouster viewers use distinct IDs and roles: `hello-ouster-world` is the direct SDK viewer, and `hello-ouster-dynamo` preserves the advanced FrameSet and tracked-object workflow. See [hello-ouster-viewers.md](hello-ouster-viewers.md).
 
+## Example discovery
+
+Each directory under `examples/` with a `default.nix` is discovered as an app. Cargo lockfile updates find projects from `Cargo.toml`, and app-specific image checks from `tests/image-check.nix`. `simpleCrossServices` in `apps/flake.nix` names the few apps that do not need the heavier cross-build workarounds.
+
 ## Distributable artifact vs install identity
 
 Two filename layers — do not conflate them.

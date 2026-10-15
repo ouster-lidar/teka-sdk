@@ -43,6 +43,14 @@ exampleAppsPkgsFor = _: {
 
 Those are source paths, not `packages.${system}` derivations. App `default.nix` uses `ps.appCrate` (wired inside `mkApp`).
 
+## App-specific image checks
+
+`flakeOutputs` accepts `imageChecks`, an attrset keyed by service ID.
+Each value is a function receiving `{ pkgs, imageVersion }` and returning a shell snippet added to that service's native and cross image checks.
+The snippet can inspect the image at `$raw`; generic filesystem, unit, and `os-release` validation remains shared.
+
+`flakeOutputs` accepts `simpleCrossServices` for apps that do not need the additional cross-build workarounds; it defaults to an empty list. The app flake keeps this small exception list explicit.
+
 ## Host contract
 
 Install app manifests and web assets at host paths under `usr/lib/jetstream/mission-control/…`. Unit files reference `mission-control.service`; portable host checks use `jetstream-portable-check-*` and `ID_LIKE=jetstream-portable` in `os-release`. See jetstream-os for portable-service mechanics.

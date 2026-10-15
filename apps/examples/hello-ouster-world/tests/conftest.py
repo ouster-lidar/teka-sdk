@@ -68,7 +68,7 @@ def app(browser, pytestconfig):
                         p
                         for parent in (Path.cwd(), *Path.cwd().parents)
                         for p in (parent / "apps", parent)
-                        if (p / "examples/flake-services.nix").is_file()
+                        if (p / "examples/default.nix").is_file()
                     ),
                     None,
                 )

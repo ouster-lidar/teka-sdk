@@ -69,8 +69,16 @@
         legacyPackages = nixpkgs.lib.genAttrs systems nixpkgsFor;
       };
 
-      exampleServices = import ./examples/flake-services.nix;
-      services = exampleServices;
+      exampleApps = import ./examples { lib = nixpkgs.lib; };
+      inherit (exampleApps) services imageChecks cargoDirs;
+
+      # These examples can cross-build without the heavier package workarounds.
+      simpleCrossServices = [
+        "hello-world"
+        "hello-http"
+        "hello-llm"
+        "nvidia-devtools"
+      ];
 
       appLib = import ./nix/app-lib.nix;
 
@@ -97,20 +105,13 @@
           systems
           services
           appOverlays
+          simpleCrossServices
+          imageChecks
           version
           ;
         advisoryDb = rustsecAdvisoryDb;
         ousterSdkSrc = ouster-sdk;
       };
-
-      cargoDirs = [
-        "examples/hello-pub"
-        "examples/hello-sub"
-        "examples/hello-slidev"
-        "examples/hello-ouster-world"
-        "examples/hello-ouster-dynamo"
-        "examples/nvidia-devtools"
-      ];
     in
     let
       infraPackages = nixpkgs.lib.mapAttrs (
