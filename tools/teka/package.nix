@@ -2,6 +2,7 @@
   lib,
   stdenv,
   craneLib,
+  advisoryDb ? null,
   installShellFiles,
   bash,
   fish,
@@ -18,6 +19,24 @@ let
     doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
   };
   cargoArtifacts = craneLib.buildDepsOnly common;
+  cargoChecks = {
+    clippy = craneLib.cargoClippy (
+      common
+      // {
+        inherit cargoArtifacts;
+        cargoClippyExtraArgs = "--all-targets -- -D warnings";
+      }
+    );
+    fmt = craneLib.cargoFmt (builtins.removeAttrs common [ "cargoExtraArgs" ]);
+  }
+  // lib.optionalAttrs (advisoryDb != null) {
+    audit = craneLib.cargoAudit {
+      src = common.src;
+      advisory-db = advisoryDb;
+      pname = common.pname;
+      version = common.version;
+    };
+  };
 in
 craneLib.buildPackage (
   common
@@ -36,13 +55,8 @@ craneLib.buildPackage (
       installShellCompletion teka.{bash,fish,zsh}
     '';
     passthru = {
-      clippy = craneLib.cargoClippy (
-        common
-        // {
-          inherit cargoArtifacts;
-          cargoClippyExtraArgs = "--all-targets -- -D warnings";
-        }
-      );
+      inherit cargoChecks;
+      clippy = cargoChecks.clippy;
     };
     meta = {
       description = "Composite CLI for Teka devices";

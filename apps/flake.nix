@@ -23,6 +23,7 @@
       url = "path:../tools/teka";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.crane.follows = "crane";
+      inputs.rustsecAdvisoryDb.follows = "rustsecAdvisoryDb";
     };
   };
 

@@ -7,6 +7,11 @@
     url = "path:./tools/teka";
     inputs.nixpkgs.follows = "nixpkgs";
     inputs.crane.follows = "crane";
+    inputs.rustsecAdvisoryDb.follows = "rustsecAdvisoryDb";
+  };
+  inputs.rustsecAdvisoryDb = {
+    url = "github:RustSec/advisory-db";
+    flake = false;
   };
 
   outputs =
@@ -20,7 +25,7 @@
         inherit (packages) teka;
         default = packages.teka;
       }) teka.packages;
-      inherit (teka) apps overlays;
+      inherit (teka) apps overlays checks;
       devShells = nixpkgs.lib.genAttrs (builtins.attrNames teka.packages) (
         system:
         let

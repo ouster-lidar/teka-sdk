@@ -2,11 +2,16 @@
   description = "Composite teka CLI";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   inputs.crane.url = "github:ipetkov/crane/master";
+  inputs.rustsecAdvisoryDb = {
+    url = "github:RustSec/advisory-db";
+    flake = false;
+  };
   outputs =
     {
       self,
       nixpkgs,
       crane,
+      rustsecAdvisoryDb,
     }:
     let
       systems = [
@@ -15,7 +20,12 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      mkTeka = pkgs: pkgs.callPackage ./package.nix { craneLib = crane.mkLib pkgs; };
+      mkTeka =
+        pkgs:
+        pkgs.callPackage ./package.nix {
+          craneLib = crane.mkLib pkgs;
+          advisoryDb = rustsecAdvisoryDb;
+        };
     in
     {
       packages = forAllSystems (
@@ -40,10 +50,16 @@
       overlays.default = final: _: {
         teka = self.packages.${final.stdenv.hostPlatform.system}.teka;
       };
-      checks = forAllSystems (system: {
-        inherit (self.packages.${system}) teka;
-        clippy = self.packages.${system}.teka.clippy;
-      });
+      checks = forAllSystems (
+        system:
+        let
+          teka = self.packages.${system}.teka;
+        in
+        {
+          inherit teka;
+          inherit (teka.cargoChecks) clippy fmt audit;
+        }
+      );
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = with nixpkgs.legacyPackages.${system}; [
