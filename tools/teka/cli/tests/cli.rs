@@ -541,12 +541,61 @@ exit 0"#,
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
     assert!(!fs::read_to_string(&log).unwrap().contains("ran-system"));
-    let out = cli(d.path()).args(["--help"]).output().unwrap();
+    let out = cli(d.path())
+        .env("PATH", d.path().join("bin"))
+        .args(["--help"])
+        .output()
+        .unwrap();
     assert_eq!(out.status.code(), Some(0));
     let help = String::from_utf8_lossy(&out.stdout);
-    assert!(help.contains("on PATH):\n  foo\n"));
+    assert!(help.contains("Plugins:\n  foo  External plugin\n"));
     let out = cli(d.path()).args(["nope"]).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn plugin_help_uses_metadata_and_command_styles_without_running_plugins() {
+    let d = TempDir::new().unwrap();
+    let bin = d.path().join("bin");
+    fs::create_dir(&bin).unwrap();
+    plugin_bin(d.path(), "osdev", "echo ran > plugin-ran");
+    plugin_bin(d.path(), "plain", "echo ran > plugin-ran");
+    fs::write(
+        bin.join("teka-osdev.completion.json"),
+        r#"{"version":1,"about":"Build and test OS images"}"#,
+    )
+    .unwrap();
+    fs::write(bin.join("teka-plain.completion.json"), "invalid").unwrap();
+    for color in [false, true] {
+        let mut command = cli(d.path());
+        command
+            .env("PATH", &bin)
+            .env_remove("NO_COLOR")
+            .env_remove("CLICOLOR_FORCE")
+            .env("TERM", "xterm")
+            .arg("--help");
+        if color {
+            command.env("CLICOLOR_FORCE", "1");
+        } else {
+            command.env("NO_COLOR", "1");
+        }
+        let out = command.output().unwrap();
+        success(&out);
+        let help = String::from_utf8(out.stdout).unwrap();
+        if color {
+            assert!(help.contains("\x1b[1m\x1b[4mPlugins:\x1b[0m"));
+            assert!(help.contains("\x1b[1mosdev\x1b[0m"));
+        } else {
+            assert!(
+                help.contains(
+                    "Plugins:\n  osdev  Build and test OS images\n  plain  External plugin\n"
+                ),
+                "{help:?}"
+            );
+            assert!(!help.contains('\x1b'));
+        }
+    }
+    assert!(!d.path().join("plugin-ran").exists());
 }
 
 fn system_cli(dir: &Path) -> Command {
@@ -568,7 +617,9 @@ fn plugins_in_empty_path_entries_are_listed_and_dispatched() {
             .output()
             .unwrap();
         success(&out);
-        assert!(String::from_utf8_lossy(&out.stdout).contains("on PATH):\n  local\n"));
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains("Plugins:\n  local  External plugin\n")
+        );
         let out = cli(d.path())
             .env("PATH", path)
             .arg("local")

@@ -109,14 +109,23 @@ pub fn find_plugin(name: &str) -> Option<PathBuf> {
 }
 
 pub fn augment_help(cmd: &mut clap::Command) {
-    let plugins = discover_plugins();
+    let plugins = discover_plugin_paths();
     if plugins.is_empty() {
         return;
     }
-    let list = plugins.join(", ");
-    *cmd = cmd
-        .clone()
-        .after_help(format!("\nPlugins (teka-<name> on PATH):\n  {list}\n"));
+    let mut help = clap::Command::new("teka")
+        .styles(cmd.get_styles().clone())
+        .disable_help_flag(true)
+        .disable_help_subcommand(true)
+        .subcommand_help_heading("Plugins")
+        .help_template("{all-args}");
+    for (name, path) in plugins {
+        let about = crate::completion::metadata_command(&name, &path)
+            .and_then(|command| command.get_about().cloned())
+            .unwrap_or_else(|| "External plugin".into());
+        help = help.subcommand(clap::Command::new(name).about(about));
+    }
+    *cmd = cmd.clone().after_help(help.render_help());
 }
 
 pub fn run_external(args: Vec<std::ffi::OsString>) -> Result<()> {

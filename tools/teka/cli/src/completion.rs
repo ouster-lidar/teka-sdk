@@ -122,7 +122,7 @@ fn token(value: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
 }
 
-fn metadata_command(name: &str, path: &Path) -> Option<Command> {
+pub(crate) fn metadata_command(name: &str, path: &Path) -> Option<Command> {
     let path = path.with_file_name(format!("teka-{name}.completion.json"));
     if !path.metadata().ok()?.is_file() {
         return None;

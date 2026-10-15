@@ -101,6 +101,8 @@ A plugin can supply a `teka-<name>.completion.json` file beside its executable o
 }
 ```
 
+The optional `about` field also supplies its description in `teka --help`; plugins without a description show “External plugin.”
+
 Options require `long`, `short`, or both, without leading dashes. Without `value`, an option is a boolean flag; `value` makes it take one argument. A value may provide nonempty `choices`, a `file` or `directory` hint, or neither. Set `value.optional` to `true` for an optional argument. Choices and hints cannot be combined. `options` defaults to an empty list; `about` and option `help` are optional. Positional metadata is not supported.
 
 Nested commands use `subcommands`, an optional list of objects with `name`, optional `about`, `options`, and further `subcommands`. Child names follow the plugin-name restrictions and must be unique within their parent; `help` is reserved. For example, `"subcommands": [{"name": "build", "options": [{"long": "verbose"}]}]` adds completion for `teka <plugin> build --verbose`.
