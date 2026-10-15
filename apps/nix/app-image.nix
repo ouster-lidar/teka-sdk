@@ -853,10 +853,11 @@ let
       perSystemChecks =
         system:
         let
+          isLinux = lib.hasSuffix "-linux" system;
           pkgs = appPkgsFor system;
-          hostPkgs = perHostPackages system;
+          # Match Teka: macOS delegates app builds to Linux builders.
+          hostPkgs = perHostPackages (if isLinux then system else artifactSystem);
           crossTargets = lib.filter (t: t != system) linuxSystems;
-          # Non-Linux hosts expose Linux cross builds via crossAliases; name artifacts for that target.
           artifactSystem = defaultLinuxTarget system;
 
           nativeChecks = lib.genAttrs allServiceNames (
@@ -873,10 +874,11 @@ let
                 target:
                 let
                   attr = "${n}-cross-${target}";
+                  drv = if isLinux then hostPkgs.${attr} else (perHostPackages target).${n};
                 in
                 {
                   name = attr;
-                  value = mkRawCheck pkgs "app-image-check-${attr}" n hostPkgs.${attr} (
+                  value = mkRawCheck pkgs "app-image-check-${attr}" n drv (
                     appArtifactRawName n target
                   );
                 }
@@ -892,7 +894,7 @@ let
             )
           ) { } allServiceNames;
         in
-        lib.optionalAttrs (lib.hasSuffix "-linux" system) {
+        lib.optionalAttrs isLinux {
           default = pkgs.runCommand "app-image-check-default" { } ''
             ${lib.concatMapStringsSep "\n" (n: ''
               test -f "${hostPkgs.${n}}/${appArtifactRawName n system}"
