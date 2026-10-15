@@ -6,6 +6,8 @@ args@{
   bash,
   replaceVars,
   writeText,
+  runCommand,
+  writeShellScript,
   dbus,
   pkgsStatic,
   vulkan-loader,

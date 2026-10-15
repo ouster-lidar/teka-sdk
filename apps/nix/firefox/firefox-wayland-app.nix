@@ -7,6 +7,8 @@
   bash,
   replaceVars,
   writeText,
+  runCommand,
+  writeShellScript,
   dbus,
   pkgsStatic,
   vulkan-loader,
@@ -25,7 +27,12 @@
 }:
 
 let
-  inherit (ps.mkFirefoxBin { inherit lib stdenv path; }) firefox-bin;
+  inherit (import ./firefox-bin-app.nix { inherit lib stdenv path; }) firefox-bin;
+
+  mkFirefoxClientLoop = import ./client-loop.nix {
+    inherit writeText runCommand writeShellScript;
+    inherit (ps) caBundlePath;
+  };
 
   jp = ps.hostUnitDefaults {
     hostGpuChecksCfg = {
@@ -45,7 +52,7 @@ let
     stdenv.cc.cc.lib
   ];
 
-  firefoxLoop = ps.mkFirefoxClientLoop {
+  firefoxLoop = mkFirefoxClientLoop {
     inherit nssTools p11-kit firefox-bin;
     name = "${name}-client-loop";
     firefoxCliTail =
