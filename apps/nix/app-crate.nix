@@ -3,6 +3,7 @@
   pkgs,
   lib,
   runCommand,
+  craneLib,
   appApiJs ? ../web/app-api.js,
   appRuntimeSrc ? ../lib/app-runtime,
 }:
@@ -17,91 +18,51 @@ let
         name = "app-api.js";
       };
 
-  appOpensslNative = with pkgs; [
-    pkg-config
-    openssl
-  ];
-
-  appRuntimeSrcFilter =
-    if lib.isDerivation appRuntimeSrc then appRuntimeSrc else lib.cleanSource appRuntimeSrc;
-
-  strictRustWarnings = attrs: {
-    extraRustcOpts = (attrs.extraRustcOpts or [ ]) ++ [ "-Dwarnings" ];
-    capLints = "forbid";
-  };
-
-  appCrateOverridesFor =
+  buildAppCrate =
     {
       crateName,
-      filteredSrc ? null,
-      targetPkgs ? pkgs,
-    }:
-    targetPkgs.defaultCrateOverrides
-    // {
-      app-runtime =
-        attrs:
-        strictRustWarnings attrs
-        // {
-          src = appRuntimeSrcFilter;
-        };
-      jetstream-host = strictRustWarnings;
-      ${crateName} =
-        attrs:
-        strictRustWarnings attrs
-        // {
-          src = if filteredSrc != null then filteredSrc else attrs.src;
-          preBuild = (attrs.preBuild or "") + ''
-            export CARGO_CRATE_NAME="${attrs.libName or (lib.replaceStrings [ "-" ] [ "_" ] crateName)}"
-          '';
-        };
-    };
-
-  rootCrateBuildFor =
-    crateOverridesForPkgs:
-    import ./cross-crate2nix.nix {
-      inherit lib pkgs crateOverridesForPkgs;
-    };
-
-  buildCrate2nix =
-    {
-      cargoNix,
-      packageId,
-      crateOverridesForPkgs,
-      rootFeatures ? [ "default" ],
+      filteredSrc,
       nativeBuildInputs ? [ ],
+      buildInputs ? [ ],
       meta ? { },
     }:
-    (rootCrateBuildFor crateOverridesForPkgs {
-      inherit cargoNix packageId rootFeatures;
-    }).overrideAttrs
-      (old: {
-        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ nativeBuildInputs;
-        meta = (old.meta or { }) // meta;
-      });
-
-  buildAppCrate2nix =
-    {
-      cargoNix,
-      crateName,
-      filteredSrc ? null,
-      rootFeatures ? [ "default" ],
-      nativeBuildInputs ? [ ],
-      meta ? { },
-    }:
-    buildCrate2nix {
-      inherit
-        cargoNix
-        nativeBuildInputs
-        meta
-        rootFeatures
-        ;
-      packageId = crateName;
-      crateOverridesForPkgs =
-        targetPkgs:
-        appCrateOverridesFor {
-          inherit crateName filteredSrc targetPkgs;
-        };
-    };
+    let
+      runtimeSrc =
+        if lib.isDerivation appRuntimeSrc then appRuntimeSrc else lib.cleanSource appRuntimeSrc;
+      # Preserve Cargo's relative path dependency, including downstream overrides.
+      mkSource =
+        appSrc: runtimeSrc:
+        pkgs.buildPackages.runCommand "${crateName}-source" { } ''
+          mkdir -p "$out/examples/${crateName}" "$out/lib"
+          cp -r ${appSrc}/. "$out/examples/${crateName}/"
+          cp -r ${runtimeSrc} "$out/lib/app-runtime"
+        '';
+      src = mkSource filteredSrc runtimeSrc;
+      dummySrc = mkSource (craneLib.mkDummySrc { src = filteredSrc; }) (
+        craneLib.mkDummySrc { src = runtimeSrc; }
+      );
+      common = {
+        pname = crateName;
+        version = (builtins.fromTOML (builtins.readFile "${filteredSrc}/Cargo.toml")).package.version;
+        inherit src nativeBuildInputs buildInputs;
+        cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = "${filteredSrc}/Cargo.lock"; };
+        cargoExtraArgs = "--locked";
+        postUnpack = "sourceRoot+=/examples/${crateName}";
+        strictDeps = true;
+        doCheck = pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform;
+        # Cargo caps dependency lints, leaving warnings fatal for our local crates.
+        RUSTFLAGS = "-Dwarnings";
+      };
+    in
+    craneLib.buildPackage (
+      common
+      // {
+        cargoArtifacts = craneLib.buildDepsOnly (
+          (builtins.removeAttrs common [ "src" ]) // { inherit dummySrc; }
+        );
+        inherit meta;
+      }
+    );
 
   appRustSrc =
     {
@@ -112,8 +73,6 @@ let
       [
         "Cargo.lock"
         "Cargo.toml"
-        "Cargo.nix"
-        "default.nix"
         "src(/.*)?"
       ]
       ++ extra
@@ -180,9 +139,7 @@ in
 {
   inherit
     appApiJsSrc
-    appOpensslNative
-    buildAppCrate2nix
-    strictRustWarnings
+    buildAppCrate
     appRustSrc
     appHostUnitDefaults
     appWebTree

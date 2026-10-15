@@ -27,11 +27,9 @@ let
 
   utilLinuxMount = pkgs.util-linux.mount;
 
-  nvidiaDevtoolsBin = app.buildAppCrate2nix {
-    cargoNix = ./Cargo.nix;
+  nvidiaDevtoolsBin = app.buildAppCrate {
     crateName = "nvidia-devtools";
     filteredSrc = nvidiaDevtoolsSrc;
-    nativeBuildInputs = app.appOpensslNative;
     meta.mainProgram = "nvidia-devtools";
   };
 

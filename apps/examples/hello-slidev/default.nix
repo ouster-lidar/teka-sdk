@@ -13,11 +13,9 @@ let
 
   helloSlidevSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloSlidevBin = app.buildAppCrate2nix {
-    cargoNix = ./Cargo.nix;
+  helloSlidevBin = app.buildAppCrate {
     crateName = "hello-slidev";
     filteredSrc = helloSlidevSrc;
-    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-slidev";
     };

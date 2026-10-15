@@ -11,7 +11,7 @@ Stable `lib` and `packages` outputs from `apps/flake.nix` for downstream flake c
 | `flakeOutputs` | Full `packages` + `checks` for a `services` attrset |
 | `mkVersion` | `version.nix` — `IMAGE_VERSION`, `BUILD_ID`, `appArtifactRawName` |
 | `appCrate` | `app-crate.nix` — crate/web/manifest helpers (also on `ps.appCrate`) |
-| `paths` | Stable paths to shared nix (`erofs-mkfs`, `cross-crate2nix`, …) |
+| `paths` | Stable paths to shared nix (`erofs-mkfs`, `core-version-validate`) |
 | `appArtifactRawName` | `<id>-<system>-v<compose>.raw` basename helper |
 
 ## Shared infra `packages.<system>.*`
@@ -19,8 +19,8 @@ Stable `lib` and `packages` outputs from `apps/flake.nix` for downstream flake c
 | Attr | Purpose |
 |------|---------|
 | `app-api-js` | Web helper prepended into app `*.js` at image build |
-| `app-runtime-src` | Source tree for crate2nix app-runtime path-dep overrides |
-| `app-runtime` | Standalone build of the runtime crate (verification / non-crate2nix) |
+| `app-runtime-src` | Source tree for app-runtime path dependency overrides |
+| `app-runtime` | Standalone build of the runtime crate and its tests |
 
 Resolve attrs via `nix flake show`.
 
@@ -57,7 +57,7 @@ Install app manifests and web assets at host paths under `usr/lib/jetstream/miss
 
 ## Flake input `follows`
 
-This flake pins `nixpkgs`, `crate2nix`, and `jetpack`. Downstream flakes should use `inputs.<this-flake>.inputs.*.follows` so app builds inherit the consumer's toolchain pins.
+This flake pins `nixpkgs`, `crane`, and `jetpack`. Downstream flakes should use `inputs.<this-flake>.inputs.*.follows` so app builds inherit the consumer's toolchain pins.
 
 ## Downstream compatibility
 
@@ -67,3 +67,11 @@ Commit and merge `lib` / app-api / app-runtime changes in **this repo** before d
 
 1. Commit and merge shared nix / rust / app API JS changes in this repo.
 2. Downstream bumps its `example-apps` input rev when the exported API changes.
+
+## Rust app builds
+
+`flakeOutputs` requires the `crane` input. Direct `mkApp` and `appCrate` callers supply `craneLib = crane.mkLib pkgs` using the native or cross package set. Follow the apps flake's `crane` input downstream to share its pin.
+
+Use `ps.appCrate.buildAppCrate { crateName = "my-app"; filteredSrc = ps.appCrate.appRustSrc { srcDir = ./.; }; }`. Optional `nativeBuildInputs`, `buildInputs`, and `meta` apply to the package; dependency builds receive the same build inputs. Cargo lockfiles drive vendoring, dependency artifacts are cached separately, and native builds run Cargo tests. Cross builds compile without executing target tests. Sources retain the `examples/<crateName>` and `lib/app-runtime` layout, with `appRuntimeSrc` supplying the shared runtime (including downstream overrides).
+
+Put build-platform tools in `nativeBuildInputs` and target libraries in `buildInputs`. Cargo provides crate names and caps third-party dependency lints; local Rust warnings remain errors. Run `nix run .#update-cargo-lock` from the apps directory when updating lockfiles.

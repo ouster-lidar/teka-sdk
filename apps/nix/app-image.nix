@@ -2,6 +2,7 @@ let
   mkApp =
     {
       pkgs,
+      craneLib,
       version,
       ousterSdkSrc ? null,
       ousterSdkNix ? ./ouster-sdk.nix,
@@ -475,7 +476,7 @@ let
       appCrate = import ./app-crate.nix (
         {
           ps = psBase;
-          inherit pkgs runCommand;
+          inherit pkgs runCommand craneLib;
           lib = pkgs.lib;
         }
         // lib.optionalAttrs (exampleAppsPkgs != null) {
@@ -616,6 +617,7 @@ let
   flakeOutputs =
     {
       nixpkgs,
+      crane,
       systems,
       services,
       version,
@@ -718,6 +720,7 @@ let
                 n:
                 callService services.${n} {
                   ps = mkApp {
+                    craneLib = crane.mkLib pkgs;
                     inherit
                       pkgs
                       version
@@ -756,6 +759,7 @@ let
                   in
                   crossPkgs.callPackage services.${n} {
                     ps = mkApp {
+                      craneLib = crane.mkLib crossPkgs;
                       pkgs = crossPkgs;
                       inherit
                         version

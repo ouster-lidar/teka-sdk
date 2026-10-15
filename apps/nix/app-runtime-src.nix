@@ -1,4 +1,4 @@
-# Source tree for crate2nix app-runtime path-dep overrides (cross-repo consumers).
+# Source tree for app-runtime path dependency overrides (cross-repo consumers).
 { lib, runCommand }:
 
 runCommand "app-runtime-src" { } ''

@@ -13,11 +13,9 @@ let
 
   helloSubSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloSubBin = app.buildAppCrate2nix {
-    cargoNix = ./Cargo.nix;
+  helloSubBin = app.buildAppCrate {
     crateName = "hello-sub";
     filteredSrc = helloSubSrc;
-    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-sub";
     };

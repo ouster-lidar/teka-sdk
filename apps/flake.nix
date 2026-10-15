@@ -4,11 +4,7 @@
   inputs = {
     # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).
     nixpkgs.url = "github:NixOS/nixpkgs/a50de1b7d8a586adc18d2395c19de7d6058e6030";
-    crate2nix = {
-      url = "github:nix-community/crate2nix/5e1ecfd2d15b34ec90c2e51fdffbe8116595a767";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.cachix.inputs.nixpkgs.follows = "nixpkgs";
-    };
+    crane.url = "github:ipetkov/crane/master";
     # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
     # apps/nix/ouster-sdk.nix against nixpkgs GLFW.
     ouster-sdk = {
@@ -22,6 +18,7 @@
     teka = {
       url = "path:../tools/teka";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.crane.follows = "crane";
     };
   };
 
@@ -29,7 +26,7 @@
     {
       self,
       nixpkgs,
-      crate2nix,
+      crane,
       ouster-sdk,
       jetpack,
       teka,
@@ -89,11 +86,17 @@
 
       appOutputs = appLib.flakeOutputs {
         nixpkgs = nixpkgsPkgs;
-        inherit systems services appOverlays version;
+        inherit
+          crane
+          systems
+          services
+          appOverlays
+          version
+          ;
         ousterSdkSrc = ouster-sdk;
       };
 
-      cargoNixDirs = [
+      cargoDirs = [
         "examples/hello-pub"
         "examples/hello-sub"
         "examples/hello-slidev"
@@ -146,30 +149,16 @@
           pkgs = nixpkgsPkgs.legacyPackages.${system};
         in
         {
-          regen-cargo-nix = {
-            type = "app";
-            program = toString (
-              pkgs.writeShellScript "regen-cargo-nix" ''
-                set -euo pipefail
-                crate2nix=${crate2nix.packages.${system}.default}/bin/crate2nix
-                for d in ${nixpkgs.lib.concatStringsSep " " cargoNixDirs}; do
-                  (cd "$d" && "$crate2nix" generate)
-                done
-              ''
-            );
-          };
           update-cargo-lock = {
             type = "app";
             program = toString (
               pkgs.writeShellScript "update-cargo-lock" ''
                 set -euo pipefail
                 cargo=${pkgs.cargo}/bin/cargo
-                for d in ${nixpkgs.lib.concatStringsSep " " cargoNixDirs}; do
+                for d in ${nixpkgs.lib.concatStringsSep " " cargoDirs}; do
                   echo "updating $d/Cargo.lock"
                   (cd "$d" && "$cargo" update "$@")
                 done
-                echo
-                echo "Next: nix run .#regen-cargo-nix"
               ''
             );
           };

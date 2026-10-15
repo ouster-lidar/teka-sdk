@@ -13,11 +13,9 @@ let
 
   helloPubSrc = app.appRustSrc { srcDir = ./.; };
 
-  helloPubBin = app.buildAppCrate2nix {
-    cargoNix = ./Cargo.nix;
+  helloPubBin = app.buildAppCrate {
     crateName = "hello-pub";
     filteredSrc = helloPubSrc;
-    nativeBuildInputs = app.appOpensslNative;
     meta = {
       mainProgram = "hello-pub";
     };

@@ -50,14 +50,6 @@ let
 
   howSrc = app.appRustSrc { srcDir = ./.; };
 
-  gstNative = with pkgs; [
-    pkg-config
-    gst_all_1.gstreamer
-    gst_all_1.gst-plugins-base
-    wayland
-    glib
-  ];
-
   # DDI GStreamer. nvvidconv/nvjpegenc are L4T; NVIDIA userspace comes from
   # X-Jetstream-PortableGPU (not BindReadOnlyPaths of host /usr).
   gstPluginSystemPath = lib.concatStringsSep ":" [
@@ -67,47 +59,18 @@ let
     "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
   ];
 
-  howBin =
-    let
-      crateOverridesForPkgs =
-        targetPkgs:
-        targetPkgs.defaultCrateOverrides
-        // (import ./crate-config.nix { pkgs = targetPkgs; })
-        // {
-          app-runtime = app.strictRustWarnings;
-          hello-ouster-world =
-            attrs:
-            app.strictRustWarnings attrs
-            // {
-              src = howSrc;
-              preBuild = (attrs.preBuild or "") + ''
-                export CARGO_CRATE_NAME="${attrs.libName or "hello_ouster_world"}"
-              '';
-              nativeBuildInputs = (attrs.nativeBuildInputs or [ ]) ++ [ targetPkgs.pkg-config ];
-              buildInputs =
-                (attrs.buildInputs or [ ])
-                ++ (with targetPkgs; [
-                  gst_all_1.gstreamer
-                  gst_all_1.gst-plugins-base
-                  glib
-                  wayland
-                ]);
-            };
-        };
-      cross = import ../../nix/cross-crate2nix.nix {
-        inherit lib pkgs crateOverridesForPkgs;
-      };
-    in
-    (cross {
-      cargoNix = ./Cargo.nix;
-      packageId = "hello-ouster-world";
-    }).overrideAttrs
-      (old: {
-        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ app.appOpensslNative ++ gstNative;
-        meta = (old.meta or { }) // {
-          mainProgram = "hello-ouster-world";
-        };
-      });
+  howBin = app.buildAppCrate {
+    crateName = "hello-ouster-world";
+    filteredSrc = howSrc;
+    nativeBuildInputs = [ pkgs.buildPackages.pkg-config ];
+    buildInputs = with pkgs; [
+      gst_all_1.gstreamer
+      gst_all_1.gst-plugins-base
+      glib
+      wayland
+    ];
+    meta.mainProgram = "hello-ouster-world";
+  };
 
   howApiCmd = writeShellScript "${name}-api" ''
     set -euo pipefail

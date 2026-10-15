@@ -15,7 +15,6 @@ in
 
   paths = {
     erofsMkfs = ./erofs-mkfs.nix;
-    crossCrate2nix = ./cross-crate2nix.nix;
     coreVersionValidate = ./core-version-validate.nix;
   };
 }
