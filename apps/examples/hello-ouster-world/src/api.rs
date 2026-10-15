@@ -136,7 +136,7 @@ async fn post_source_config(
         state
             .record
             .start_from_config(&state, &cfg)
-            .map_err(|e| ApiError::invalid_request(e))?
+            .map_err(ApiError::invalid_request)?
     } else if state.record.is_active() {
         state.record.stop(&state).await.map_err(|e| {
             ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e)
@@ -205,12 +205,11 @@ async fn post_record(
             cfg.sensor_hostname = h.to_string();
         }
     }
-    if body.active {
-        if cfg.source != source_config::SOURCE_SENSOR || cfg.sensor_hostname.is_empty() {
-            return Err(ApiError::invalid_request(
-                "select a sensor before enabling recording",
-            ));
-        }
+    if body.active && (cfg.source != source_config::SOURCE_SENSOR || cfg.sensor_hostname.is_empty())
+    {
+        return Err(ApiError::invalid_request(
+            "select a sensor before enabling recording",
+        ));
     }
     cfg = cfg.normalize().map_err(ApiError::invalid_request)?;
     if body.active && state.record.is_active() {
@@ -230,7 +229,7 @@ async fn post_record(
         state
             .record
             .start_from_config(&state, &cfg)
-            .map_err(|e| ApiError::invalid_request(e))?
+            .map_err(ApiError::invalid_request)?
     } else {
         state.record.stop(&state).await.map_err(|e| {
             ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e)

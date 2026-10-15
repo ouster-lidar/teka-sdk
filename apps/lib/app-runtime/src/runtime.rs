@@ -369,14 +369,8 @@ fn port_bodies() -> Vec<PortBody> {
     let udp = UDP_PORTS.lock().map(|g| g.clone()).unwrap_or_default();
     let tcp = TCP_PORTS.lock().map(|g| g.clone()).unwrap_or_default();
     udp.iter()
-        .map(|&port| PortBody {
-            port,
-            proto: "udp",
-        })
-        .chain(tcp.iter().map(|&port| PortBody {
-            port,
-            proto: "tcp",
-        }))
+        .map(|&port| PortBody { port, proto: "udp" })
+        .chain(tcp.iter().map(|&port| PortBody { port, proto: "tcp" }))
         .collect()
 }
 

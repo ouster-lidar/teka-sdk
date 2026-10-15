@@ -616,9 +616,7 @@ fn parse_rfc3339(value: &str) -> Option<i64> {
     let month = date_parts.next()?.parse::<i64>().ok()?;
     let day = date_parts.next()?.parse::<i64>().ok()?;
     let date_days = days_from_civil(year, month, day);
-    let time_end = time
-        .find(|character| matches!(character, 'Z' | '+' | '-'))
-        .unwrap_or(time.len());
+    let time_end = time.find(['Z', '+', '-']).unwrap_or(time.len());
     let clock = time.get(..time_end)?;
     let mut clock_parts = clock.split(':');
     let hour = clock_parts.next()?.parse::<i64>().ok()?;

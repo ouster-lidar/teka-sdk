@@ -1,15 +1,15 @@
 //! nvidia-devtools HTTP API.
 
+use ::app_runtime::resource_stream::send_snapshot;
 use axum::{
-    extract::State,
     extract::ws::{WebSocket, WebSocketUpgrade},
+    extract::State,
     http::{HeaderMap, StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
-use ::app_runtime::resource_stream::send_snapshot;
 use serde::Serialize;
 
 use crate::keys::KeysBody;
@@ -31,10 +31,7 @@ pub fn routes() -> Router<AppState> {
         )
 }
 
-async fn require_mc_principal(
-    request: axum::extract::Request,
-    next: middleware::Next,
-) -> Response {
+async fn require_mc_principal(request: axum::extract::Request, next: middleware::Next) -> Response {
     if principal_present(request.headers()) {
         next.run(request).await
     } else {
@@ -90,12 +87,7 @@ async fn put_keys(
         .keys
         .write(&body)
         .map(|()| StatusCode::NO_CONTENT)
-        .map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorBody { error: e }),
-            )
-        })
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(ErrorBody { error: e })))
 }
 
 async fn tegrastats_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {

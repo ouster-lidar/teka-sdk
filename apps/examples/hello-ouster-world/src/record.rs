@@ -7,8 +7,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use parking_lot::Mutex;
 use serde_json::{json, Value};
-use tracing::{info, warn};
 use tokio::time::Instant;
+use tracing::{info, warn};
 
 use crate::source_config::PersistedSourceConfig;
 use crate::ui_state;
@@ -70,6 +70,12 @@ impl Clone for RecordHandle {
         Self {
             inner: Arc::clone(&self.inner),
         }
+    }
+}
+
+impl Default for RecordHandle {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

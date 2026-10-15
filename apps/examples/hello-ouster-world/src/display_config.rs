@@ -72,6 +72,11 @@ pub fn save(state_dir: &Path, cfg: &PersistedDisplayConfig) -> Result<(), String
     }
     let body = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
     fs::write(&p, body).map_err(|e| format!("write {}: {e}", p.display()))?;
-    info!(hdmi = cfg.hdmi, stream = cfg.stream, "saved display config to {}", p.display());
+    info!(
+        hdmi = cfg.hdmi,
+        stream = cfg.stream,
+        "saved display config to {}",
+        p.display()
+    );
     Ok(())
 }

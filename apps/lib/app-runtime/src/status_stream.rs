@@ -22,9 +22,7 @@ pub fn heartbeat_message() -> String {
 pub fn cards_message(cards: &[(&str, &str)]) -> String {
     let cards_json: Vec<_> = cards
         .iter()
-        .map(|(card_id, summary)| {
-            serde_json::json!({ "card_id": card_id, "summary": summary })
-        })
+        .map(|(card_id, summary)| serde_json::json!({ "card_id": card_id, "summary": summary }))
         .collect();
     serde_json::json!({ "type": "STATUS", "cards": cards_json }).to_string()
 }

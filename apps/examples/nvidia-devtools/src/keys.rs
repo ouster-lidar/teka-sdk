@@ -115,10 +115,7 @@ mod tests {
     #[test]
     fn skips_comments_and_blanks() {
         let raw = "# comment\n\nssh-ed25519 AAAA user\n";
-        assert_eq!(
-            normalize_keys(raw).unwrap(),
-            "ssh-ed25519 AAAA user"
-        );
+        assert_eq!(normalize_keys(raw).unwrap(), "ssh-ed25519 AAAA user");
     }
 
     #[test]

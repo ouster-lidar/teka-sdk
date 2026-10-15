@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt};
 use ::app_runtime::runtime::app_base_url;
 use ::app_runtime::status_stream::SummaryStream;
+use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::task::JoinHandle;
@@ -132,13 +132,10 @@ pub fn spawn_subscriber(store: Arc<FeedStore>, card_stream: Arc<SummaryStream>) 
     let card_stream2 = card_stream.clone();
     tokio::spawn(async move {
         let mut rx = store_cards.notify_tx.subscribe();
-        loop {
-            match rx.recv().await {
-                Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                    publish_card(&store_cards, &card_stream2);
-                }
-                Err(_) => break,
-            }
+        while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
+            rx.recv().await
+        {
+            publish_card(&store_cards, &card_stream2);
         }
     });
 
@@ -265,9 +262,7 @@ async fn run_session(store: Arc<FeedStore>, publisher_url: String) -> Result<(),
                 handle_text(&store, &publisher_url, text.as_str());
             }
             Message::Ping(p) => {
-                ws.send(Message::Pong(p))
-                    .await
-                    .map_err(|e| e.to_string())?;
+                ws.send(Message::Pong(p)).await.map_err(|e| e.to_string())?;
             }
             Message::Close(_) => break,
             _ => {}

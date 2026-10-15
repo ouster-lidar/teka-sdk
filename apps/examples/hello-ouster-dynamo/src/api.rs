@@ -3,16 +3,14 @@
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
+use ::app_runtime::api_error::ApiError;
+use ::app_runtime::status_stream::{serve_broadcast, serve_summary_broadcast_with_initial};
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use inotify::{EventMask, Inotify, WatchMask};
-use ::app_runtime::api_error::ApiError;
-use ::app_runtime::status_stream::{
-    serve_broadcast, serve_summary_broadcast_with_initial,
-};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::fs::File;
@@ -135,13 +133,8 @@ async fn post_source_config(
         cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
     }
     cfg = cfg.normalize();
-    source_config::save(&state_dir, &cfg).map_err(|e| {
-        ApiError::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            e,
-        )
-    })?;
+    source_config::save(&state_dir, &cfg)
+        .map_err(|e| ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e))?;
     let dynamo = source_config::push_to_dynamo(&cfg).await;
     if dynamo.get("ok") == Some(&json!(false)) {
         tracing::warn!(%dynamo, "ouster-dynamo source-config push failed (hello-ouster-dynamo save kept)");
@@ -155,7 +148,7 @@ async fn post_source_config(
         state
             .record
             .start_from_config(&state, &cfg)
-            .map_err(|e| ApiError::invalid_request(e))?
+            .map_err(ApiError::invalid_request)?
     } else if state.record.is_active() {
         state.record.stop(&state)
     } else {
@@ -201,18 +194,13 @@ async fn post_record(
         cfg.producer_kind = source_config::PRODUCER_SENSOR.to_string();
     }
     cfg = cfg.normalize();
-    source_config::save(&state_dir, &cfg).map_err(|e| {
-        ApiError::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "internal",
-            e,
-        )
-    })?;
+    source_config::save(&state_dir, &cfg)
+        .map_err(|e| ApiError::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "internal", e))?;
     let rec = if body.active {
         state
             .record
             .start_from_config(&state, &cfg)
-            .map_err(|e| ApiError::invalid_request(e))?
+            .map_err(ApiError::invalid_request)?
     } else {
         state.record.stop(&state)
     };
@@ -316,7 +304,10 @@ async fn run_console(socket: &mut WebSocket, state: &AppState) -> anyhow::Result
         .unwrap_or_default();
 
     if let Some(tail) = log_tail(&log_path, 200).await {
-        if send_msg(socket, ServerMsg::Output { data: tail }).await.is_err() {
+        if send_msg(socket, ServerMsg::Output { data: tail })
+            .await
+            .is_err()
+        {
             return Ok(());
         }
     }
@@ -482,15 +473,17 @@ async fn log_tail(path: &str, max_lines: usize) -> Option<String> {
 
 fn append_console_note(path: &str, line: &str) -> std::io::Result<()> {
     use std::io::Write;
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)?;
     writeln!(f, "{line}")?;
     Ok(())
 }
 
 fn console_log_path() -> String {
-    std::env::var("HELLO_OUSTER_DYNAMO_CONSOLE_LOG").unwrap_or_else(|_| {
-        "/run/hello-ouster-dynamo/console.log".to_string()
-    })
+    std::env::var("HELLO_OUSTER_DYNAMO_CONSOLE_LOG")
+        .unwrap_or_else(|_| "/run/hello-ouster-dynamo/console.log".to_string())
 }
 
 fn ensure_console_log(path: &str) {

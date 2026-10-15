@@ -28,7 +28,8 @@ fn main() -> anyhow::Result<()> {
 fn main_result() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let bind = hello_ouster_dynamo::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
+    let bind =
+        hello_ouster_dynamo::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -50,7 +51,11 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
 
     let state_dir = display_config::state_dir();
     let display_cfg = display_config::load(&state_dir);
-    tracing::info!(hdmi = display_cfg.hdmi, stream = display_cfg.stream, "display config");
+    tracing::info!(
+        hdmi = display_cfg.hdmi,
+        stream = display_cfg.stream,
+        "display config"
+    );
 
     let state = AppState::new(&display_cfg);
     hello_ouster_dynamo::ui_state::spawn_ui_watchers(state.clone());

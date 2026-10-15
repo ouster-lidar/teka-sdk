@@ -4,11 +4,11 @@ pub mod access;
 pub mod api;
 pub mod display;
 pub mod display_config;
-pub mod screencopy;
 pub mod osf;
 pub mod record;
-pub mod source_config;
+pub mod screencopy;
 pub mod sensor_discovery;
+pub mod source_config;
 pub mod ui_state;
 pub mod vpointer;
 

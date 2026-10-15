@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use ::app_runtime::resource_stream::send_snapshot;
+use ::app_runtime::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},
@@ -13,8 +15,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use ::app_runtime::resource_stream::send_snapshot;
-use ::app_runtime::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
 use serde::Deserialize;
 
 use crate::store::{Event, EventStore, State as PubState};
@@ -68,13 +68,10 @@ pub fn spawn_card_bridge(store: Arc<EventStore>, card_stream: Arc<SummaryStream>
     publish_card_summary(&store, &card_stream);
     tokio::spawn(async move {
         let mut rx = store.events_tx.subscribe();
-        loop {
-            match rx.recv().await {
-                Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                    publish_card_summary(&store, &card_stream);
-                }
-                Err(_) => break,
-            }
+        while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
+            rx.recv().await
+        {
+            publish_card_summary(&store, &card_stream);
         }
     });
 }
@@ -134,11 +131,7 @@ async fn post_generator(
     State(state): State<AppState>,
     Json(body): Json<GeneratorBody>,
 ) -> Json<PubState> {
-    Json(
-        state
-            .store
-            .set_generator(body.running, body.interval_secs),
-    )
+    Json(state.store.set_generator(body.running, body.interval_secs))
 }
 
 async fn events_ws(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
@@ -151,15 +144,10 @@ async fn events_ws_loop(mut socket: WebSocket, state: AppState) {
         return;
     }
     let mut rx = state.store.events_tx.subscribe();
-    loop {
-        match rx.recv().await {
-            Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                let data = state.store.stream_data();
-                if !send_snapshot(&mut socket, &data).await {
-                    break;
-                }
-            }
-            Err(_) => break,
+    while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) = rx.recv().await {
+        let data = state.store.stream_data();
+        if !send_snapshot(&mut socket, &data).await {
+            break;
         }
     }
 }

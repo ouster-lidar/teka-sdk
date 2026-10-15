@@ -96,9 +96,7 @@ pub fn diff_ui(prev: Option<&Value>, next: &Value) -> Option<Value> {
 }
 
 pub fn publish_ui(state: &AppState) {
-    state
-        .ui_state
-        .publish_if_changed(build_ui_state(state));
+    state.ui_state.publish_if_changed(build_ui_state(state));
     let summary = source_config::load(&display_config::state_dir()).dashboard_summary();
     let mut last = state.card_stream.cache.read().clone().unwrap_or_default();
     state.card_stream.tick(&summary, &mut last);

@@ -109,10 +109,7 @@ mod tests {
 
     #[test]
     fn load_migrates_legacy_publisher_url() {
-        let dir = std::env::temp_dir().join(format!(
-            "hello-sub-peer-cfg-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("hello-sub-peer-cfg-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let body = r#"{ "publisher_url": "other-box" }"#;

@@ -46,7 +46,10 @@ impl TegraMonitor {
     }
 }
 
-async fn tegra_supervisor(tx: broadcast::Sender<TegraSample>, last: Arc<RwLock<Option<TegraSample>>>) {
+async fn tegra_supervisor(
+    tx: broadcast::Sender<TegraSample>,
+    last: Arc<RwLock<Option<TegraSample>>>,
+) {
     loop {
         match run_tegrastats(&tx, &last).await {
             Ok(()) => warn!("tegrastats exited; restarting in 2s"),

@@ -121,7 +121,13 @@ async fn fetch_mc_enforcement() -> Option<bool> {
         .timeout(ENFORCEMENT_FETCH_TIMEOUT)
         .build()
         .ok()?;
-    let resp = client.get(&url).send().await.ok()?.error_for_status().ok()?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?;
     let body: serde_json::Value = resp.json().await.ok()?;
     body.get("enforcement")?.as_bool()
 }
@@ -162,7 +168,10 @@ pub fn allowed(method: &Method, path: &str, access: Access) -> bool {
         || match access {
             Access::Editor => true,
             Access::Viewer => {
-                get && matches!(path, "/guest-access" | "/display/stream" | "/display/status")
+                get && matches!(
+                    path,
+                    "/guest-access" | "/display/stream" | "/display/status"
+                )
             }
             Access::Denied => get && path == "/guest-access",
         }
@@ -262,7 +271,8 @@ mod tests {
         for path in declared_routes() {
             for method in &METHODS {
                 let open = allowed(method, &path, Access::Denied);
-                let expected = method_is_get(method) && matches!(path.as_str(), "/status" | "/guest-access");
+                let expected =
+                    method_is_get(method) && matches!(path.as_str(), "/status" | "/guest-access");
                 assert_eq!(open, expected, "{method} {path} for signed-out, guest off");
             }
         }

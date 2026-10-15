@@ -176,9 +176,7 @@ fn post_activate_response(
         )
     })?;
     if !status.is_success() || !parsed.ok {
-        return Err(parsed
-            .error
-            .unwrap_or_else(|| "activate failed".into()));
+        return Err(parsed.error.unwrap_or_else(|| "activate failed".into()));
     }
     parsed
         .http_listen

@@ -27,9 +27,7 @@ pub fn snapshot_message<T: Serialize>(data: &T) -> String {
         frame_type: SNAPSHOT,
         data,
     })
-    .unwrap_or_else(|_| {
-        serde_json::json!({ "type": SNAPSHOT, "data": null }).to_string()
-    })
+    .unwrap_or_else(|_| serde_json::json!({ "type": SNAPSHOT, "data": null }).to_string())
 }
 
 /// Emit a snapshot frame on a WebSocket. Returns `false` if the send failed.

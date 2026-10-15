@@ -58,6 +58,12 @@ impl Clone for RecordHandle {
     }
 }
 
+impl Default for RecordHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecordHandle {
     pub fn new() -> Self {
         let h = Self {

@@ -36,14 +36,19 @@ const VIZ_APP_ID: &str = "hello-ouster-world";
 
 #[derive(Debug)]
 enum InjectCmd {
-    Move { x: i32, y: i32 },
+    Move {
+        x: i32,
+        y: i32,
+    },
     Button {
         press: bool,
         button: VPtrButton,
         x: i32,
         y: i32,
     },
-    Axis { delta_y: f64 },
+    Axis {
+        delta_y: f64,
+    },
     Key {
         code: String,
         key: String,
@@ -281,15 +286,23 @@ async fn display_stream(
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ClientEvent {
-    Control { action: String },
-    PointerMove { x: f64, y: f64 },
+    Control {
+        action: String,
+    },
+    PointerMove {
+        x: f64,
+        y: f64,
+    },
     PointerButton {
         button: String,
         state: String,
         x: f64,
         y: f64,
     },
-    PointerAxis { delta_x: f64, delta_y: f64 },
+    PointerAxis {
+        delta_x: f64,
+        delta_y: f64,
+    },
     Key {
         key: String,
         code: String,
@@ -326,8 +339,13 @@ enum ServerEvent {
         fps: u64,
         max_framerate: u64,
     },
-    Control { ok: bool, message: String },
-    Error { message: String },
+    Control {
+        ok: bool,
+        message: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 async fn stream_session(mut socket: WebSocket, state: AppState, can_control: bool) {
@@ -351,7 +369,11 @@ async fn stream_session(mut socket: WebSocket, state: AppState, can_control: boo
         let _ = socket.send(Message::Close(None)).await;
         return;
     }
-    let viewer_id = state.display.inner.next_viewer.fetch_add(1, Ordering::SeqCst);
+    let viewer_id = state
+        .display
+        .inner
+        .next_viewer
+        .fetch_add(1, Ordering::SeqCst);
     // Subscribe before opening the capture gate so the first frame is not dropped.
     let mut frames = state.display.inner.frame_tx.subscribe();
     let mut codec_updates = state.display.inner.codec_watch.subscribe();
@@ -364,7 +386,12 @@ async fn stream_session(mut socket: WebSocket, state: AppState, can_control: boo
     }
     impl Drop for ViewerGuard {
         fn drop(&mut self) {
-            let n = self.state.display.inner.viewers.fetch_sub(1, Ordering::SeqCst);
+            let n = self
+                .state
+                .display
+                .inner
+                .viewers
+                .fetch_sub(1, Ordering::SeqCst);
             if n <= 1 {
                 let _ = self.state.display.inner.capture_gate.send(false);
             }
@@ -601,7 +628,10 @@ fn handle_client_event(state: &AppState, viewer_id: u64, ev: ClientEvent) -> any
                 },
             )
         }
-        ClientEvent::PointerAxis { delta_y, delta_x: _delta_x } => {
+        ClientEvent::PointerAxis {
+            delta_y,
+            delta_x: _delta_x,
+        } => {
             ensure_controlling(state, viewer_id)?;
             enqueue_inject(state, InjectCmd::Axis { delta_y })
         }
@@ -673,9 +703,8 @@ fn wayland_env() -> HashMap<String, String> {
         .unwrap_or_else(|_| "/run/hello-ouster-world".into());
     let wd = std::env::var("HELLO_OUSTER_WORLD_WAYLAND_DISPLAY")
         .unwrap_or_else(|_| discover_wayland_display(&xdg));
-    let path = std::env::var("HELLO_OUSTER_WORLD_PATH").unwrap_or_else(|_| {
-        std::env::var("PATH").unwrap_or_else(|_| "/bin:/usr/bin".into())
-    });
+    let path = std::env::var("HELLO_OUSTER_WORLD_PATH")
+        .unwrap_or_else(|_| std::env::var("PATH").unwrap_or_else(|_| "/bin:/usr/bin".into()));
     env.insert("XDG_RUNTIME_DIR".into(), xdg.clone());
     env.insert("WAYLAND_DISPLAY".into(), wd);
     env.insert("PATH".into(), path);
@@ -779,40 +808,10 @@ fn is_viz_con(node: &serde_json::Value) -> bool {
     name == VIZ_WINDOW_TITLE || app_id == VIZ_APP_ID
 }
 
-#[cfg(test)]
-mod tests {
-    use super::find_viz_output_in_tree;
-
-    #[test]
-    fn finds_viz_on_tiled_and_floating_sway_containers() {
-        for container_type in ["con", "floating_con"] {
-            let tree = serde_json::json!({
-                "type": "root",
-                "nodes": [{
-                    "type": "output",
-                    "name": "DP-1",
-                    "nodes": [{
-                        "type": "workspace",
-                        "nodes": [],
-                        "floating_nodes": [{
-                            "type": container_type,
-                            "name": "Ouster Viz",
-                            "app_id": "hello-ouster-world",
-                            "nodes": [],
-                            "floating_nodes": []
-                        }]
-                    }],
-                    "floating_nodes": []
-                }],
-                "floating_nodes": []
-            });
-
-            assert_eq!(find_viz_output_in_tree(&tree, None), Some("DP-1".to_string()));
-        }
-    }
-}
-
-fn find_viz_output_in_tree(node: &serde_json::Value, current_output: Option<&str>) -> Option<String> {
+fn find_viz_output_in_tree(
+    node: &serde_json::Value,
+    current_output: Option<&str>,
+) -> Option<String> {
     let output = if node.get("type").and_then(|t| t.as_str()) == Some("output") {
         node.get("name").and_then(|n| n.as_str())
     } else {
@@ -854,24 +853,24 @@ fn output_active(o: &serde_json::Value) -> bool {
     o.get("active").and_then(|a| a.as_bool()) == Some(true)
 }
 
-fn find_headless<'a>(arr: &'a [serde_json::Value]) -> Option<&'a serde_json::Value> {
+fn find_headless(arr: &[serde_json::Value]) -> Option<&serde_json::Value> {
     arr.iter()
         .find(|o| is_headless_name(output_name(o)) && output_active(o))
         .or_else(|| arr.iter().find(|o| is_headless_name(output_name(o))))
 }
 
 /// Any non-HEADLESS connector (enabled or blanked). Used for cable presence.
-fn find_physical_any<'a>(arr: &'a [serde_json::Value]) -> Option<&'a serde_json::Value> {
+fn find_physical_any(arr: &[serde_json::Value]) -> Option<&serde_json::Value> {
     arr.iter().find(|o| !is_headless_name(output_name(o)))
 }
 
 /// Active (enabled) physical output currently driving a panel.
-fn find_physical_active<'a>(arr: &'a [serde_json::Value]) -> Option<&'a serde_json::Value> {
+fn find_physical_active(arr: &[serde_json::Value]) -> Option<&serde_json::Value> {
     arr.iter()
         .find(|o| !is_headless_name(output_name(o)) && output_active(o))
 }
 
-fn find_physical<'a>(arr: &'a [serde_json::Value]) -> Option<&'a serde_json::Value> {
+fn find_physical(arr: &[serde_json::Value]) -> Option<&serde_json::Value> {
     find_physical_active(arr).or_else(|| find_physical_any(arr))
 }
 
@@ -1095,7 +1094,11 @@ async fn apply_inject(display: &DisplayState, cmd: InjectCmd) {
             });
         }
         InjectCmd::Axis { delta_y } => {
-            display.inner.vpointer.lock().send(VPtrCmd::Axis { delta_y });
+            display
+                .inner
+                .vpointer
+                .lock()
+                .send(VPtrCmd::Axis { delta_y });
         }
         InjectCmd::Key {
             code,
@@ -1218,9 +1221,9 @@ fn is_headless_name(name: &str) -> bool {
 async fn list_outputs() -> anyhow::Result<Vec<serde_json::Value>> {
     let outputs = run_swaymsg(&["-t", "get_outputs"]).await?;
     let v: serde_json::Value = serde_json::from_str(&outputs)?;
-    Ok(v.as_array()
+    v.as_array()
         .cloned()
-        .ok_or_else(|| anyhow::anyhow!("no outputs"))?)
+        .ok_or_else(|| anyhow::anyhow!("no outputs"))
 }
 
 async fn fetch_output_size() -> anyhow::Result<(u32, u32)> {
@@ -1305,4 +1308,40 @@ fn spawn_output_manager(display: DisplayState) {
             last_present = physical_present;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find_viz_output_in_tree;
+
+    #[test]
+    fn finds_viz_on_tiled_and_floating_sway_containers() {
+        for container_type in ["con", "floating_con"] {
+            let tree = serde_json::json!({
+                "type": "root",
+                "nodes": [{
+                    "type": "output",
+                    "name": "DP-1",
+                    "nodes": [{
+                        "type": "workspace",
+                        "nodes": [],
+                        "floating_nodes": [{
+                            "type": container_type,
+                            "name": "Ouster Viz",
+                            "app_id": "hello-ouster-world",
+                            "nodes": [],
+                            "floating_nodes": []
+                        }]
+                    }],
+                    "floating_nodes": []
+                }],
+                "floating_nodes": []
+            });
+
+            assert_eq!(
+                find_viz_output_in_tree(&tree, None),
+                Some("DP-1".to_string())
+            );
+        }
+    }
 }

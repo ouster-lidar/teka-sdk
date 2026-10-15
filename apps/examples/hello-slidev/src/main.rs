@@ -3,6 +3,7 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
+use ::app_runtime::api_error::ApiError;
 use axum::{
     body::Body,
     extract::{Path as AxumPath, State},
@@ -12,7 +13,6 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use ::app_runtime::api_error::ApiError;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
@@ -200,10 +200,7 @@ fn content_type_for_path(path: &Path) -> &'static str {
 fn api_routes() -> Router<AppState> {
     let deck = get(serve_deck).head(serve_deck);
     Router::new()
-        .route(
-            "/guest-access",
-            get(get_guest_access).put(put_guest_access),
-        )
+        .route("/guest-access", get(get_guest_access).put(put_guest_access))
         .route("/deck", deck.clone())
         .route("/deck/", deck.clone())
         .route("/deck/{*path}", deck)

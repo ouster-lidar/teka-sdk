@@ -2,9 +2,9 @@
 
 use std::fs::{File, OpenOptions};
 use std::os::fd::{AsFd, AsRawFd};
+use std::path::PathBuf;
 use std::ptr;
 use std::slice;
-use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::sync::Arc;
@@ -395,7 +395,12 @@ impl EncodePipeline {
     }
 
     fn key(&self) -> (u32, u32, u64, u32) {
-        (self.width, self.height, self.fps, fourcc_u32(self.drm_fourcc))
+        (
+            self.width,
+            self.height,
+            self.fps,
+            fourcc_u32(self.drm_fourcc),
+        )
     }
 
     fn push_sysmem(&self, pixels: Vec<u8>) -> anyhow::Result<()> {
@@ -612,21 +617,19 @@ impl WaylandCapture {
         for global in globals.contents().clone_list() {
             match global.interface.as_str() {
                 "wl_output" => {
-                    let version = global.version.min(4).max(1);
+                    let version = global.version.clamp(1, 4);
                     let output =
                         registry.bind::<wl_output::WlOutput, _, _>(global.name, version, &qh, ());
-                    state.outputs.push(OutputInfo {
-                        output,
-                        name: None,
-                    });
+                    state.outputs.push(OutputInfo { output, name: None });
                 }
                 "zwlr_screencopy_manager_v1" => {
                     // wayland-protocols-wlr 0.3 XML max is v3; wlroots advertises v4.
-                    let mgr = globals.bind::<
-                        zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1,
-                        _,
-                        _,
-                    >(&qh, 1..=3, ())?;
+                    let mgr = globals
+                        .bind::<zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1, _, _>(
+                            &qh,
+                            1..=3,
+                            (),
+                        )?;
                     state.screencopy = Some(mgr);
                 }
                 "wl_shm" => {
@@ -706,7 +709,12 @@ impl WaylandCapture {
                             anyhow::anyhow!("screencopy frame missing wl_shm buffer params")
                         })?;
                         return self.copy_shm_frame(
-                            shm, &frame, &rx, format, width, height, stride,
+                            shm,
+                            &frame,
+                            &rx,
+                            format,
+                            (width, height),
+                            stride,
                         );
                     }
                     FrameEvent::Failed => anyhow::bail!("screencopy frame failed"),
@@ -777,8 +785,7 @@ impl WaylandCapture {
         frame: &zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1,
         rx: &Receiver<FrameEvent>,
         shm_format: u32,
-        width: u32,
-        height: u32,
+        (width, height): (u32, u32),
         stride: u32,
     ) -> anyhow::Result<CapturedFrame> {
         let drm = drm_fourcc_for_wl_shm(shm_format)
@@ -905,7 +912,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
         let (dw, dh) = crate::display::native_stream_size(src_w, src_h);
         *display.inner.scaled_size.lock() = (dw, dh);
         write_stream_target_throttled(false);
-        let fps = display.max_framerate().max(1).min(20);
+        let fps = display.max_framerate().clamp(1, 20);
 
         if wl.is_none() {
             match WaylandCapture::connect() {
@@ -929,8 +936,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
         }
 
         let drm_fourcc = DrmFourcc::try_from(last_format).unwrap_or(DrmFourcc::Xrgb8888);
-        let need_pipeline =
-            pipeline.as_ref().map(|p| p.key()) != Some((dw, dh, fps, last_format));
+        let need_pipeline = pipeline.as_ref().map(|p| p.key()) != Some((dw, dh, fps, last_format));
 
         if need_pipeline {
             if let Some(p) = pipeline.take() {
@@ -987,10 +993,10 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                         }
                         display.set_error(Some(e.to_string()));
                     } else {
-                        display.inner.last_capture_ms.store(
-                            started.elapsed().as_millis() as u64,
-                            Ordering::Relaxed,
-                        );
+                        display
+                            .inner
+                            .last_capture_ms
+                            .store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
                         display.set_error(None);
                         write_stream_target_throttled(true);
                     }

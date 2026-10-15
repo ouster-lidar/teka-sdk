@@ -222,9 +222,7 @@ fn pick_output<'a>(
         .map(|o| &o.output)
 }
 
-fn setup(
-    preferred_output: Option<&str>,
-) -> anyhow::Result<(Connection, EventQueue<State>, State)> {
+fn setup(preferred_output: Option<&str>) -> anyhow::Result<(Connection, EventQueue<State>, State)> {
     apply_wayland_env();
     let conn = Connection::connect_to_env()?;
     let (globals, mut event_queue) = registry_queue_init::<State>(&conn)?;
@@ -245,12 +243,9 @@ fn setup(
         if global.interface != "wl_output" {
             continue;
         }
-        let version = global.version.min(4).max(1);
+        let version = global.version.clamp(1, 4);
         let output = registry.bind::<wl_output::WlOutput, _, _>(global.name, version, &qh, ());
-        state.outputs.push(OutputInfo {
-            output,
-            name: None,
-        });
+        state.outputs.push(OutputInfo { output, name: None });
     }
     let manager = globals
         .bind::<zwlr_virtual_pointer_manager_v1::ZwlrVirtualPointerManagerV1, _, _>(

@@ -2,12 +2,12 @@
 
 use std::net::SocketAddr;
 
+use ::app_runtime::status_stream::SummaryStream;
 use axum::Router;
 use clap::Parser;
 use hello_pub::api::{self, spawn_card_bridge, spawn_generator};
 use hello_pub::store::EventStore;
 use hello_pub::AppState;
-use ::app_runtime::status_stream::SummaryStream;
 use tower_http::cors::CorsLayer;
 
 #[derive(Parser)]
@@ -35,10 +35,7 @@ async fn run(bind: SocketAddr) -> anyhow::Result<()> {
     spawn_card_bridge(store.clone(), card_stream.clone());
     spawn_generator(store.clone());
 
-    let state = AppState {
-        store,
-        card_stream,
-    };
+    let state = AppState { store, card_stream };
 
     let app = Router::new()
         .nest("/api/v1", api::routes())

@@ -1,5 +1,7 @@
 //! hello-sub HTTP API — see hello-sub.md.
 
+use ::app_runtime::resource_stream::send_snapshot;
+use ::app_runtime::status_stream::serve_summary_broadcast_with_initial;
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},
@@ -9,8 +11,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use ::app_runtime::resource_stream::send_snapshot;
-use ::app_runtime::status_stream::serve_summary_broadcast_with_initial;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -145,15 +145,10 @@ async fn feed_ws_loop(mut socket: WebSocket, state: AppState) {
         return;
     }
     let mut rx = state.store.notify_tx.subscribe();
-    loop {
-        match rx.recv().await {
-            Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                let data = state.store.stream_data();
-                if !send_snapshot(&mut socket, &data).await {
-                    break;
-                }
-            }
-            Err(_) => break,
+    while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) = rx.recv().await {
+        let data = state.store.stream_data();
+        if !send_snapshot(&mut socket, &data).await {
+            break;
         }
     }
 }

@@ -283,7 +283,8 @@ mod tests {
     use std::fs;
 
     fn test_dir(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("hello-sub-store-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("hello-sub-store-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -338,10 +339,7 @@ mod tests {
     #[test]
     fn apply_peer_config_updates_slots() {
         let dir = test_dir("cfg");
-        let store = FeedStore::new(
-            vec!["http://a/api/v1/app/hello-pub".into()],
-            dir.clone(),
-        );
+        let store = FeedStore::new(vec!["http://a/api/v1/app/hello-pub".into()], dir.clone());
         assert!(store.apply_peer_config(vec![
             "http://a/api/v1/app/hello-pub".into(),
             "http://b/api/v1/app/hello-pub".into(),

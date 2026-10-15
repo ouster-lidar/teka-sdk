@@ -65,11 +65,7 @@ impl ApiError {
     }
 
     pub fn identity_unverified(message: impl Into<String>) -> Self {
-        Self::new(
-            StatusCode::UNAUTHORIZED,
-            code::IDENTITY_UNVERIFIED,
-            message,
-        )
+        Self::new(StatusCode::UNAUTHORIZED, code::IDENTITY_UNVERIFIED, message)
     }
 
     pub fn forbidden(message: impl Into<String>) -> Self {

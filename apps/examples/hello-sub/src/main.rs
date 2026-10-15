@@ -2,13 +2,13 @@
 
 use std::net::SocketAddr;
 
+use ::app_runtime::status_stream::SummaryStream;
 use axum::Router;
 use clap::Parser;
 use hello_sub::api;
 use hello_sub::peer::{self, spawn_subscriber};
 use hello_sub::store::FeedStore;
 use hello_sub::{peer_config, AppState};
-use ::app_runtime::status_stream::SummaryStream;
 use tower_http::cors::CorsLayer;
 
 #[derive(Parser)]
@@ -32,9 +32,8 @@ fn main() -> anyhow::Result<()> {
 
 async fn run(bind: SocketAddr) -> anyhow::Result<()> {
     let state_dir = peer_config::state_dir();
-    let publisher_urls = peer_config::load(&state_dir).unwrap_or_else(|| {
-        vec![peer::publisher_base_url_from_env()]
-    });
+    let publisher_urls =
+        peer_config::load(&state_dir).unwrap_or_else(|| vec![peer::publisher_base_url_from_env()]);
     tracing::info!("publisher URLs {publisher_urls:?}");
     let store = FeedStore::new(publisher_urls, state_dir);
     let card_stream = SummaryStream::new();

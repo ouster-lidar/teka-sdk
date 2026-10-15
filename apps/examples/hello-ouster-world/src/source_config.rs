@@ -268,13 +268,17 @@ mod tests {
             assert!(PersistedSourceConfig {
                 record_duration_seconds: seconds,
                 ..Default::default()
-            }.normalize().is_ok());
+            }
+            .normalize()
+            .is_ok());
         }
         for seconds in [0, 3601] {
             assert!(PersistedSourceConfig {
                 record_duration_seconds: seconds,
                 ..Default::default()
-            }.normalize().is_err());
+            }
+            .normalize()
+            .is_err());
         }
     }
 
@@ -291,7 +295,12 @@ mod tests {
         };
         assert!(ok("/srv/recordings/a.osf", "os-122.local"));
         assert!(ok("", "192.168.1.5"));
-        for path in ["/etc/passwd", "/srv/recordings/../etc/x.osf", "/srv/recordings/a.txt", "/srv/recordings/sub/a.osf"] {
+        for path in [
+            "/etc/passwd",
+            "/srv/recordings/../etc/x.osf",
+            "/srv/recordings/a.txt",
+            "/srv/recordings/sub/a.osf",
+        ] {
             assert!(!ok(path, ""), "{path}");
         }
         for host in ["a b", "http://x/", "x;y", "a/b"] {

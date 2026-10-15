@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use ::app_runtime::api_error::ApiError;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
 use axum::http::{header, HeaderValue, StatusCode};
@@ -14,12 +15,11 @@ use axum::routing::get;
 use axum::{Json, Router};
 use futures_util::stream::unfold;
 use futures_util::StreamExt;
-use tokio::io::AsyncReadExt;
-use ::app_runtime::api_error::ApiError;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::fs::{self, File};
+use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
 use crate::AppState;
@@ -77,6 +77,12 @@ impl ImportStatus {
 #[derive(Clone)]
 pub struct ImportHandle {
     inner: Arc<Mutex<ImportStatus>>,
+}
+
+impl Default for ImportHandle {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ImportHandle {
@@ -172,8 +178,11 @@ fn incomplete_recording_marker(name: &str) -> PathBuf {
 }
 
 pub(crate) fn mark_recording_incomplete(name: &str) -> Result<(), String> {
-    std::fs::write(incomplete_recording_marker(name), b"record writer close failed\n")
-        .map_err(|e| format!("mark {name} incomplete: {e}"))
+    std::fs::write(
+        incomplete_recording_marker(name),
+        b"record writer close failed\n",
+    )
+    .map_err(|e| format!("mark {name} incomplete: {e}"))
 }
 
 fn recording_is_incomplete(name: &str) -> bool {
@@ -349,8 +358,8 @@ async fn import_seed(
     seed: &OsfSeed,
     state: &AppState,
 ) -> Result<(), String> {
-    let share_id = share_id_from_url(&seed.share_url)
-        .ok_or_else(|| "invalid Studio share URL".to_string())?;
+    let share_id =
+        share_id_from_url(&seed.share_url).ok_or_else(|| "invalid Studio share URL".to_string())?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(6 * 3600))
         .connect_timeout(Duration::from_secs(30))
@@ -520,9 +529,8 @@ async fn get_osf(
     );
     headers.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&disposition).unwrap_or_else(|_| {
-            HeaderValue::from_static("attachment")
-        }),
+        HeaderValue::from_str(&disposition)
+            .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
     );
     if let Ok(v) = HeaderValue::from_str(&len.to_string()) {
         headers.insert(header::CONTENT_LENGTH, v);
