@@ -556,6 +556,7 @@ impl Dispatch<zwlr_screencopy_frame_v1::ZwlrScreencopyFrameV1, SyncSender<FrameE
 
 struct CapturedFrame {
     format: DrmFourcc,
+    size: (u32, u32),
     pixels: Vec<u8>,
 }
 
@@ -838,6 +839,7 @@ impl WaylandCapture {
                         };
                         return Ok(CapturedFrame {
                             format: DrmFourcc::Xrgb8888,
+                            size: (width, height),
                             pixels,
                         });
                     }
@@ -987,6 +989,12 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
         match capture_result {
             Ok(captured) => {
                 last_format = fourcc_u32(captured.format);
+                // Output moves can race the cached size; never encode with stale caps.
+                if captured.size != (dw, dh) {
+                    *display.inner.source_size.lock() = captured.size;
+                    write_stream_target_throttled(true);
+                    continue;
+                }
                 if let Some(p) = pipeline.as_ref() {
                     if let Err(e) = p.push_sysmem(captured.pixels) {
                         if last_err_log.elapsed() >= Duration::from_secs(10) {

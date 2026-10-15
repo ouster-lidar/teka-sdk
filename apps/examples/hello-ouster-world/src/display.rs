@@ -870,10 +870,6 @@ fn find_physical_active(arr: &[serde_json::Value]) -> Option<&serde_json::Value>
         .find(|o| !is_headless_name(output_name(o)) && output_active(o))
 }
 
-fn find_physical(arr: &[serde_json::Value]) -> Option<&serde_json::Value> {
-    find_physical_active(arr).or_else(|| find_physical_any(arr))
-}
-
 fn output_size(o: &serde_json::Value) -> Option<(u32, u32)> {
     if let Some((w, h, _)) = o.get("current_mode").and_then(parse_mode) {
         return Some((w, h));
@@ -1226,16 +1222,6 @@ async fn list_outputs() -> anyhow::Result<Vec<serde_json::Value>> {
         .ok_or_else(|| anyhow::anyhow!("no outputs"))
 }
 
-async fn fetch_output_size() -> anyhow::Result<(u32, u32)> {
-    let arr = list_outputs().await?;
-    // Prefer the output that hosts viz: physical when active, else HEADLESS.
-    let o = find_physical(&arr)
-        .filter(|o| output_active(o))
-        .or_else(|| find_headless(&arr))
-        .ok_or_else(|| anyhow::anyhow!("no viz output"))?;
-    output_size(o).ok_or_else(|| anyhow::anyhow!("could not read output size"))
-}
-
 fn spawn_output_manager(display: DisplayState) {
     tokio::spawn(async move {
         // Retry until PointViz exists and is on the intended output. A one-shot
@@ -1294,7 +1280,11 @@ fn spawn_output_manager(display: DisplayState) {
                 if let Err(e) = place_viz_window(&display).await {
                     tracing::debug!(?e, "viz placement refresh failed");
                 }
-            } else if let Ok((nw, nh)) = fetch_output_size().await {
+            } else if let Some((nw, nh)) = arr
+                .iter()
+                .find(|o| Some(output_name(o)) == viz_out.as_deref())
+                .and_then(output_size)
+            {
                 let mut sz = display.inner.source_size.lock();
                 if *sz != (nw, nh) {
                     *sz = (nw, nh);

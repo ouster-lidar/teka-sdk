@@ -26,10 +26,17 @@ def test_display_controls(replay):
     replay.frames()
     display = replay.api("/display/status")
     if display["hdmi_present"]:
-        for enabled in (False, True):
+        for enabled in (False, True, False, True):
             replay.toggle("hdmi-toggle", enabled)
             replay.wait(lambda: replay.api("/display/status")["on_device"] == enabled)
+            # Let the periodic output refresh run after moving the viewer.
+            page.wait_for_timeout(3000)
             replay.frames()
+            display = replay.api("/display/status")
+            assert display["viz_output"].startswith("HEADLESS") == (not enabled)
+            if not enabled:
+                assert (display["width"], display["height"]) == (1920, 1080)
+                assert (display["stream_width"], display["stream_height"]) == (1920, 1080)
     else:
         expect(page.locator("#hdmi-toggle")).to_be_disabled()
 
