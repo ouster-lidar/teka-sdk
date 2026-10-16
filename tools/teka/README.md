@@ -47,12 +47,13 @@ From the repository root or `apps/`:
 ```sh
 teka app list
 teka app build hello-world --arch aarch64
-teka app deploy --build hello-world --host http://device.local
+teka app deploy --host http://device.local hello-world hello-pub
+teka app deploy --host http://device.local --build hello-world hello-pub
 teka system status --host http://device.local
 teka system update ./image.bin --wait --host http://device.local
 ```
 
-`build` links `./result/<app>` at the requested images and prints those paths. `deploy` uploads from `./result`; `deploy --build` selects the device architecture automatically.
+`build` links `./result/<app>` at the requested images and prints those paths. `deploy APP…` uploads named apps from `./result`; adding `--build` builds those apps for the device architecture first.
 
 `system update --wait` waits for a rebooting update to commit or fail.
 

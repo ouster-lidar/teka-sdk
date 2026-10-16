@@ -10,22 +10,16 @@ use std::time::Duration;
 const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug, Args)]
-#[command(group(
-    clap::ArgGroup::new("app")
-        .args(["apps", "build"])
-        .required(true)
-        .multiple(false)
-))]
 pub struct DeployOptions {
     /// URL of the Teka device
     #[arg(short = 'H', long, env = "TEKA_HOST", value_name = "URL")]
     pub host: String,
-    /// App IDs to deploy from ./result
-    #[arg(value_name = "APP")]
+    /// App IDs to deploy from ./result, or build when --build is set
+    #[arg(value_name = "APP", required = true, num_args = 1..)]
     pub apps: Vec<String>,
-    /// Build the named apps for the device before deploying
-    #[arg(long, value_name = "APP", num_args = 1..)]
-    pub build: Vec<String>,
+    /// Build apps for the device before deploying
+    #[arg(long)]
+    pub build: bool,
     /// App installation profile
     #[arg(long, default_value = "trusted")]
     pub profile: String,
@@ -89,8 +83,8 @@ fn ensure_result_target(target: &str) -> Result<()> {
 }
 
 pub fn run(args: DeployOptions) -> Result<()> {
-    let do_build = !args.build.is_empty();
-    let apps: &[String] = if do_build { &args.build } else { &args.apps };
+    let do_build = args.build;
+    let apps = &args.apps;
     build::validate_apps(apps)?;
     let client = DeviceClient::new(&args.host)?;
     client.authenticate()?;

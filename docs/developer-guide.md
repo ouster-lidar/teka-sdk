@@ -24,7 +24,7 @@ flowchart TD
 
     subgraph auto [3. teka app deploy auto flow]
         H[Confirm Teka web UI loads]
-        I[teka app deploy --build hello-ouster-terminal --host http://jetstream-$SN/]
+        I[teka app deploy --build --host http://jetstream-$SN/ hello-ouster-terminal]
         J[Open app and verify]
         H --> I --> J
     end
@@ -73,7 +73,7 @@ Replace `hello-ouster-terminal` with another app id as needed.
 
    ```bash
    export TEKA_PASSWORD='…'
-   teka app deploy --build hello-ouster-terminal --host http://zedbox-mini-nx-$SN.local/
+   teka app deploy --build --host http://zedbox-mini-nx-$SN.local/ hello-ouster-terminal
    ```
 
 ## Verify and iterate
