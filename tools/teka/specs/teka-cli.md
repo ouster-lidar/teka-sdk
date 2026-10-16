@@ -12,7 +12,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 | Command | Contract |
 |---------|----------|
 | `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
-| `teka app deploy APP…` / `teka app deploy --build APP…` | Deploy apps linked in `./result`, or build for the device architecture, replace apps, and verify startup logs |
+| `teka app deploy [--build] APP…` | Deploy apps linked in `./result`, or build the positional apps for the device architecture first; then verify startup logs |
 | `teka system status` | Print the device system status JSON |
 | `teka system update FILE [--no-reboot] [--wait]` | Upload and apply a system update file |
 | `teka <name> ARGS…` | Run plugin `teka-<name>` from `PATH` |
