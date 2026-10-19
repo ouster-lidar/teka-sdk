@@ -56,7 +56,7 @@ let
     version = "1.0.0";
     src = slidevSrcWithAssets;
 
-    npmDepsHash = "sha256-SK98Vga+VSVohVt5LLjTYw9p8ZDyjGylb6g3hGNeASo=";
+    npmDepsHash = "sha256-ixMJ/po2V9D0oi5FOj81tEf9HkXWQ7oNejsy+9+1ERA=";
 
     # Slidev build is custom; npm deps are fetched via npmDepsHash above.
     dontNpmBuild = true;
