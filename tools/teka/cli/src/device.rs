@@ -14,7 +14,20 @@ pub struct DeviceClient {
 
 impl DeviceClient {
     pub fn new(host: &str) -> Result<Self> {
-        let mut base = Url::parse(host).context("host must be an HTTP(S) URL")?;
+        let has_scheme = host.contains("://")
+            || host
+                .get(..5)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("http:"))
+            || host
+                .get(..6)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case("https:"));
+        // Shorthand hosts work, but explicit schemes are recommended for clarity.
+        let address = if has_scheme {
+            host.to_owned()
+        } else {
+            format!("http://{host}")
+        };
+        let mut base = Url::parse(&address).context("host must be an HTTP(S) URL")?;
         if !matches!(base.scheme(), "http" | "https")
             || base.host_str().is_none()
             || !base.username().is_empty()

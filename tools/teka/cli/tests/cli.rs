@@ -189,7 +189,7 @@ fn success(output: &Output) {
 }
 
 #[test]
-fn device_urls_preserve_scheme_port_and_base_path() {
+fn device_urls_default_scheme_and_preserve_port_and_base_path() {
     for scheme in ["http", "https"] {
         for suffix in ["", "/"] {
             let client =
@@ -200,9 +200,17 @@ fn device_urls_preserve_scheme_port_and_base_path() {
             );
         }
     }
+    for (host, expected) in [
+        ("device.local", "http://device.local/"),
+        ("device.local/proxy/", "http://device.local/proxy/"),
+        ("device.local:8443/proxy", "http://device.local:8443/proxy/"),
+    ] {
+        let client = DeviceClient::new(host).unwrap();
+        assert_eq!(client.endpoint("").unwrap().as_str(), expected);
+    }
     for url in [
+        "http://",
         "ftp://device.local",
-        "device.local",
         "https://user:secret@device.local",
         "https://device.local?token=secret",
         "https://device.local#fragment",
