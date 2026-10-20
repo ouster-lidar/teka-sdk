@@ -10,7 +10,8 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::Path,
     process::{Command, Output},
-    time::{Duration, Instant},
+    sync::mpsc,
+    time::Duration,
 };
 use tempfile::TempDir;
 
@@ -129,13 +130,12 @@ struct Request {
 fn serve(
     replies: Vec<(&'static str, &'static str)>,
 ) -> (String, std::thread::JoinHandle<Vec<Request>>) {
-    serve_delayed(replies, None, Duration::ZERO)
+    serve_with_hook(replies, |_| {})
 }
 
-fn serve_delayed(
+fn serve_with_hook(
     replies: Vec<(&'static str, &'static str)>,
-    delay_index: Option<usize>,
-    delay: Duration,
+    mut before_reply: impl FnMut(usize) + Send + 'static,
 ) -> (String, std::thread::JoinHandle<Vec<Request>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = format!("http://{}", listener.local_addr().unwrap());
@@ -171,9 +171,7 @@ fn serve_delayed(
                 headers,
                 body: payload,
             });
-            if delay_index == Some(index) {
-                std::thread::sleep(delay);
-            }
+            before_reply(index);
             write!(socket, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nSet-Cookie: session=test; Path=/\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
         }
         requests
@@ -574,10 +572,25 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
         ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
         ("200 OK", "x86 log"),
     ];
-    let (arm_url, arm_server) = serve_delayed(arm_replies, Some(2), Duration::from_millis(400));
-    let (x86_url, x86_server) = serve_delayed(x86_replies, Some(2), Duration::from_millis(400));
+    let (arm_tx, arm_rx) = mpsc::channel();
+    let (x86_tx, x86_rx) = mpsc::channel();
+    let (arm_url, arm_server) = serve_with_hook(arm_replies, move |index| {
+        if index == 2 {
+            arm_tx.send(()).unwrap();
+            x86_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("x86 install must start before arm install finishes");
+        }
+    });
+    let (x86_url, x86_server) = serve_with_hook(x86_replies, move |index| {
+        if index == 2 {
+            x86_tx.send(()).unwrap();
+            arm_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("arm install must start before x86 install finishes");
+        }
+    });
 
-    let started = Instant::now();
     let out = cli(d.path())
         .env("TEKA_HOST", "http://127.0.0.1:1")
         .env("TEKA_MOCK_PAYLOAD", "payload")
@@ -596,12 +609,7 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
         ])
         .output()
         .unwrap();
-    let elapsed = started.elapsed();
     success(&out);
-    assert!(
-        elapsed < Duration::from_millis(700),
-        "deploy took {elapsed:?}"
-    );
 
     let arm_requests = arm_server.join().unwrap();
     let x86_requests = x86_server.join().unwrap();
