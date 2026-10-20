@@ -10,6 +10,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::Path,
     process::{Command, Output},
+    time::{Duration, Instant},
 };
 use tempfile::TempDir;
 
@@ -42,12 +43,36 @@ const NIX_MOCK: &str = r#"if [ "$1" = build ]; then
         printf '%s\n' "$expr" >&2
         exit 1
     fi
-    rm -rf "$out"
-    mkdir -p "$out"
-    for name in $names; do
-        mkdir -p "$out/$name"
-        printf '%s' "${TEKA_MOCK_PAYLOAD:-app}" > "$out/$name/app.raw"
-    done
+    if printf '%s\n' "$expr" | grep -q 'pkgs.linkFarm "teka-multi"'; then
+        store="${out}-store-teka-multi"
+        rm -rf "$out" "$store"
+        mkdir -p "$store"
+        farm=
+        while IFS= read -r line; do
+            case "$line" in
+                *'pkgs.linkFarm "teka-'*)
+                    farm=$(printf '%s\n' "$line" | sed -n 's/.*pkgs.linkFarm "teka-\([^"]*\)".*/\1/p')
+                    ;;
+                *'name = "'* )
+                    name=$(printf '%s\n' "$line" | sed -n 's/.*name = "\([^"]*\)".*/\1/p')
+                    if [ -n "$farm" ] && [ "$farm" != multi ]; then
+                        mkdir -p "$store/$farm/$name"
+                        printf '%s:%s' "$farm" "${TEKA_MOCK_PAYLOAD:-app}" > "$store/$farm/$name/app.raw"
+                    fi
+                    ;;
+            esac
+        done <<EOF
+$expr
+EOF
+        ln -s "$store" "$out"
+    else
+        rm -rf "$out"
+        mkdir -p "$out"
+        for name in $names; do
+            mkdir -p "$out/$name"
+            printf '%s' "${TEKA_MOCK_PAYLOAD:-app}" > "$out/$name/app.raw"
+        done
+    fi
     printf '%s\n' "$@" "$expr" >> calls
 elif [ "$2" = --raw ]; then
     printf x86_64-linux
@@ -59,7 +84,6 @@ fn cli(dir: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_teka"));
     c.env_remove("TEKA_HOST")
         .env_remove("TEKA_PASSWORD")
-        .env_remove("TEKA_BOOTSTRAP_TOKEN")
         .env_remove("TEKA_APPS_FLAKE_ROOT")
         .env("TEKA_POST_DEPLOY_SEC", "0")
         .env("TEKA_LOG_SEC", "2")
@@ -105,11 +129,19 @@ struct Request {
 fn serve(
     replies: Vec<(&'static str, &'static str)>,
 ) -> (String, std::thread::JoinHandle<Vec<Request>>) {
+    serve_delayed(replies, None, Duration::ZERO)
+}
+
+fn serve_delayed(
+    replies: Vec<(&'static str, &'static str)>,
+    delay_index: Option<usize>,
+    delay: Duration,
+) -> (String, std::thread::JoinHandle<Vec<Request>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = format!("http://{}", listener.local_addr().unwrap());
     let handle = std::thread::spawn(move || {
         let mut requests = Vec::new();
-        for (status, body) in replies {
+        for (index, (status, body)) in replies.into_iter().enumerate() {
             let (mut socket, _) = listener.accept().unwrap();
             socket
                 .set_read_timeout(Some(std::time::Duration::from_secs(5)))
@@ -139,6 +171,9 @@ fn serve(
                 headers,
                 body: payload,
             });
+            if delay_index == Some(index) {
+                std::thread::sleep(delay);
+            }
             write!(socket, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nSet-Cookie: session=test; Path=/\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
         }
         requests
@@ -235,14 +270,11 @@ fn authenticated_install_streams_with_cookie_and_profile() {
 }
 
 #[test]
-fn setup_sends_bootstrap_token() {
+fn setup_sends_password() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
     let (url, server) = serve(vec![
-        (
-            "200 OK",
-            r#"{"needs_setup":true,"bootstrap_required":true}"#,
-        ),
+        ("200 OK", r#"{"needs_setup":true}"#),
         ("200 OK", "{}"),
         ("200 OK", r#"{"architecture":"amd64"}"#),
         ("200 OK", r#"{"success":true,"app_id":"app"}"#),
@@ -251,7 +283,6 @@ fn setup_sends_bootstrap_token() {
     success(
         &cli(d.path())
             .env("TEKA_PASSWORD", "secret")
-            .env("TEKA_BOOTSTRAP_TOKEN", "token")
             .args(["app", "deploy", "--build", "app", "--host", &url])
             .output()
             .unwrap(),
@@ -259,8 +290,8 @@ fn setup_sends_bootstrap_token() {
     let requests = server.join().unwrap();
     assert_eq!(requests[1].line, "POST /api/v1/auth/setup HTTP/1.1");
     assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&requests[1].body).unwrap()["bootstrap_token"],
-        "token"
+        serde_json::from_slice::<serde_json::Value>(&requests[1].body).unwrap(),
+        serde_json::json!({"password": "secret"})
     );
     assert_eq!(
         requests[3].line,
@@ -443,6 +474,15 @@ fn cli_rejects_invalid_usage() {
         vec!["app", "deploy"],
         vec!["app", "deploy", "--build"],
         vec!["app", "deploy", "hello-world", "--build", "hello-world"],
+        vec![
+            "app",
+            "deploy",
+            "--host",
+            "http://device",
+            "--jobs",
+            "0",
+            "app",
+        ],
         vec!["app", "build"],
         vec!["app", "build", "hello-world", "--arch", "unknown"],
     ] {
@@ -504,6 +544,237 @@ fn host_flag_overrides_environment() {
             .unwrap(),
     );
     server.join().unwrap();
+}
+
+#[test]
+fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let arm_replies = vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"arm64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "arm log"),
+        ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+        ("200 OK", "arm log"),
+    ];
+    let x86_replies = vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"amd64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "x86 log"),
+        ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+        ("200 OK", "x86 log"),
+    ];
+    let (arm_url, arm_server) = serve_delayed(arm_replies, Some(2), Duration::from_millis(400));
+    let (x86_url, x86_server) = serve_delayed(x86_replies, Some(2), Duration::from_millis(400));
+
+    let started = Instant::now();
+    let out = cli(d.path())
+        .env("TEKA_HOST", "http://127.0.0.1:1")
+        .env("TEKA_MOCK_PAYLOAD", "payload")
+        .args([
+            "app",
+            "deploy",
+            "--build",
+            "--jobs",
+            "2",
+            "--host",
+            &arm_url,
+            "--host",
+            &x86_url,
+            "app",
+            "hello-world",
+        ])
+        .output()
+        .unwrap();
+    let elapsed = started.elapsed();
+    success(&out);
+    assert!(
+        elapsed < Duration::from_millis(700),
+        "deploy took {elapsed:?}"
+    );
+
+    let arm_requests = arm_server.join().unwrap();
+    let x86_requests = x86_server.join().unwrap();
+    let install_bodies = |requests: &[Request]| {
+        requests
+            .iter()
+            .filter(|request| request.line.starts_with("POST /api/v1/manager/install"))
+            .map(|request| request.body.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        install_bodies(&arm_requests),
+        vec![b"aarch64-linux:payload".to_vec(); 2]
+    );
+    assert_eq!(
+        install_bodies(&x86_requests),
+        vec![b"x86_64-linux:payload".to_vec(); 2]
+    );
+    assert_eq!(
+        fs::read(d.path().join("result/aarch64-linux/app/app.raw")).unwrap(),
+        b"aarch64-linux:payload"
+    );
+    assert_eq!(
+        fs::read(d.path().join("result/x86_64-linux/app/app.raw")).unwrap(),
+        b"x86_64-linux:payload"
+    );
+
+    let calls = fs::read_to_string(d.path().join("calls")).unwrap();
+    assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
+    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"app-cross-aarch64-linux\""));
+    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world-cross-aarch64-linux\""));
+    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"app\""));
+    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world\""));
+
+    let (arm_url, arm_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "arm log"),
+    ]);
+    let (x86_url, x86_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "x86 log"),
+    ]);
+    success(
+        &cli(d.path())
+            .args([
+                "app", "deploy", "--host", &arm_url, "--host", &x86_url, "app",
+            ])
+            .output()
+            .unwrap(),
+    );
+    let arm_requests = arm_server.join().unwrap();
+    let x86_requests = x86_server.join().unwrap();
+    assert_eq!(
+        install_bodies(&arm_requests),
+        vec![b"aarch64-linux:payload".to_vec()]
+    );
+    assert_eq!(
+        install_bodies(&x86_requests),
+        vec![b"x86_64-linux:payload".to_vec()]
+    );
+}
+
+#[test]
+fn deploy_reuses_one_build_for_same_architecture_hosts() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let (first_url, first_server) = serve(vec![
+        ("200 OK", r#"{"enforcement":true}"#),
+        ("200 OK", "{}"),
+        ("200 OK", r#"{"architecture":"arm64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "healthy"),
+    ]);
+    let (second_url, second_server) = serve(vec![
+        ("200 OK", r#"{"enforcement":true}"#),
+        ("200 OK", "{}"),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "healthy"),
+    ]);
+    let out = cli(d.path())
+        .env("TEKA_PASSWORD", "secret")
+        .args([
+            "app",
+            "deploy",
+            "--build",
+            "--host",
+            &first_url,
+            "--host",
+            &second_url,
+            "app",
+        ])
+        .output()
+        .unwrap();
+    success(&out);
+    let first_requests = first_server.join().unwrap();
+    let second_requests = second_server.join().unwrap();
+    for requests in [&first_requests, &second_requests] {
+        assert_eq!(requests[1].line, "POST /api/v1/auth/login HTTP/1.1");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&requests[1].body).unwrap()["password"],
+            "secret"
+        );
+        assert_eq!(
+            requests
+                .iter()
+                .find(|request| request.line.starts_with("POST /api/v1/manager/install"))
+                .unwrap()
+                .body,
+            b"app"
+        );
+    }
+    let calls = fs::read_to_string(d.path().join("calls")).unwrap();
+    assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
+    assert!(calls.contains("pkgs.linkFarm \"teka-aarch64-linux\""));
+    assert!(!calls.contains("teka-multi"));
+    assert!(d.path().join("result/app/app.raw").is_file());
+}
+
+#[test]
+fn deploy_rejects_mixed_architectures_without_matching_build() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let (arm_url, arm_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+    ]);
+    let (x86_url, x86_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
+    ]);
+    let out = cli(d.path())
+        .args([
+            "app", "deploy", "--host", &arm_url, "--host", &x86_url, "app",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("mixed-architecture deploy"));
+    assert!(!d.path().join("calls").exists());
+    assert_eq!(arm_server.join().unwrap().len(), 2);
+    assert_eq!(x86_server.join().unwrap().len(), 2);
+}
+
+#[test]
+fn deploy_collects_failures_after_other_hosts_finish() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let (good_url, good_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "healthy"),
+    ]);
+    let (bad_url, bad_server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("500 Internal Server Error", "install failed"),
+    ]);
+    let out = cli(d.path())
+        .args([
+            "app", "deploy", "--build", "--host", &good_url, "--host", &bad_url, "app",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains(&format!("{good_url}: deploy succeeded")),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!("{bad_url}: device HTTP 500")),
+        "{stderr}"
+    );
+    assert_eq!(good_server.join().unwrap().len(), 4);
+    assert_eq!(bad_server.join().unwrap().len(), 3);
 }
 
 fn plugin_bin(dir: &Path, name: &str, body: &str) {

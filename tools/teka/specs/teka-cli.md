@@ -12,7 +12,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 | Command | Contract |
 |---------|----------|
 | `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
-| `teka app deploy [--build] APP…` | Deploy apps linked in `./result`, or build the positional apps for the device architecture first; then verify startup logs |
+| `teka app deploy [--build] [-H URL]… APP…` | Deploy the same apps to every host from `./result`, building for the device architectures first with `--build`; then verify startup logs |
 | `teka system status` | Print the device system status JSON |
 | `teka system update FILE [--no-reboot] [--wait]` | Upload and apply a system update file |
 | `teka <name> ARGS…` | Run plugin `teka-<name>` from `PATH` |
@@ -20,10 +20,11 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - `teka app build` passes a Nix expression on stdin (`nix build --file -`) whose value is a `linkFarm` of the requested apps (dependencies are the existing flake packages). `./result` is the one out-link, and `./result/<app>` refers to each app's store output. Stdout prints those `./result/<app>` paths. The farm name is `teka-<system>`; a later build replaces `./result`. A failed Nix build includes Nix's stderr in the error.
 
 - Deploy replaces apps in place; `--remove` removes existing apps before install. App logs use the install response's `app_id`; known runtime failures are errors.
-- App uploads use `/api/v1/manager/install`, and authentication uses `/api/v1/auth/*`. Support setup, bootstrap tokens, and login; reject unsuccessful HTTP responses and login redirects.
-- Accept HTTP(S) URLs with ports and base paths. Use HTTPS when given; read secrets from `TEKA_PASSWORD` / `TEKA_BOOTSTRAP_TOKEN`; keep session cookies in memory.
-- Host precedence is `-H`/`--host`, then `TEKA_HOST`; `deploy` fails with a usage error (exit 2) if neither is set. There is no default host.
-- `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system. `deploy --build` uses the device's architecture.
+- Deploy accepts repeatable `-H` / `--host`. Authenticate all hosts and read their architectures before building. `--build` builds unique targets in one Nix invocation; one target uses `result/<app>`, multiple targets use `result/<target>/<app>`. Without `--build`, artifacts must match every target. `--jobs` (default 4) limits concurrent host deployments; apps stay sequential per host. Collect failures by host and finish all deployments before failing; partial updates are possible.
+- App uploads use `/api/v1/manager/install`, and authentication uses `/api/v1/auth/*`. Support setup and login; reject unsuccessful HTTP responses and login redirects.
+- Accept HTTP(S) URLs with ports and base paths. Use HTTPS when given; read the password from `TEKA_PASSWORD`; keep session cookies in memory.
+- Explicit `-H`/`--host` values override the single-host `TEKA_HOST` fallback. `deploy` fails with a usage error (exit 2) if neither is set; there is no default host. `system` commands accept one host.
+- `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system.
 - Apps-flake precedence is `--flake`, `TEKA_APPS_FLAKE_ROOT`, then `apps/flake.nix` at the root of the enclosing git checkout. An apps flake exports `teka.apps`, an attrset of per-app metadata keyed by app id; `teka app list` prints its names without forcing values. Builds reject apps missing from `teka.apps`, and unsupported targets fail at build time. Other teka flake data goes under `teka.<name>`. CLI-specific environment variables use `TEKA_*`.
 
 ## System

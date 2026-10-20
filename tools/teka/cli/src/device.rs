@@ -76,21 +76,15 @@ impl DeviceClient {
         }
         let password = std::env::var("TEKA_PASSWORD")
             .context("device requires a session; set TEKA_PASSWORD")?;
-        let (path, body) = if status["needs_setup"] == true {
-            let mut body = json!({"password": password});
-            if status["bootstrap_required"] == true {
-                body["bootstrap_token"] = std::env::var("TEKA_BOOTSTRAP_TOKEN")
-                    .context("device setup requires TEKA_BOOTSTRAP_TOKEN")?
-                    .into();
-            }
-            ("api/v1/auth/setup", body)
+        let path = if status["needs_setup"] == true {
+            "api/v1/auth/setup"
         } else {
-            ("api/v1/auth/login", json!({"password": password}))
+            "api/v1/auth/login"
         };
         Self::response(
             self.client
                 .post(self.endpoint(path)?)
-                .json(&body)
+                .json(&json!({"password": password}))
                 .timeout(Duration::from_secs(30))
                 .send()?,
         )?;

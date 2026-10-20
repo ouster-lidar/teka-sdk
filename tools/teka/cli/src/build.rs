@@ -2,7 +2,7 @@ use crate::{checked_output, device::normalize_arch};
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, BTreeSet, HashSet},
     io::{IsTerminal, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -59,7 +59,22 @@ pub fn validate_apps(apps: &[String]) -> Result<()> {
 }
 
 pub fn build_apps(source: &BuildSource, apps: &[String], target: &str) -> Result<Vec<PathBuf>> {
+    build_apps_for_targets(source, apps, &[target.to_owned()])?
+        .remove(target)
+        .context("build did not produce requested target")
+}
+
+pub fn build_apps_for_targets(
+    source: &BuildSource,
+    apps: &[String],
+    targets: &[String],
+) -> Result<BTreeMap<String, Vec<PathBuf>>> {
     validate_apps(apps)?;
+    let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
+    if targets.is_empty() {
+        bail!("no device targets to build");
+    }
+    let multi_target = targets.len() > 1;
     let flake = find_apps_flake(source.flake.as_deref())?;
     let known = app_names(&flake)?;
     if let Some(app) = apps.iter().find(|app| !known.contains(app)) {
@@ -72,16 +87,31 @@ pub fn build_apps(source: &BuildSource, apps: &[String], target: &str) -> Result
         .args(["build", "--file", "-", "-L", "--out-link", RESULT])
         .args(["--no-write-lock-file", "--argstr", "flake"])
         .arg(&flake);
-    run_with_stdin(&mut command, &result_expr(&builder, target, apps))
-        .context("nix build failed")?;
-    raw_paths(apps)
+    let expr = if !multi_target {
+        result_expr(&builder, targets.first().unwrap(), apps)
+    } else {
+        multi_result_expr(&builder, &targets, apps)
+    };
+    run_with_stdin(&mut command, &expr).context("nix build failed")?;
+
+    targets
+        .into_iter()
+        .map(|target| {
+            let root = if multi_target {
+                PathBuf::from(RESULT).join(&target)
+            } else {
+                PathBuf::from(RESULT)
+            };
+            raw_paths_at(apps, &root).map(|paths| (target, paths))
+        })
+        .collect()
 }
 
-pub fn raw_paths(apps: &[String]) -> Result<Vec<PathBuf>> {
+pub fn raw_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
     apps.iter()
         .map(|app| {
-            single_raw(&Path::new(RESULT).join(app))
-                .with_context(|| format!("no image in {RESULT}/{app}"))
+            let path = root.join(app);
+            single_raw(&path).with_context(|| format!("no image in {}", path.display()))
         })
         .collect()
 }
@@ -155,16 +185,7 @@ pub fn target_package(builder: &str, app: &str, target: &str) -> (String, String
 /// One native derivation depending on the requested packages. Passed to
 /// `nix build --file -` so Nix does not treat a temp directory as a flake.
 fn result_expr(builder: &str, target: &str, apps: &[String]) -> String {
-    let entries = apps
-        .iter()
-        .map(|app| {
-            let (system, name) = target_package(builder, app, target);
-            format!(
-                "    {{\n      name = \"{app}\";\n      path = apps.packages.\"{system}\".\"{name}\";\n    }}"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    let entries = package_entries(builder, target, apps);
     format!(
         r#"{{ flake }}:
 let
@@ -176,6 +197,46 @@ pkgs.linkFarm "teka-{target}" [
 ]
 "#
     )
+}
+
+fn multi_result_expr(builder: &str, targets: &BTreeSet<String>, apps: &[String]) -> String {
+    let mut farms = Vec::new();
+    let mut links = Vec::new();
+    for (index, target) in targets.iter().enumerate() {
+        farms.push(format!(
+            "  target{index} = pkgs.linkFarm \"teka-{target}\" [\n{}\n  ];",
+            package_entries(builder, target, apps)
+        ));
+        links.push(format!(
+            "    {{ name = \"{target}\"; path = target{index}; }}"
+        ));
+    }
+    format!(
+        r#"{{ flake }}:
+let
+  apps = builtins.getFlake flake;
+  pkgs = apps.inputs.nixpkgs.legacyPackages."{builder}";
+{farms}
+in
+pkgs.linkFarm "teka-multi" [
+{links}
+]
+"#,
+        farms = farms.join("\n"),
+        links = links.join("\n")
+    )
+}
+
+fn package_entries(builder: &str, target: &str, apps: &[String]) -> String {
+    apps.iter()
+        .map(|app| {
+            let (system, name) = target_package(builder, app, target);
+            format!(
+                "    {{\n      name = \"{app}\";\n      path = apps.packages.\"{system}\".\"{name}\";\n    }}"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn nom_available() -> bool {

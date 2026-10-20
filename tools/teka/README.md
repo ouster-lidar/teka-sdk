@@ -46,7 +46,7 @@ From the repository root or `apps/`:
 
 ```sh
 teka app list
-teka app build hello-world --arch aarch64
+teka app build hello-world
 teka app deploy --host http://device.local hello-world hello-pub
 teka app deploy --host http://device.local --build hello-world hello-pub
 teka system status --host http://device.local
@@ -61,7 +61,7 @@ Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
 App builds use `apps/flake.nix` at the root of the enclosing git checkout; it must export `teka.apps`. Outside the checkout, use `--flake /path/to/apps` or set `TEKA_APPS_FLAKE_ROOT` to that directory.
 
-Set `TEKA_PASSWORD` to the device administrator password. Use `TEKA_BOOTSTRAP_TOKEN` when initial setup requires a token. Host URLs accept HTTP and HTTPS; `TEKA_HOST` supplies a default for `--host`.
+Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 
 ## Shell completion
 
