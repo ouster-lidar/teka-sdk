@@ -400,10 +400,13 @@ fn apps_flake_environment_and_flag_precedence() {
 #[test]
 fn apps_flake_is_found_at_git_root() {
     let d = TempDir::new().unwrap();
-    apps_flake(d.path());
-    let sub = d.path().join("nested/dir");
+    fs::create_dir(d.path().join(".git")).unwrap();
+    let root = d.path().join("checkout");
+    fs::create_dir(&root).unwrap();
+    apps_flake(&root);
+    let sub = root.join("nested/dir");
     fs::create_dir_all(&sub).unwrap();
-    let out = cli(d.path())
+    let out = cli(&root)
         .current_dir(&sub)
         .args(["app", "list"])
         .output()
@@ -411,14 +414,15 @@ fn apps_flake_is_found_at_git_root() {
     success(&out);
     assert_eq!(out.stdout, b"app\nhello-world\n");
 
-    fs::remove_dir(d.path().join(".git")).unwrap();
-    let out = cli(d.path())
+    fs::remove_dir(root.join(".git")).unwrap();
+    let out = cli(&root)
         .current_dir(&sub)
         .args(["app", "list"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("not in a git checkout"));
+    assert!(String::from_utf8_lossy(&out.stderr)
+        .contains(&format!("no apps/flake.nix in {}", d.path().display())));
 }
 
 #[test]
