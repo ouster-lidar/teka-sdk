@@ -1,26 +1,19 @@
 # App image erofs DDI format
 
-App images in `apps/` ship as **DDI** `.raw` files. The default format is **erofs** with the same compression tuning as the Jetstream appliance rootfs (see the appliance zedbox-mini-nx image layout spec for OTA benchmarks and kernel codec notes).
-
-At runtime **`systemd-dissect`**, **`portablectl`**, and the host app manager also accept legacy **squashfs** `.raw` images.
+App `.tpk` packages contain signed GPT **DDI** images with erofs and dm-verity per [teka-package.md](../../tools/teka/specs/teka-package.md).
+`makeAppImage` uses `systemd-repart` with the mkfs tuning below.
+Bind `roothash` into the package manifest.
 
 ## Decision
 
 | Choice | Rationale |
 |--------|-----------|
-| **erofs** (default) | Better random-access IO than squashfs for Nix store trees; same format as appliance root |
-| **lz4hc level 9** | Fast decode on 6.8-tegra; no experimental kernel warnings (unlike deflate) |
+| **erofs** (default) | Random-access IO for Nix store trees |
+| **lz4hc level 9** | Fast decode on 6.8-tegra |
 | **`-Efragments`** | Packs small tail-end file data into shared fragments (large win on Nix closures) |
 | **`-C 16384`** | 16 KiB compression clusters — smaller images than fragments alone; kernel ≥6.6 |
-| **`--all-root`** | App images are single-owner trees; matches appliance mkfs |
+| **`--all-root`** | App images are single-owner trees |
 | **`-T0`** | Reproducible inode timestamps |
-
-**Not used:**
-
-- **deflate-9** — ~3–8% smaller than lz4hc+fragments on the same trees, but **6.8.12-tegra** logs `EROFS: … deflate is experimental` at decode time. Reverted on appliance 2026-06-24.
-- **erofs zstd** — needs kernel **6.10+**; product tegra is **6.8.12-tegra**.
-- **`-Ededupe`** — ~20 MiB extra savings on a large closure but mkfs ~35× slower (single-threaded in erofs-utils 1.9); deferred.
-- **`-Efragments -C 32768` / `65536`** — modest extra savings vs C16k; C16k matches mkosi and appliance default; no product need to chase larger clusters yet.
 
 ## Canonical mkfs.erofs
 
@@ -29,9 +22,7 @@ mkfs.erofs --all-root -T0 -zlz4hc,level=9 -Efragments -C 16384 <output> <tree>
 fsck.erofs <output>
 ```
 
-**Build wiring (apps flake only):** `nix/erofs-mkfs.nix` emits the shell snippet; `nix/image-builder.nix` → `makeAppImage` is the only erofs entry point. App packages must not call `mkfs.erofs` directly.
-
-The Jetstream appliance rootfs uses the same flag set — keep mkfs flags aligned manually when tuning changes.
+**Build wiring (apps flake only):** Importing `nix/erofs-mkfs.nix` with `{ lib, erofs-utils }` returns shared `args` and a `mkfs` function accepting `{ output, sourceDir, extraArgs ? [ ] }`. `nix/image-builder.nix` → `makeAppImage` passes `args` to repart and remains the only erofs entry point. App packages must not call `mkfs.erofs` directly.
 
 ## Extension DDI sizes (`x86_64-linux` `*.raw`)
 

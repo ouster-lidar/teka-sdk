@@ -6,7 +6,9 @@ App image DDIs target **Linux** only. The `apps/` flake `systems` list may inclu
 
 On **Linux** build hosts, `<id>` is a native build for that system.
 
-On **non-Linux** build hosts (e.g. `aarch64-darwin`), `<id>` is an alias for the same-CPU Linux cross target (`hello-http` → `hello-http-cross-aarch64-linux`).
+On **non-Linux** build hosts (e.g. `aarch64-darwin`), `<id>` builds a Linux package for the same CPU.
+Explicit cross attributes select other Linux targets.
+These builds require a Linux builder.
 Use the short name from a Mac:
 
 ```bash
@@ -23,11 +25,11 @@ Explicit `*-cross-<system>` attrs remain on every build host for other targets.
 
 ## Distribution filenames
 
-Each app image derivation ships **`$out/<id>-<system>-v<compose>.raw`** (see [naming.md](naming.md)).
-The flake **`default`** bundle re-exports every native app image with that basename so mixed-arch upload folders stay unique. **`jetstream-portable-install`** copies into the catalog as **`<id>.raw`** (see [naming.md](naming.md)).
+Each public app derivation ships **`$out/<id>-<system>-v<compose>.tpk`** (see [naming.md](naming.md)).
+The flake **`default`** bundle re-exports every native app package with that basename so mixed-arch upload folders stay unique.
 
 ```bash
-nix build .#default   # on x86_64-linux: <id>-x86_64-linux-v<compose>.raw for every native app image
+nix build .#default   # on x86_64-linux: <id>-x86_64-linux-v<compose>.tpk for every native app package
 ```
 
 Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, …).

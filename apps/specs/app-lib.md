@@ -14,7 +14,7 @@ Group shared browser, SDK, overlay, and Wayland support by domain.
 |--------|------|
 | `mkApp` | App image builder context (`ps` in `default.nix`) |
 | `mkImageBuilder` | DDI image staging (`makeAppImage`, …) |
-| `flakeOutputs` | Full `packages` + `checks` for a `services` attrset |
+| `flakeOutputs` | Signed `.tpk` app `packages` + image `checks` for a `services` attrset |
 | `mkVersion` | `version.nix` — `IMAGE_VERSION`, `BUILD_ID`, `appArtifactRawName` |
 | `appCrate` | `app-crate.nix` — crate/web/manifest helpers (also on `ps.appCrate`) |
 | `paths` | Stable paths to shared nix (`erofs-mkfs`, `core-version-validate`) |
@@ -53,7 +53,7 @@ The snippet can inspect the image at `$raw`; generic filesystem, unit, and `os-r
 
 ## Host contract
 
-Install app manifests and web assets at host paths under `usr/lib/jetstream/mission-control/…`. Unit files reference `mission-control.service`; portable host checks use `jetstream-portable-check-*` and `ID_LIKE=jetstream-portable` in `os-release`. See jetstream-os for portable-service mechanics.
+Install app manifests and web assets at host paths under `usr/lib/jetstream/mission-control/…`.
 
 ## Runtime nftables leases
 

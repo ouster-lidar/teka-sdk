@@ -13,13 +13,17 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 |---------|----------|
 | `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
 | `teka app deploy [--build] [-H URL]… APP…` | Deploy the same apps to every host from `./result`, building for the device architectures first with `--build`; then verify startup logs |
+| `teka package pack --manifest PATH --member NAME=FILE --private-key KEY --certificate CERT --output FILE [--zstd-level N]` | Finalize the Bao root and stored payload descriptors, sign the manifest, and atomically create a Bao-authenticated TPK package |
+| `teka package verify FILE --trust DIR` | Require trusted manifest, image, verity and UKI verification; print the verification report as JSON |
+| `teka package stream FILE_OR_HTTP_URL --trust DIR --member NAME [--offset N --size N]` | Authenticate accessed groups on disk or complete sequential HTTP transport; emit only verified logical bytes |
+| `teka package inspect FILE [--verify [--trust DIR]] [--json] [-v]` | Read the manifest offline; `--verify` checks manifest and native signatures, BLAKE3, root hash binding and the dm-verity tree, checking trust only with `--trust` |
 | `teka system status` | Print the device system status JSON |
-| `teka system update FILE [--no-reboot] [--wait]` | Upload and apply a system update file |
+| `teka system update FILE [--no-reboot] [--wait]` | Upload and apply a `.tpk` package |
 | `teka <name> ARGS…` | Run plugin `teka-<name>` from `PATH` |
 
 - `teka app build` passes a Nix expression on stdin (`nix build --file -`) whose value is a `linkFarm` of the requested apps (dependencies are the existing flake packages). `./result` is the one out-link, and `./result/<app>` refers to each app's store output. Stdout prints those `./result/<app>` paths. The farm name is `teka-<system>`; a later build replaces `./result`. A failed Nix build includes Nix's stderr in the error.
 
-- Deploy replaces apps in place; `--remove` removes existing apps before install. App logs use the install response's `app_id`; known runtime failures are errors.
+- Deploy replaces apps in place; `--remove` removes existing apps before install. App logs use the install response's `app_id`; known runtime failures are errors. Inputs are [`.tpk`](teka-package.md) files or app names under `./result`; validate members, a single app component and architecture before upload.
 - Deploy accepts repeatable `-H` / `--host`. Authenticate all hosts and read their architectures before building. `--build` builds unique targets in one Nix invocation; one target uses `result/<app>`, multiple targets use `result/<target>/<app>`. Without `--build`, artifacts must match every target. `--jobs` (default 4) limits concurrent host deployments; apps stay sequential per host. Collect failures by host and finish all deployments before failing; partial updates are possible.
 - App uploads use `/api/v1/manager/install`, and authentication uses `/api/v1/auth/*`. Support setup and login; reject unsuccessful HTTP responses and login redirects.
 - Accept HTTP(S) URLs with ports and base paths. Use HTTPS when given; read the password from `TEKA_PASSWORD`; keep session cookies in memory.
@@ -30,7 +34,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 ## System
 
 - `teka system` uses `GET /api/v1/app/jetstream/status` and `POST /api/v1/app/jetstream/sysupdate/apply`.
-- `update` streams `FILE` as `application/octet-stream`, adds `?reboot=false` with `--no-reboot`, and prints the apply response JSON. The response `result` is `REBOOTING`, `INSTALLED_NO_REBOOT`, or `NO_UPDATE_NEEDED`.
+- `update` validates package structure and transport, a single OS component and architecture, then streams `FILE` as `application/octet-stream`, adds `?reboot=false` with `--no-reboot`, and prints the apply response JSON. The response `result` is `REBOOTING`, `INSTALLED_NO_REBOOT`, or `NO_UPDATE_NEEDED`.
 - `--wait` records the status `version` before upload. For `REBOOTING`, it reauthenticates and polls `update.commit_state`:
     - `COMMITTED` or `NONE` with a changed `version`: success; print the final status JSON.
     - `ABORTED_UNHEALTHY` or `FAILED_SET_DEFAULT`: error listing `update.failed_units`.
@@ -55,7 +59,16 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ## Output and exit codes
 
-- Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, and 2 for usage errors. Do not ask for confirmation.
+- Package JSON reports keep the parsed manifest under `manifest`. `package verify` includes runtime results under `verification`; `package inspect` includes that key only with `--verify`.
+- Plain inspection reads the bounded prefix and CMS object, then extracts the manifest JSON without authenticating it or reading payload bytes. Preserve its parsed fields without schema normalization; JSON output contains only `manifest`.
+- Verified inspection authenticates the manifest before parsing it, verifies complete BLAKE3 transport and native payloads, and keeps every runtime result under `verification`.
+- Native verification reports include decoded image and UKI sizes; these come from authenticated frame headers, not manifest storage lengths.
+- Text inspection starts with `Manifest` and indents component summaries and stored payload sizes beneath it. With `--verify`, add `Verification` with `Signatures`, `Integrity`, and `Publisher trust` groups indented beneath it, each itemizing its checks one level deeper; omit verification without `--verify`.
+- `Signatures` lists the manifest signature with its signing role and certificate fingerprint, then each component's image signature with its certificate fingerprint and, for OS components, its UKI Authenticode signature. `Integrity` lists BLAKE3 transport, then each component's root hash binding and dm-verity tree. Fingerprints are abbreviated like root hashes unless `--verbose`.
+- Mirror these groups under JSON `verification`: `signatures.manifest` and `signatures.native` each include `valid`; retain signer and component diagnostics under the corresponding signature group. `integrity` contains boolean `blake3`, `root_hash_binding`, and `dm_verity_tree` results. Do not duplicate trust flags or retain legacy verification keys.
+- Signature validity alone does not establish publisher trust. Without configured certificates, JSON `publisher_trust` is `{"status":"not_checked","reason":"no_trust_directory"}` and text shows exactly `· not checked (add --trust DIR to verify the publisher)`, with no separate trust hint. With trusted certificates, use `{"status":"trusted"}` and `✓ signing certificates match configured trust`.
+- A failed verification emits no success report or unchecked-trust result. `package verify` returns exit 3 for rejected package contents; input-file access, trust configuration, staging I/O and verifier process failures return exit 1. Keep these categories machine-readable without matching diagnostic text.
+- Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, 2 for usage errors, and 3 for rejected contents from `package verify`. Do not ask for confirmation.
 
 ## Packaging and checks
 
