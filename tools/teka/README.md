@@ -49,11 +49,16 @@ teka app list
 teka app build hello-world
 teka app deploy --host http://device.local hello-world hello-pub
 teka app deploy --host http://device.local --build hello-world hello-pub
+teka package pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
+teka package inspect hello-world.tpk
+teka package stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
 teka system status --host http://device.local
 teka system update ./image.bin --wait --host http://device.local
 ```
 
 `build` links `./result/<app>` at the requested images and prints those paths. `deploy APP…` uploads named apps from `./result`; adding `--build` builds those apps for the device architecture first.
+
+`package pack` concatenates stored payloads and protects them with 64 KiB Bao groups. It signs an external JSON manifest binding the Bao root, payload names, stored lengths, decoded sizes and encodings using the native image signing key and certificate. Signed lengths provide direct disk access to each payload. `stream` requires publisher trust and verifies groups before decoding bytes. Disk input accesses the selected member; HTTP(S) input reads sequentially and validates the complete transport. HTTP output may precede a late failure; activate only after successful completion.
 
 `system update --wait` waits for a rebooting update to commit or fail.
 

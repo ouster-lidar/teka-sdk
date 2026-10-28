@@ -2,6 +2,9 @@ pub mod build;
 pub mod completion;
 pub mod deploy;
 pub mod device;
+pub mod inspect;
+pub mod package;
+pub use package::PackageCommand;
 pub mod plugins;
 pub mod system;
 
@@ -20,6 +23,11 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Create, stream, and inspect TPK packages
+    Package {
+        #[command(subcommand)]
+        command: PackageCommand,
+    },
     /// Generate shell completions
     #[command(after_help = r#"Load once per shell:
   Bash: eval "$(teka completion bash)"
@@ -61,6 +69,7 @@ pub enum AppCommand {
 
 pub fn run(command: Command) -> Result<()> {
     match command {
+        Command::Package { command } => package::run(command),
         Command::Completion { shell } => completion::run(shell),
         Command::App { command } => match command {
             AppCommand::Deploy(args) => deploy::run(args),

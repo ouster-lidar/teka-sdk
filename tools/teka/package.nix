@@ -3,10 +3,13 @@
   stdenv,
   craneLib,
   advisoryDb ? null,
+  buildPackages,
   installShellFiles,
-  bash,
+  bashInteractive,
   fish,
   zsh,
+  openssl,
+  pkg-config,
 }:
 let
   common = {
@@ -15,7 +18,9 @@ let
     src = craneLib.cleanCargoSource ./.;
     strictDeps = true;
     CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
-    cargoExtraArgs = "--locked -p ouster-teka";
+    cargoExtraArgs = "--locked --workspace";
+    nativeBuildInputs = [ pkg-config ];
+    buildInputs = [ openssl ];
     doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
   };
   cargoArtifacts = craneLib.buildDepsOnly common;
@@ -42,11 +47,12 @@ craneLib.buildPackage (
   common
   // {
     inherit cargoArtifacts;
-    nativeBuildInputs = [ installShellFiles ];
+    nativeBuildInputs = common.nativeBuildInputs ++ [ installShellFiles ];
     nativeCheckInputs = [
-      bash
+      bashInteractive
       fish
       zsh
+      buildPackages.openssl
     ];
     postInstall = ''
       printf 'eval "$(%s completion bash)"\n' "$out/bin/teka" > teka.bash

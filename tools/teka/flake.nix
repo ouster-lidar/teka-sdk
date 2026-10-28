@@ -62,9 +62,15 @@
       );
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
+          buildInputs = [ nixpkgs.legacyPackages.${system}.openssl ];
           packages = with nixpkgs.legacyPackages.${system}; [
+            bashInteractive
             cargo
+            fish
             clippy
+            openssl
+            pkg-config
+            zsh
             rustc
             rustfmt
             nixfmt

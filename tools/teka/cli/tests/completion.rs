@@ -47,6 +47,7 @@ fn composes_plugins_without_changing_dispatch() {
         "plain",
         "example-tool",
         "app",
+        "package",
         "help",
         "completion",
         "not-executable",
@@ -65,7 +66,19 @@ fn composes_plugins_without_changing_dispatch() {
     for shell in ["bash", "fish", "zsh"] {
         let script = completion(dir.path(), dir.path().as_os_str(), shell);
         for word in [
-            "example", "plain", "verbose", "format", "json", "text", "aarch64", "arm64",
+            "example",
+            "plain",
+            "verbose",
+            "format",
+            "json",
+            "text",
+            "aarch64",
+            "arm64",
+            "pack",
+            "stream",
+            "inspect",
+            "private-key",
+            "certificate",
         ] {
             assert!(script.contains(word), "missing {word} in {shell}");
         }
@@ -138,11 +151,11 @@ fn metadata_follows_the_first_executable_on_path() {
     plugin(&second, "example");
     fs::write(second.join("teka-example.completion.json"), METADATA).unwrap();
     let path = std::env::join_paths([&first, &second, &first]).unwrap();
-    assert!(!completion(dir.path(), &path, "bash").contains("--verbose"));
+    assert!(!completion(dir.path(), &path, "bash").contains("--boot-disk"));
     fs::write(first.join("teka-example.completion.json"), METADATA).unwrap();
-    assert!(completion(dir.path(), &path, "bash").contains("--verbose"));
+    assert!(completion(dir.path(), &path, "bash").contains("--boot-disk"));
     fs::remove_file(first.join("teka-example")).unwrap();
-    assert!(completion(dir.path(), &path, "bash").contains("--verbose"));
+    assert!(completion(dir.path(), &path, "bash").contains("--boot-disk"));
 }
 
 #[test]
