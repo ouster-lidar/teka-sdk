@@ -23,7 +23,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Create, stream, and inspect TPK packages
+    /// Create, verify, stream, and inspect TPK packages
     Package {
         #[command(subcommand)]
         command: PackageCommand,
@@ -112,6 +112,8 @@ pub fn main_entry() -> i32 {
             eprintln!("teka: error: {e:#}");
             if plugins::is_usage(&e) {
                 2
+            } else if e.is::<package::Rejected>() {
+                3
             } else {
                 1
             }

@@ -138,6 +138,26 @@ fn requires_exact_bounded_signature_and_unambiguous_manifest() {
             "accepted {invalid}"
         );
     }
+    let certs = teka_pkg::verify::Certificates {
+        app: vec![certificate],
+        os: vec![],
+    };
+    let mut changed = package.clone();
+    changed.manifest_bytes.push(b' ');
+    assert!(
+        teka_pkg::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
+            .unwrap_err()
+            .to_string()
+            .contains("verify package manifest signature")
+    );
+    let mut changed = package.clone();
+    changed.manifest.components[0].root_hash = "b".repeat(64);
+    assert!(
+        teka_pkg::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
+            .unwrap_err()
+            .to_string()
+            .contains("differs from signed bytes")
+    );
 }
 
 #[test]
@@ -272,6 +292,12 @@ fn os_manifests_require_os_role_trust() {
         .unwrap()
         .remove("uki");
     assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&missing_uki).unwrap()).is_err());
+    assert!(
+        teka_pkg::verify::signatures(&mut Cursor::new(&archive), &package, Some(&trust))
+            .unwrap_err()
+            .to_string()
+            .contains("verify package manifest signature")
+    );
 }
 
 #[test]

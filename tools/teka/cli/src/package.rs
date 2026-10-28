@@ -3,12 +3,48 @@
 use anyhow::{ensure, Context, Result};
 use clap::Subcommand;
 use openssl::{pkey::PKey, x509::X509};
-use std::{collections::BTreeMap, fs::File, io::Read, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+};
+
+#[derive(Debug)]
+pub(crate) struct Rejected;
+
+impl std::fmt::Display for Rejected {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("package rejected")
+    }
+}
+
+impl std::error::Error for Rejected {}
+
+fn rejection(error: anyhow::Error) -> anyhow::Error {
+    if error.is::<teka_pkg::verify::Operational>()
+        || error.chain().any(|cause| {
+            cause
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|error| error.raw_os_error().is_some())
+        })
+    {
+        error
+    } else {
+        error.context(Rejected)
+    }
+}
 
 #[derive(Debug, Subcommand)]
 pub enum PackageCommand {
     /// Inspect a TPK package offline
     Inspect(crate::inspect::InspectOptions),
+    /// Verify trusted package and native image signatures, verity, and UKIs
+    Verify {
+        file: PathBuf,
+        #[arg(long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
+        trust: PathBuf,
+    },
     /// Authenticate and emit a logical member range from disk or HTTP(S)
     Stream {
         #[arg(value_name = "FILE_OR_HTTP_URL")]
@@ -42,6 +78,23 @@ pub enum PackageCommand {
 pub fn run(command: PackageCommand) -> Result<()> {
     match command {
         PackageCommand::Inspect(args) => crate::inspect::run(args),
+        PackageCommand::Verify { file, trust } => {
+            use teka_pkg::verify::{signatures, Certificates};
+            let mut file = File::open(file)?;
+            ensure!(file.metadata()?.is_file(), "input must be a regular file");
+            let certificates = Certificates::load(&trust)?;
+            let verified = (|| {
+                let package = teka_pkg::read_trusted(&mut file, &certificates)?;
+                signatures(&mut file, &package, Some(&certificates))
+            })()
+            .map_err(rejection)?;
+            writeln!(
+                std::io::stdout().lock(),
+                "{}",
+                serde_json::to_string(&verified)?
+            )?;
+            Ok(())
+        }
         PackageCommand::Stream {
             file,
             trust,
@@ -131,5 +184,27 @@ pub fn run(command: PackageCommand) -> Result<()> {
             staging.persist_noclobber(output)?;
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+
+    #[test]
+    fn rejection_preserves_operational_causes() {
+        for kind in [
+            io::ErrorKind::InvalidData,
+            io::ErrorKind::UnexpectedEof,
+            io::ErrorKind::Other,
+        ] {
+            assert!(rejection(io::Error::new(kind, "invalid payload").into()).is::<Rejected>());
+        }
+        let error = anyhow::Error::new(io::Error::from_raw_os_error(5)).context("read payload");
+        assert!(!rejection(error).is::<Rejected>());
+        let error =
+            anyhow::Error::msg("temporary output failed").context(teka_pkg::verify::Operational);
+        assert!(!rejection(error).is::<Rejected>());
     }
 }

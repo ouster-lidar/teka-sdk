@@ -1,9 +1,11 @@
+mod common;
 use ouster_teka::{
     build::{single_raw, target_package, validate_apps},
     deploy::check_logs,
     device::{normalize_arch, DeviceClient},
 };
 use std::{
+    collections::BTreeMap,
     fs,
     io::{Read, Write},
     net::TcpListener,
@@ -13,6 +15,7 @@ use std::{
     sync::mpsc,
     time::Duration,
 };
+use teka_pkg::{Architecture, Component, ComponentType, Manifest};
 use tempfile::TempDir;
 
 fn apps_flake(dir: &Path) {
@@ -26,6 +29,38 @@ fn apps_flake(dir: &Path) {
 fn script(path: &Path, text: &str) {
     fs::write(path, format!("#!/bin/sh\n{text}\n")).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+fn os_package(dir: &Path, name: &str, arch: Architecture) -> std::path::PathBuf {
+    fs::create_dir_all(dir).unwrap();
+    let source = tempfile::tempdir_in(dir).unwrap();
+    let image = source.path().join("os.raw");
+    let uki = source.path().join("os.efi");
+    fs::write(&image, b"OS image".repeat(512)).unwrap();
+    fs::write(&uki, b"UKI".repeat(1024)).unwrap();
+    let manifest = Manifest {
+        format: 1,
+        bao_root: None,
+        arch,
+        components: vec![Component {
+            kind: ComponentType::Os,
+            id: "device".into(),
+            version: "test".into(),
+            root_hash: "a".repeat(64),
+            image: teka_pkg::file_descriptor(&image, "os.raw").unwrap(),
+            uki: Some(teka_pkg::file_descriptor(&uki, "os.efi").unwrap()),
+        }],
+    };
+    let path = dir.join(name);
+    teka_pkg::pack(
+        &mut fs::File::create(&path).unwrap(),
+        &manifest,
+        &BTreeMap::from([("os.raw".into(), image), ("os.efi".into(), uki)]),
+        common::signing(true).0,
+        common::signing(true).1,
+    )
+    .unwrap();
+    path
 }
 
 const NIX_MOCK: &str = r#"if [ "$1" = build ]; then
@@ -498,6 +533,121 @@ fi"#,
 }
 
 #[test]
+fn package_inspect_lists_manifest_without_verifying() {
+    let d = TempDir::new().unwrap();
+    let path = os_package(d.path(), "os.tpk", Architecture::X86_64);
+    let original = fs::read(&path).unwrap();
+    let package = teka_pkg::read(&mut std::io::Cursor::new(&original)).unwrap();
+    let manifest: serde_json::Value = serde_json::from_slice(&package.manifest_bytes).unwrap();
+    let out = cli(d.path())
+        .args(["package", "inspect"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    success(&out);
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.starts_with("Manifest\n  device test (OS, x86_64)\n  root ")
+            && text.contains("- os.efi")
+            && text.contains("zstd")
+            && !text.contains("Verification")
+            && !text.contains('✓'),
+        "{text}"
+    );
+    let inspect_json = || {
+        let out = cli(d.path())
+            .args(["package", "inspect", "--json"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        success(&out);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap(),
+            serde_json::json!({"manifest": manifest})
+        );
+    };
+    inspect_json();
+    let mut changed_signature = original.clone();
+    changed_signature[16 + package.signature.len() - 1] ^= 1;
+    let mut changed_payload = original;
+    *changed_payload.last_mut().unwrap() ^= 1;
+    for (bytes, error) in [
+        (changed_signature, "authenticate envelope"),
+        (changed_payload, "HashMismatch"),
+    ] {
+        fs::write(&path, bytes).unwrap();
+        inspect_json();
+        let rejected = cli(d.path())
+            .args(["package", "inspect", "--json", "--verify"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        assert_eq!(rejected.status.code(), Some(1));
+        assert!(rejected.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&rejected.stderr).contains(error));
+    }
+}
+
+#[test]
+fn package_inspect_preserves_raw_json_and_bounds_manifest() {
+    let d = TempDir::new().unwrap();
+    let path = d.path().join("diagnostic.tpk");
+    let manifest = serde_json::json!({
+        "format": 99, "arch": null, "bao_root": null,
+        "components": [{"type": "future", "version": null, "custom": {"nullable": null}}],
+        "diagnostic": [1, null, "unknown"]
+    });
+    let json = serde_json::to_vec(&manifest).unwrap();
+    let cms = openssl::pkcs7::Pkcs7::sign(
+        common::signing(false).1,
+        common::signing(false).0,
+        &openssl::stack::Stack::new().unwrap(),
+        &json,
+        openssl::pkcs7::Pkcs7Flags::NOATTR | openssl::pkcs7::Pkcs7Flags::BINARY,
+    )
+    .unwrap()
+    .to_der()
+    .unwrap();
+    let mut bytes = teka_pkg::MAGIC.to_vec();
+    bytes.extend((cms.len() as u32).to_le_bytes());
+    bytes.extend(0u32.to_le_bytes());
+    bytes.extend(&cms);
+    fs::write(&path, &bytes).unwrap();
+    let inspect = |json: bool| {
+        let mut command = cli(d.path());
+        command.args(["package", "inspect"]).arg(&path);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+    let out = inspect(true);
+    success(&out);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap(),
+        serde_json::json!({"manifest": manifest})
+    );
+    let text = inspect(false);
+    assert_eq!(text.status.code(), Some(1));
+    assert!(text.stdout.is_empty());
+    let mut invalid = vec![bytes[..15].to_vec(), bytes[..bytes.len() - 1].to_vec()];
+    let mut bad_magic = bytes.clone();
+    bad_magic[0] ^= 1;
+    invalid.push(bad_magic);
+    for (offset, size) in [(8, 0), (8, teka_pkg::MAX_SIGNATURE as u32 + 1), (12, 1)] {
+        let mut changed = bytes.clone();
+        changed[offset..offset + 4].copy_from_slice(&size.to_le_bytes());
+        invalid.push(changed);
+    }
+    for bytes in invalid {
+        fs::write(&path, bytes).unwrap();
+        let out = inspect(true);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(out.stdout.is_empty());
+    }
+}
+
+#[test]
 fn cli_rejects_invalid_usage() {
     let d = TempDir::new().unwrap();
     for args in [
@@ -515,6 +665,7 @@ fn cli_rejects_invalid_usage() {
         ],
         vec!["app", "build"],
         vec!["app", "build", "hello-world", "--arch", "unknown"],
+        vec!["package", "inspect", "x.tpk", "--trust", "dir"],
     ] {
         let out = cli(d.path()).args(&args).output().unwrap();
         assert_eq!(

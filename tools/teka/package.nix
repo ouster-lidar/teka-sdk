@@ -10,6 +10,7 @@
   zsh,
   openssl,
   pkg-config,
+  ukiVerifier,
 }:
 let
   common = {
@@ -19,9 +20,12 @@ let
     strictDeps = true;
     CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
     cargoExtraArgs = "--locked --workspace";
+    doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    ${if stdenv.hostPlatform.isLinux then "TEKA_SBVERIFY" else "TEKA_OSSLSIGNCODE"} =
+      lib.getExe' ukiVerifier
+        (if stdenv.hostPlatform.isLinux then "sbverify" else "osslsigncode");
     nativeBuildInputs = [ pkg-config ];
     buildInputs = [ openssl ];
-    doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
   };
   cargoArtifacts = craneLib.buildDepsOnly common;
   cargoChecks = {
@@ -47,13 +51,25 @@ craneLib.buildPackage (
   common
   // {
     inherit cargoArtifacts;
-    nativeBuildInputs = common.nativeBuildInputs ++ [ installShellFiles ];
+    nativeBuildInputs = common.nativeBuildInputs ++ [
+      installShellFiles
+    ];
     nativeCheckInputs = [
       bashInteractive
       fish
       zsh
-      buildPackages.openssl
-    ];
+    ]
+    ++ (
+      with buildPackages;
+      [
+        openssl
+        osslsigncode
+      ]
+      ++ lib.optionals stdenv.hostPlatform.isLinux [
+        cryptsetup
+        sbsigntool
+      ]
+    );
     postInstall = ''
       printf 'eval "$(%s completion bash)"\n' "$out/bin/teka" > teka.bash
       printf '%s completion fish | source\n' "$out/bin/teka" > teka.fish

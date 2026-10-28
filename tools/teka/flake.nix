@@ -25,6 +25,11 @@
         pkgs.callPackage ./package.nix {
           craneLib = crane.mkLib pkgs;
           advisoryDb = rustsecAdvisoryDb;
+          ukiVerifier =
+            if pkgs.stdenv.hostPlatform.isLinux then
+              nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sbsigntool
+            else
+              pkgs.osslsigncode;
         };
     in
     {
@@ -63,18 +68,29 @@
       devShells = forAllSystems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           buildInputs = [ nixpkgs.legacyPackages.${system}.openssl ];
-          packages = with nixpkgs.legacyPackages.${system}; [
-            bashInteractive
-            cargo
-            fish
-            clippy
-            openssl
-            pkg-config
-            zsh
-            rustc
-            rustfmt
-            nixfmt
-          ];
+          packages =
+            with nixpkgs.legacyPackages.${system};
+            [
+              bashInteractive
+              cargo
+              fish
+              clippy
+              rustc
+              rustfmt
+              zsh
+              nixfmt
+              openssl
+              osslsigncode
+              pkg-config
+            ]
+            ++ nixpkgs.lib.optionals (nixpkgs.lib.hasSuffix "-linux" system) (
+              with nixpkgs.legacyPackages.${system};
+              [
+                cryptsetup
+                erofs-utils
+                sbsigntool
+              ]
+            );
         };
       });
     };

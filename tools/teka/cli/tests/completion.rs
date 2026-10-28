@@ -75,6 +75,7 @@ fn composes_plugins_without_changing_dispatch() {
             "aarch64",
             "arm64",
             "pack",
+            "verify",
             "stream",
             "inspect",
             "private-key",

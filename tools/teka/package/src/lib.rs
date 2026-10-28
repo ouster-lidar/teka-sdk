@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 mod cms;
+pub mod image;
 mod stream;
 pub mod transport;
+pub mod uki;
 pub mod verify;
 mod zstd_member;
 pub use stream::stream;
@@ -367,8 +369,7 @@ impl Member {
     }
 }
 
-/// Checks complete authenticated transport and decodes every member.
-pub fn verify(reader: &mut (impl Read + Seek), package: &Package) -> Result<()> {
+pub(crate) fn validate_metadata(package: &Package) -> Result<()> {
     let manifest = Manifest::parse(&package.manifest_bytes)?;
     ensure!(
         manifest == package.manifest,
@@ -395,10 +396,18 @@ pub fn verify(reader: &mut (impl Read + Seek), package: &Package) -> Result<()> 
                 && member.archive_offset == package.archive_offset,
             "package member differs from manifest"
         );
-        member.check(reader, io::sink())?;
         offset = offset
             .checked_add(file.size)
             .context("member offset overflow")?;
+    }
+    Ok(())
+}
+
+/// Checks complete authenticated transport and decodes every member.
+pub fn verify(reader: &mut (impl Read + Seek), package: &Package) -> Result<()> {
+    validate_metadata(package)?;
+    for member in &package.members {
+        member.check(reader, io::sink())?;
     }
     Ok(())
 }

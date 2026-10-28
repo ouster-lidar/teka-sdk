@@ -79,9 +79,16 @@ run_install_command() {
 
 status "Building with $builder"
 if [ "$builder" = nix ]; then
-  store_path=$(nix build --no-link --print-out-paths ./tools/teka#portable) || fail 'Nix build failed'
+  runtime_root="${XDG_DATA_HOME:-$HOME/.local/share}/teka"
+  mkdir -p "$(dirname "$runtime_root")" || fail 'cannot create Teka runtime directory'
+  store_path=$(nix build --out-link "$runtime_root" --print-out-paths ./tools/teka#portable) || fail 'Nix build failed'
   binary="$store_path/bin/teka"
 else
+  case "$os" in
+    Linux) verifier=sbverify; dependency='sbsigntool (Linux package manager)' ;;
+    Darwin) verifier=osslsigncode; dependency='osslsigncode (brew install osslsigncode)' ;;
+  esac
+  command -v "$verifier" >/dev/null 2>&1 || fail "$verifier is required for package verification; install $dependency"
   command -v rustc >/dev/null 2>&1 || fail 'rustc is required when building with Cargo'
   cargo_target=$(rustc -vV | sed -n 's/^host: //p')
   [ -n "$cargo_target" ] || fail 'cannot determine Rust host target'

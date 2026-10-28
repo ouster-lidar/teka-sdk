@@ -121,7 +121,6 @@ enum Mode {
     Detached,
 }
 
-#[cfg(test)]
 pub(crate) fn validate(der: &[u8]) -> Result<()> {
     validate_profile(der, Mode::Detached)
 }
@@ -268,7 +267,6 @@ fn sign_content(
     Ok(signature)
 }
 
-#[cfg(test)]
 pub(crate) fn verify(
     content: &[u8],
     der: &[u8],
