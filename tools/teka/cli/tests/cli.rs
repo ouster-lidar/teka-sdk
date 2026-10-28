@@ -276,6 +276,26 @@ fn authenticated_install_streams_with_cookie_and_profile() {
 }
 
 #[test]
+fn deploy_stops_when_removal_fails() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"amd64"}"#),
+        ("500 Internal Server Error", "removal failed"),
+    ]);
+    let out = cli(d.path())
+        .args([
+            "app", "deploy", "--build", "app", "--host", &url, "--remove",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("removal failed"));
+    assert_eq!(server.join().unwrap().len(), 3);
+}
+
+#[test]
 fn setup_sends_password() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());

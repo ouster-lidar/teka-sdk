@@ -115,11 +115,12 @@ impl DeviceClient {
 
     pub fn remove_app(&self, name: &str) -> Result<()> {
         let url = self.app_endpoint(name, "remove")?;
-        let _ = self
-            .client
-            .post(url)
-            .timeout(Duration::from_secs(30))
-            .send();
+        Self::response(
+            self.client
+                .post(url)
+                .timeout(Duration::from_secs(30))
+                .send()?,
+        )?;
         Ok(())
     }
 
