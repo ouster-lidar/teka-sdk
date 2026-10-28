@@ -1363,12 +1363,12 @@ fn plugins_in_empty_path_entries_are_listed_and_dispatched() {
 #[test]
 fn system_status_prints_json_and_update_streams() {
     let d = TempDir::new().unwrap();
-    let image = d.path().join("update.bin");
-    fs::write(&image, b"sysimage").unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
         ("200 OK", r#"{"version":"1.0","ok":true}"#),
         ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"amd64"}"#),
         ("200 OK", r#"{"result":"INSTALLED_NO_REBOOT"}"#),
     ]);
     let out = system_cli(d.path())
@@ -1399,19 +1399,23 @@ fn system_status_prints_json_and_update_streams() {
     );
     assert_eq!(
         requests[3].line,
+        "GET /api/v1/platform/architecture HTTP/1.1"
+    );
+    assert_eq!(
+        requests[4].line,
         "POST /api/v1/app/jetstream/sysupdate/apply?reboot=false HTTP/1.1"
     );
-    assert_eq!(requests[3].body, b"sysimage");
+    assert_eq!(requests[4].body, fs::read(&image).unwrap());
 }
 
 #[test]
 fn system_update_login_and_http_errors() {
     let d = TempDir::new().unwrap();
-    let image = d.path().join("update.bin");
-    fs::write(&image, b"x").unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"enforcement":true}"#),
         ("200 OK", "{}"),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
         ("200 OK", r#"{"result":"INSTALLED_NO_REBOOT"}"#),
     ]);
     success(
@@ -1423,6 +1427,11 @@ fn system_update_login_and_http_errors() {
     );
     let requests = server.join().unwrap();
     assert_eq!(requests[1].line, "POST /api/v1/auth/login HTTP/1.1");
+    assert_eq!(
+        requests[2].line,
+        "GET /api/v1/platform/architecture HTTP/1.1"
+    );
+    assert_eq!(requests[3].body, fs::read(&image).unwrap());
     let (url, server) = serve(vec![("401 Unauthorized", "nope")]);
     let out = system_cli(d.path())
         .args(["system", "status", "--host", &url])
@@ -1436,10 +1445,10 @@ fn system_update_login_and_http_errors() {
 #[test]
 fn system_update_wait_commits_after_reboot() {
     let d = TempDir::new().unwrap();
-    let image = d.path().join("update.bin");
-    fs::write(&image, b"payload").unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
         ("200 OK", r#"{"version":"old"}"#),
         ("200 OK", r#"{"result":"REBOOTING"}"#),
         ("503 Service Unavailable", "restarting"),
@@ -1495,10 +1504,10 @@ fn system_update_wait_commits_after_reboot() {
 #[test]
 fn system_update_wait_aborts_on_unhealthy() {
     let d = TempDir::new().unwrap();
-    let image = d.path().join("update.bin");
-    fs::write(&image, b"x").unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
         ("200 OK", r#"{"version":"old"}"#),
         ("200 OK", r#"{"result":"REBOOTING"}"#),
         ("200 OK", r#"{"auth_disabled":true}"#),
@@ -1532,10 +1541,10 @@ fn system_update_wait_aborts_on_unhealthy() {
 #[test]
 fn system_update_wait_detects_rollback() {
     let d = TempDir::new().unwrap();
-    let image = d.path().join("update.bin");
-    fs::write(&image, b"x").unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"x86_64"}"#),
         ("200 OK", r#"{"version":"same"}"#),
         ("200 OK", r#"{"result":"REBOOTING"}"#),
         ("200 OK", r#"{"auth_disabled":true}"#),
@@ -1564,6 +1573,79 @@ fn system_update_wait_detects_rollback() {
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("rolled back"));
     server.join().unwrap();
+}
+
+#[test]
+fn system_update_rejects_invalid_packages_before_contacting_device() {
+    let d = TempDir::new().unwrap();
+    let valid = os_package(d.path(), "valid.tpk", Architecture::X86_64);
+    let raw = d.path().join("os.raw");
+    std::os::unix::fs::symlink(&valid, &raw).unwrap();
+    let invalid_extension = d.path().join("update.invalid");
+    fs::copy(&valid, &invalid_extension).unwrap();
+    let malformed = d.path().join("malformed.tpk");
+    fs::write(&malformed, b"not an archive").unwrap();
+    let directory = d.path().join("directory.tpk");
+    fs::create_dir(&directory).unwrap();
+    let app = app_package(d.path(), "app.tpk", Architecture::X86_64, &["app"]);
+    let multiple = app_package(
+        d.path(),
+        "multiple.tpk",
+        Architecture::X86_64,
+        &["app", "other"],
+    );
+    let image_digest = os_package(d.path(), "image-digest.tpk", Architecture::X86_64);
+    corrupt_package(&image_digest, 0);
+    let uki_digest = os_package(d.path(), "uki-digest.tpk", Architecture::X86_64);
+    corrupt_package(&uki_digest, 1);
+    for (path, expected) in [
+        (raw, "requires a .tpk file"),
+        (invalid_extension, "requires a .tpk file"),
+        (malformed, "read TPK envelope"),
+        (directory, "input must be a regular file"),
+        (app, "requires an OS component"),
+        (multiple, "exactly one component"),
+        (image_digest, "HashMismatch"),
+        (uki_digest, "HashMismatch"),
+    ] {
+        let out = system_cli(d.path())
+            .args(["system", "update", "--host", "http://127.0.0.1:1"])
+            .arg(&path)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(1), "{stderr}");
+        assert!(
+            stderr.contains(expected)
+                && stderr.contains(path.file_name().unwrap().to_str().unwrap()),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn system_update_rejects_architecture_before_upload() {
+    let d = TempDir::new().unwrap();
+    let image = os_package(d.path(), "update.tpk", Architecture::X86_64);
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"arm64"}"#),
+        ("200 OK", "{}"),
+    ]);
+    let out = system_cli(d.path())
+        .args(["system", "update", "--host", &url])
+        .arg(&image)
+        .output()
+        .unwrap();
+    assert!(DeviceClient::new(&url).unwrap().get_json("done").is_ok());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("is for x86_64; device is aarch64"));
+    assert!(server
+        .join()
+        .unwrap()
+        .iter()
+        .all(|r| r.line.starts_with("GET ")));
 }
 
 #[test]

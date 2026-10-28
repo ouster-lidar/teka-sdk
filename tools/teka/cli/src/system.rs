@@ -1,5 +1,5 @@
 use crate::device::DeviceClient;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::Value;
 use std::{
@@ -143,12 +143,20 @@ pub fn run_status(args: StatusOptions) -> Result<()> {
 }
 
 pub fn run_update(args: UpdateOptions) -> Result<()> {
+    let manifest = teka_pkg::read_single(&args.file, teka_pkg::ComponentType::Os)?;
     let file = args
         .file
         .canonicalize()
         .with_context(|| format!("open {}", args.file.display()))?;
     let client = DeviceClient::new(&args.host)?;
     client.authenticate()?;
+    let architecture = client.architecture()?;
+    ensure!(
+        manifest.arch.as_str() == architecture,
+        "{} is for {}; device is {architecture}",
+        args.file.display(),
+        manifest.arch.as_str()
+    );
     let before_version = if args.wait {
         Some(status_version(&client.jetstream_status()?).to_owned())
     } else {

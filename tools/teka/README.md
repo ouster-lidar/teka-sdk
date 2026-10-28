@@ -57,7 +57,7 @@ teka package verify hello-world.tpk --trust ./trust
 teka package inspect hello-world.tpk --verify --trust ./trust
 teka package stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
 teka system status --host http://device.local
-teka system update ./image.bin --wait --host http://device.local
+teka system update ./image.tpk --wait --host http://device.local
 ```
 
 `build` links `./result/<app>` at the requested images and prints those paths. `deploy APP…` uploads named apps from `./result`; adding `--build` builds those apps for the device architecture first.
