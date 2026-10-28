@@ -3,13 +3,18 @@
   stdenv,
   runCommand,
   erofs-utils,
+  fakeroot,
+  jq,
+  systemd,
+  util-linux,
   pkgsStatic,
   closureInfo,
   version,
 }:
 let
   inherit (version) imageVersion buildId appArtifactRawName;
-  mkCanonicalErofs = import ./erofs-mkfs.nix;
+  erofs = import ./erofs-mkfs.nix { inherit lib erofs-utils; };
+  signedDdi = import ./signed-ddi.nix { inherit lib; };
   # IMAGE_VERSION / VERSION / BUILD_ID follow the app release scheme. ID stays
   # the portable name. VERSION_ID=1 is the current GPU compatibility generation
   # shared with the host portable-gl-extension (not host or app SemVer).
@@ -48,18 +53,24 @@ let
       artifactRaw = appArtifactRawName name system;
       busybox = pkgsStatic.busybox;
       closureDrv = if runtimeClosures == [ ] then null else closureInfo { rootPaths = runtimeClosures; };
-      packImage = mkCanonicalErofs {
-        inherit lib erofs-utils;
-        output = "$out/${artifactRaw}";
-        sourceDir = "tree";
-      };
+      architecture = if stdenv.hostPlatform.isAarch64 then "arm64" else "x86-64";
     in
 
+    assert lib.assertMsg stdenv.buildPlatform.isLinux
+      "signed app images require a Linux builder; use teka app build to select one";
     runCommand "${name}-${system}"
       {
         # Avoid shipping large .raw DDIs to/from remote x86 builders when inputs are already local.
         preferLocalBuild = true;
-        nativeBuildInputs = [ erofs-utils ];
+        nativeBuildInputs = [
+          erofs-utils
+          fakeroot
+          jq
+          systemd
+          util-linux
+        ];
+        SOURCE_DATE_EPOCH = 0;
+        SYSTEMD_REPART_MKFS_OPTIONS_EROFS = lib.concatStringsSep " " erofs.args;
         passthru = { inherit cargoChecks; };
       }
       ''
@@ -114,8 +125,19 @@ let
           find tree/nix/store -type d -path '*/example/systemd/system' -exec rm -rf {} +
         ''}
 
-        mkdir -p "$out"
-        ${packImage}
+        ${signedDdi {
+          inherit architecture;
+          image = artifactRaw;
+          key = ./dev-keys/apps.key;
+          certificate = ./dev-keys/apps.pem;
+          rootPartition = ''
+            Format=erofs
+            Compression=lz4hc
+            CompressionLevel=9
+            CopyFiles=$PWD/tree:/
+            Minimize=best
+          '';
+        }}
       '';
 
 in

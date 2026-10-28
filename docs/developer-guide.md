@@ -16,7 +16,7 @@ flowchart TD
 
     subgraph manual [2. Manual build + web UI install]
         D[nix build .#hello-ouster-terminal-cross-aarch64-linux]
-        E[result/]
+        E[result/*.tpk]
         F[Upload in Jetstream web UI]
         G[Open app and verify]
         D --> E --> F --> G
@@ -54,13 +54,13 @@ The first workflow is required once. Choose either manual web UI installation or
 
 ## Workflow 2: Manual build + web UI install
 
-1. From `apps/`, build the app image targeting Jetson `aarch64-linux`:
+1. From `apps/`, build the app package targeting Jetson `aarch64-linux`:
 
    ```bash
    nix build .#hello-ouster-terminal-cross-aarch64-linux
    ```
 
-2. In the web UI, upload the image from `result/`.
+2. In the web UI, upload the `.tpk` package from `result/`.
 3. Open the app in the web UI and verify it.
 
 Replace `hello-ouster-terminal` with another app id as needed.

@@ -82,7 +82,7 @@ pub fn build_apps_for_targets(
     command
         .args(["build", "--file", "-", "-L", "--out-link", RESULT])
         .args(["--no-write-lock-file", "--argstr", "flake"])
-        .arg(&flake);
+        .arg(flake_reference(&flake)?);
     let expr = if !multi_target {
         result_expr(&builder, targets.first().unwrap(), apps)
     } else {
@@ -98,16 +98,16 @@ pub fn build_apps_for_targets(
             } else {
                 PathBuf::from(RESULT)
             };
-            raw_paths_at(apps, &root).map(|paths| (target, paths))
+            package_paths_at(apps, &root).map(|paths| (target, paths))
         })
         .collect()
 }
 
-pub fn raw_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
+pub fn package_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
     apps.iter()
         .map(|app| {
             let path = root.join(app);
-            single_raw(&path).with_context(|| format!("no image in {}", path.display()))
+            single_package(&path).with_context(|| format!("no artifact in {}", path.display()))
         })
         .collect()
 }
@@ -122,6 +122,18 @@ fn app_names(flake: &Path) -> Result<Vec<String>> {
     ]))
     .with_context(|| format!("read teka.apps from {}", flake.display()))?;
     Ok(serde_json::from_str(&output)?)
+}
+
+fn flake_reference(flake: &Path) -> Result<String> {
+    let Some(root) = flake.ancestors().find(|dir| dir.join(".git").exists()) else {
+        return Ok(flake.to_string_lossy().into_owned());
+    };
+    let url = reqwest::Url::from_file_path(root)
+        .map_err(|_| anyhow::anyhow!("invalid repository path: {}", root.display()))?;
+    let mut url = reqwest::Url::parse(&format!("git+{url}"))?;
+    url.query_pairs_mut()
+        .append_pair("dir", &flake.strip_prefix(root)?.to_string_lossy());
+    Ok(url.into())
 }
 
 pub fn list(args: BuildSource) -> Result<()> {
@@ -288,17 +300,17 @@ fn run_with_stdin(command: &mut Command, expr: &str) -> Result<()> {
     bail!("command failed: {text}")
 }
 
-pub fn single_raw(output: &Path) -> Result<PathBuf> {
+pub fn single_package(output: &Path) -> Result<PathBuf> {
     let mut files = Vec::new();
     for entry in output.read_dir()? {
         let path = entry?.path();
-        if path.extension().is_some_and(|ext| ext == "raw") && path.is_file() {
+        if path.extension().is_some_and(|ext| ext == "tpk") && path.is_file() {
             files.push(path);
         }
     }
     if files.len() != 1 {
         bail!(
-            "expected exactly one .raw in {} (got {})",
+            "expected exactly one .tpk in {} (got {})",
             output.display(),
             files.len()
         );

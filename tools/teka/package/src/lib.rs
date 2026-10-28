@@ -426,6 +426,34 @@ pub fn file_descriptor(path: &Path, member_path: &str) -> Result<FileDescriptor>
     })
 }
 
+/// Reads a package holding exactly one component of `kind` and decodes every member.
+pub fn read_single(path: &Path, kind: ComponentType) -> Result<Manifest> {
+    let what = match kind {
+        ComponentType::App => "app",
+        ComponentType::Os => "OS",
+    };
+    ensure!(
+        path.extension().is_some_and(|ext| ext == "tpk"),
+        "{}: {what} package requires a .tpk file",
+        path.display()
+    );
+    (|| {
+        let mut file = std::fs::File::open(path)?;
+        ensure!(file.metadata()?.is_file(), "input must be a regular file");
+        let package = read(&mut file)?;
+        let [component] = &package.manifest.components[..] else {
+            anyhow::bail!("{what} package requires exactly one component");
+        };
+        ensure!(
+            component.kind == kind,
+            "{what} package requires an {what} component"
+        );
+        verify(&mut file, &package)?;
+        Ok(package.manifest)
+    })()
+    .with_context(|| format!("validate {} as a single-{what} TPK package", path.display()))
+}
+
 /// Level 9 saves 3-5% vs level 3 for ~13% slower decode; 10+ costs 1.4-4x compress time for <1% more.
 pub const DEFAULT_ZSTD_LEVEL: i32 = 9;
 /// Levels above 19 need windows larger than the decoder's 8 MiB cap.

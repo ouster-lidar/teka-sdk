@@ -2,7 +2,7 @@
 
 ## Goal
 
-An **app image** DDI (read-only erofs **`.raw`**) that runs **Cage** (single-client wlroots compositor) and **Firefox** in **kiosk** mode, loading **[webglreport.com](https://webglreport.com/?v=2)** (WebGL 2 report) on a Jetstream host with an **NVIDIA** stack. The image follows **`hello-wayland-gpu`**: it relies on the host for **kernel / DRM / NVIDIA** plus GLVND, EGL vendor data, GBM, and paths under **`/run/opengl-driver`**.
+A signed **`.tpk` app package** that runs **Cage** (single-client wlroots compositor) and **Firefox** in **kiosk** mode, loading **[webglreport.com](https://webglreport.com/?v=2)** (WebGL 2 report) on a TekaOS host with an **NVIDIA** stack. The image follows **`hello-wayland-gpu`**: it relies on the host for **kernel / DRM / NVIDIA** plus GLVND, EGL vendor data, GBM, and paths under **`/run/opengl-driver`**.
 
 ## Browser choice
 
@@ -18,7 +18,7 @@ An **app image** DDI (read-only erofs **`.raw`**) that runs **Cage** (single-cli
 - **Flake:** **`apps/`** (`flake.nix`).
 - **Service key:** **`hello-firefox-kiosk`** under `services` → **`nix build .#hello-firefox-kiosk`** and **`nix flake check`** use that name.
 - **Layout:** this directory: **`default.nix`**, **`run.sh.in`**, **`README.md`**. **DBus session** ( **`dbus-run-session`**) + **`cage --`** + **Firefox** loop, with the same DRM and EGL external platform checks as **`hello-wayland-gpu`**.
-- **Zed Box Mini / aarch64:** use **`hello-firefox-kiosk-cross-aarch64-linux`** when building on **x86_64** so the app image closure matches the device CPU. From repo root: **`nix build ./apps#hello-firefox-kiosk-cross-aarch64-linux`**, or **`cd apps && nix build .#hello-firefox-kiosk-cross-aarch64-linux`**. Deploying an **x86_64** **`hello-firefox-kiosk.raw`** on aarch64 yields **`systemd` 203 / EXEC** (wrong ELF / interpreter).
+- **Zed Box Mini / aarch64:** use **`hello-firefox-kiosk-cross-aarch64-linux`** when building on **x86_64** so the app image closure matches the device CPU. From repo root: **`nix build ./apps#hello-firefox-kiosk-cross-aarch64-linux`**, or **`cd apps && nix build .#hello-firefox-kiosk-cross-aarch64-linux`**. The CLI rejects packages whose architecture differs from the device.
 - **Input / seat handling:** wlroots on an app **system** service does not get a real logind session. The app unit therefore binds the host **`/run/seatd.sock`**, orders after **`seatd.service`**, and forces **`LIBSEAT_BACKEND=seatd`** instead of the broken **`builtin`** fallback that can open DRM but miss **`/dev/input/event*`**. Also, do **not** force **`WLR_BACKENDS=drm`** by itself: that disables the **`libinput`** backend, so you get video and zero keyboard / mouse input. Use **`drm,libinput`** (or let wlroots auto-create backends) when you want local input devices.
 - **Certificate trust:** the image ships its own CA bundle for sane defaults, then overlays the host CA bundle files when present and registers **`p11-kit-trust`** in the Firefox profile. Binding the host **`/etc/ssl/certs`** directory alone is not enough on NixOS because those entries are often symlinks into a host **`/nix/store`** path the app namespace cannot follow.
 - **Exec entrypoint:** **`ExecStart`** points at a **`#!/bin/sh`** stub (app image’s **`/bin/sh`**, same idea as **`hello-world`**) that **`exec`s** bash and the real **`run.sh.in`** body.
@@ -40,8 +40,8 @@ An **app image** DDI (read-only erofs **`.raw`**) that runs **Cage** (single-cli
 
 ## Operator flow
 
-- Build the **`.raw`** on a workstation (`nix build` / cross like other **app** images).
-- Attach on a Teka host with **`portablectl`** or **`teka app deploy --build hello-firefox-kiosk --host http://HOST/`**.
+- Build the **`.tpk`** package on a workstation (`nix build` / cross like other **app** packages).
+- Deploy on a Teka host with **`teka app deploy --build hello-firefox-kiosk --host http://HOST/`**.
 
 ## Non-goals
 

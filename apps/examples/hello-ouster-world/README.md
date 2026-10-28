@@ -4,14 +4,14 @@
 
 ## Build and deploy
 
-From `apps/`, build the native and Jetson images:
+From `apps/`, build the native and Jetson packages:
 
 ```sh
 nix build .#hello-ouster-world
 nix build .#hello-ouster-world-cross-aarch64-linux
 ```
 
-Both outputs are `.raw` EROFS DDI images. To build and deploy to an existing Jetstream host, run:
+Both outputs are signed `.tpk` packages containing EROFS DDI images. To build and deploy to an existing TekaOS host, run:
 
 ```sh
 teka app deploy --build hello-ouster-world --host http://HOST/

@@ -10,6 +10,7 @@
   ousterSdkSrc ? null,
   ousterSdkNix ? ./ouster/ouster-sdk.nix,
   exampleAppsPkgsFor ? null,
+  tekaFor,
   # Services outside this list also receive the PipeWire, onnxruntime,
   # and openblas cross-build workarounds.
   simpleCrossServices ? [ ],
@@ -90,27 +91,68 @@ let
       overlays = appOverlays ++ [ heavyCrossOverlay ];
     };
 
+  mkTpk =
+    {
+      pkgs,
+      image,
+      id,
+      targetSystem,
+    }:
+    let
+      artifact = appArtifactRawName id targetSystem;
+      basename = lib.removeSuffix ".raw" artifact;
+      arch = hostCpu targetSystem;
+    in
+    pkgs.runCommand "${id}-${targetSystem}-tpk"
+      {
+        nativeBuildInputs = [
+          pkgs.jq
+          (tekaFor pkgs.stdenv.buildPlatform.system)
+        ];
+        passthru = { inherit image; };
+      }
+      ''
+        raw=${lib.escapeShellArg "${image}/${artifact}"}
+        jq -n \
+          --arg arch ${lib.escapeShellArg arch} \
+          --arg version ${lib.escapeShellArg version.compose} \
+          --arg id ${lib.escapeShellArg id} \
+          --arg root_hash "$(cat ${lib.escapeShellArg "${image}/${basename}.roothash"})" \
+          '{format:1,arch:$arch,components:[{type:"app",id:$id,version:$version,root_hash:$root_hash,image:{path:($id+".raw")}}]}' >manifest.json
+        mkdir -p "$out"
+        teka package pack --manifest manifest.json \
+          --member ${lib.escapeShellArg "${id}.raw"}="$raw" \
+          --private-key ${./dev-keys/apps.key} --certificate ${./dev-keys/apps.pem} \
+          --output "$out/${basename}.tpk"
+      '';
+
   perHostPackages =
     host:
     let
-      pkgs = appPkgsFor host;
+      builderSystem = defaultLinuxTarget host;
+      pkgs = appPkgsFor builderSystem;
       callService = pkgs.callPackage;
       crossTargets = lib.filter (t: t != host) linuxSystems;
       nativeByName =
         if lib.hasSuffix "-linux" host then
           lib.genAttrs allServiceNames (
             n:
-            callService services.${n} {
-              ps = mkApp {
-                craneLib = crane.mkLib pkgs;
-                inherit
-                  pkgs
-                  version
-                  advisoryDb
-                  ousterSdkSrc
-                  ousterSdkNix
-                  ;
-                exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor host else null;
+            mkTpk {
+              inherit pkgs;
+              id = n;
+              targetSystem = host;
+              image = callService services.${n} {
+                ps = mkApp {
+                  craneLib = crane.mkLib pkgs;
+                  inherit
+                    pkgs
+                    version
+                    advisoryDb
+                    ousterSdkSrc
+                    ousterSdkNix
+                    ;
+                  exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor builderSystem else null;
+                };
               };
             }
           )
@@ -126,11 +168,11 @@ let
               let
                 crossPkgs =
                   if lib.elem n heavyCrossServices then
-                    mkCross host target
+                    mkCross builderSystem target
                   else
                     import nixpkgs {
                       localSystem = {
-                        system = host;
+                        system = builderSystem;
                       };
                       crossSystem = {
                         system = target;
@@ -139,19 +181,24 @@ let
                       overlays = appOverlays ++ [ waylandCompositorsOverlay ];
                     };
               in
-              crossPkgs.callPackage services.${n} {
-                ps = mkApp {
-                  craneLib = crane.mkLib crossPkgs;
-                  pkgs = crossPkgs;
-                  inherit
-                    version
-                    advisoryDb
-                    ousterSdkSrc
-                    ousterSdkNix
-                    ;
-                  # Shared infra pkgs from exampleAppsPkgsFor are build-time
-                  # inputs; use the build host system, not the cross target.
-                  exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor host else null;
+              mkTpk {
+                inherit pkgs;
+                id = n;
+                targetSystem = target;
+                image = crossPkgs.callPackage services.${n} {
+                  ps = mkApp {
+                    craneLib = crane.mkLib crossPkgs;
+                    pkgs = crossPkgs;
+                    inherit
+                      version
+                      advisoryDb
+                      ousterSdkSrc
+                      ousterSdkNix
+                      ;
+                    # Shared infra pkgs from exampleAppsPkgsFor are build-time
+                    # inputs; use the build host system, not the cross target.
+                    exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor builderSystem else null;
+                  };
                 };
               };
           }) crossTargets
@@ -175,7 +222,7 @@ let
       bundleMembers = lib.map (
         n:
         let
-          artifact = appArtifactRawName n host;
+          artifact = "${lib.removeSuffix ".raw" (appArtifactRawName n host)}.tpk";
         in
         {
           name = artifact;
@@ -183,7 +230,7 @@ let
         }
       ) allServiceNames;
 
-      defaultBundle = pkgs.linkFarm "app-image-bundle" bundleMembers;
+      defaultBundle = pkgs.linkFarm "app-package-bundle" bundleMembers;
     in
     nativeByName
     // crossPackages
@@ -197,9 +244,10 @@ let
     pkgs.runCommand checkName { } ''
       raw="${drv}/${artifactRaw}"
       test -f "$raw"
-      ${pkgs.erofs-utils}/bin/fsck.erofs "$raw" >/dev/null
-      ${pkgs.erofs-utils}/bin/dump.erofs --cat --path=etc/os-release "$raw" >os-release
-      ${pkgs.erofs-utils}/bin/dump.erofs --path=usr/lib/systemd/system/${serviceName}.service "$raw" >/dev/null
+      root_offset=$(${pkgs.util-linux}/bin/sfdisk --json "$raw" | ${pkgs.jq}/bin/jq -er '.partitiontable | .sectorsize as $sector | .partitions[] | select((.type | ascii_downcase) == "4f68bce3-e8cd-4db1-96e7-fbcaf984b709" or (.type | ascii_downcase) == "b921b045-1df0-41c3-af44-4c6f280d3fae") | .start * $sector')
+      ${pkgs.erofs-utils}/bin/fsck.erofs --offset="$root_offset" "$raw" >/dev/null
+      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=etc/os-release "$raw" >os-release
+      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --path=usr/lib/systemd/system/${serviceName}.service "$raw" >/dev/null
       expect_line() {
         ${pkgs.gnugrep}/bin/grep -qxF "$1" os-release || {
           echo "app image check ${serviceName}: missing os-release line: $1" >&2
@@ -228,7 +276,8 @@ let
       artifactSystem = defaultLinuxTarget system;
 
       nativeChecks = lib.genAttrs allServiceNames (
-        n: mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n} (appArtifactRawName n artifactSystem)
+        n:
+        mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n}.image (appArtifactRawName n artifactSystem)
       );
 
       crossChecks = lib.listToAttrs (
@@ -238,7 +287,7 @@ let
             target:
             let
               attr = "${n}-cross-${target}";
-              drv = if isLinux then hostPkgs.${attr} else (perHostPackages target).${n};
+              drv = (if isLinux then hostPkgs.${attr} else (perHostPackages target).${n}).image;
             in
             {
               name = attr;
@@ -252,14 +301,14 @@ let
         checks: n:
         checks
         // lib.mapAttrs' (checkName: drv: lib.nameValuePair "${n}-${checkName}" drv) (
-          hostPkgs.${n}.passthru.cargoChecks or { }
+          hostPkgs.${n}.image.passthru.cargoChecks or { }
         )
       ) { } allServiceNames;
     in
     lib.optionalAttrs isLinux {
       default = pkgs.runCommand "app-image-check-default" { } ''
         ${lib.concatMapStringsSep "\n" (n: ''
-          test -f "${hostPkgs.${n}}/${appArtifactRawName n system}"
+          test -f "${hostPkgs.default}/${lib.removeSuffix ".raw" (appArtifactRawName n system)}.tpk"
         '') allServiceNames}
         touch "$out"
       '';

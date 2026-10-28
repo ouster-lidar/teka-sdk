@@ -111,6 +111,7 @@
           ;
         advisoryDb = rustsecAdvisoryDb;
         ousterSdkSrc = ouster-sdk;
+        tekaFor = system: teka.packages.${system}.teka;
       };
     in
     let
@@ -137,7 +138,9 @@
         appOutputs.checks.${system}
         // nixpkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           app-runtime = runtime;
+          signed-images = pkgs.callPackage ./nix/tests/signed-images.nix { inherit version; };
           flake-output-overlays = pkgs.callPackage ./nix/tests/flake-output-overlays.nix {
+            tekaFor = system: teka.packages.${system}.teka;
             inherit
               appLib
               crane

@@ -204,7 +204,13 @@ let
           closureInfo
           ;
         inherit version;
-        erofs-utils = pkgs.buildPackages.erofs-utils;
+        inherit (pkgs.buildPackages)
+          erofs-utils
+          fakeroot
+          jq
+          systemd
+          util-linux
+          ;
       };
     in
     let

@@ -3,6 +3,7 @@
   crane,
   nixpkgs,
   pkgs,
+  tekaFor,
   version,
 }:
 
@@ -21,6 +22,7 @@ let
         crane
         systems
         version
+        tekaFor
         simpleCrossServices
         ;
       appOverlays = [ markerOverlay ];
@@ -47,9 +49,9 @@ let
     outputs:
     lib.all (
       system:
-      lib.all (name: outputs.packages.${system}.${name}.marker == "applied") (
-        lib.filter (name: name != "default") (lib.attrNames outputs.packages.${system})
-      )
+      lib.all (
+        name: !(lib.hasSuffix "-tpk" name) && outputs.packages.${system}.${name}.image.marker == "applied"
+      ) (lib.filter (name: name != "default") (lib.attrNames outputs.packages.${system}))
     ) systems;
 in
 assert overlayApplied (outputsFor [ "overlay-probe" ]);
