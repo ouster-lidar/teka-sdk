@@ -23,7 +23,7 @@ From `apps/`:
 
 ```bash
 cd jetstream-example-apps/apps
-teka app build hello-world --arch aarch64
+teka app build hello-world
 ```
 
 **Build + Deploy** (normal workflow — build for the device, upload, sample logs):
