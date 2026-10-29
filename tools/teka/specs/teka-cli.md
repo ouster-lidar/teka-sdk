@@ -4,7 +4,8 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ## Structure
 
-- Host tooling lives in `tools/teka/`; app images live in `apps/`. `ouster-teka` exports the shared library and `teka` binary.
+- Host tooling lives in `tools/teka/`; app images live in `apps/`. `teka-cli` exports the shared library and `teka` binary.
+- Cargo packages follow [Rust crate naming](../../../specs/rust-crate-naming.md); signed TPK operations live in `teka-tpk`.
 - Use verbs for workflows and `<noun> <verb>` for resource commands.
 
 ## Commands and devices

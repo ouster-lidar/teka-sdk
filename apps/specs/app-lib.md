@@ -2,6 +2,8 @@
 
 Stable `lib` and `packages` outputs from `apps/flake.nix` for downstream flake consumers.
 
+The shared runtime Cargo package is `teka-app`, imported as `teka_app`, per [Rust crate naming](../../specs/rust-crate-naming.md). Its Nix package attribute remains `app-runtime`; the installed Rust library is `libteka_app.rlib`.
+
 ## Ownership
 
 Keep app-specific build expressions and runtime helpers inside their example.
