@@ -1,5 +1,5 @@
 [package]
-name = "ouster-teka"
+name = "teka-cli"
 version = "0.1.0"
 edition = "2021"
 
@@ -16,7 +16,7 @@ openssl = "0.10"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "cookies", "json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-teka-pkg = { path = "../package" }
+teka-tpk = { path = "../package" }
 tempfile = "3"
 
 [dev-dependencies]

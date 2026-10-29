@@ -14,7 +14,7 @@
 }:
 let
   common = {
-    pname = "ouster-teka";
+    pname = "teka-cli";
     version = "0.1.0";
     src = craneLib.cleanCargoSource ./.;
     strictDeps = true;

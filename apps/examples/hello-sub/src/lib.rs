@@ -5,11 +5,11 @@ pub mod peer;
 pub mod peer_config;
 pub mod store;
 
-::app_runtime::declare_app_runtime!("hello-sub");
+::teka_app::declare_app_runtime!("hello-sub");
 
 use std::sync::Arc;
 
-use ::app_runtime::status_stream::SummaryStream;
+use ::teka_app::status_stream::SummaryStream;
 
 use crate::store::FeedStore;
 

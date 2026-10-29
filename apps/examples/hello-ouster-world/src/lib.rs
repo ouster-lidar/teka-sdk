@@ -12,7 +12,7 @@ pub mod source_config;
 pub mod ui_state;
 pub mod vpointer;
 
-::app_runtime::declare_app_runtime!("hello-ouster-world");
+::teka_app::declare_app_runtime!("hello-ouster-world");
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use std::sync::Arc;
 use crate::display::DisplayState;
 use crate::osf::ImportHandle;
 use crate::record::RecordHandle;
-use ::app_runtime::status_stream::SummaryStream;
+use ::teka_app::status_stream::SummaryStream;
 
 /// Max concurrent Console log followers (WebSocket, no PTY).
 pub const MAX_PTY_SESSIONS: usize = 16;

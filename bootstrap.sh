@@ -98,7 +98,7 @@ else
     *) target_dir="$repo_root/$target_dir" ;;
   esac
   cargo build --release --locked --manifest-path "$repo_root/tools/teka/Cargo.toml" \
-    --package ouster-teka --target "$cargo_target" --target-dir "$target_dir" || fail 'Cargo build failed'
+    --package teka-cli --target "$cargo_target" --target-dir "$target_dir" || fail 'Cargo build failed'
   binary="$target_dir/$cargo_target/release/teka"
 fi
 

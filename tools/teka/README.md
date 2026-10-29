@@ -132,7 +132,7 @@ For Rust changes under `tools/teka/`:
 cd tools/teka
 nix flake check
 nix develop
-cargo run -p ouster-teka -- --help
+cargo run -p teka-cli -- --help
 ```
 
 Agent implementation requirements live in [specs/teka-cli.md](specs/teka-cli.md). See the [developer guide](../../docs/developer-guide.md) for app workflows.

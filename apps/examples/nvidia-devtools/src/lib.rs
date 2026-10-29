@@ -6,7 +6,7 @@ pub mod tegrastats;
 
 pub const SSH_PORT: u16 = 2223;
 
-::app_runtime::declare_app_runtime!("nvidia-devtools");
+::teka_app::declare_app_runtime!("nvidia-devtools");
 
 use std::sync::Arc;
 

@@ -798,23 +798,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ouster-teka"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "clap_complete",
- "crc32fast",
- "libc",
- "openssl",
- "reqwest",
- "serde",
- "serde_json",
- "teka-pkg",
- "tempfile",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1283,7 +1266,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "teka-pkg"
+name = "teka-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "crc32fast",
+ "libc",
+ "openssl",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "teka-tpk",
+ "tempfile",
+]
+
+[[package]]
+name = "teka-tpk"
 version = "0.1.0"
 dependencies = [
  "anyhow",

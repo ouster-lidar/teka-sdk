@@ -1,6 +1,6 @@
 //! nvidia-devtools HTTP API.
 
-use ::app_runtime::resource_stream::send_snapshot;
+use ::teka_app::resource_stream::send_snapshot;
 use axum::{
     extract::ws::{WebSocket, WebSocketUpgrade},
     extract::State,

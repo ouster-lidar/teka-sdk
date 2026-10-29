@@ -15,7 +15,7 @@ fn pack_zstd_encodes_and_verifies() {
     let dir = tempfile::tempdir().unwrap();
     let raw = dir.path().join("demo.raw");
     fs::write(&raw, [0u8; 4096]).unwrap();
-    let image = teka_pkg::file_descriptor(&raw, "demo.raw").unwrap();
+    let image = teka_tpk::file_descriptor(&raw, "demo.raw").unwrap();
     let manifest = json!({
         "format": 1, "arch": "x86_64",
         "components": [{"type": "app", "id": "demo", "version": "1", "root_hash": "a".repeat(64), "image": image}],
@@ -57,8 +57,8 @@ fn pack_zstd_encodes_and_verifies() {
     let output = dir.path().join("app.tpk");
     assert!(pack(&output, "19"));
     let mut file = fs::File::open(&output).unwrap();
-    let package = teka_pkg::read(&mut file).unwrap();
-    teka_pkg::verify(&mut file, &package).unwrap();
+    let package = teka_tpk::read(&mut file).unwrap();
+    teka_tpk::verify(&mut file, &package).unwrap();
     let mut finalized = manifest.clone();
     finalized["bao_root"] = serde_json::to_value(&package.manifest.bao_root).unwrap();
     finalized["components"][0]["image"]["size"] = json!(package.members[0].size);
@@ -105,14 +105,14 @@ fn pack_zstd_encodes_and_verifies() {
     );
     let cms = fs::read(&cms_file).unwrap();
     let packed = fs::read(&output).unwrap();
-    let mut interoperable = teka_pkg::MAGIC.to_vec();
+    let mut interoperable = teka_tpk::MAGIC.to_vec();
     interoperable.extend((cms.len() as u32).to_le_bytes());
     interoperable.extend(0u32.to_le_bytes());
     interoperable.extend(cms);
     interoperable.extend(&packed[16 + package.signature.len()..]);
     let mut source = std::io::Cursor::new(interoperable);
-    let external = teka_pkg::read(&mut source).unwrap();
-    teka_pkg::verify(&mut source, &external).unwrap();
+    let external = teka_tpk::read(&mut source).unwrap();
+    teka_tpk::verify(&mut source, &external).unwrap();
     assert_eq!(external.manifest_bytes, package.manifest_bytes);
     assert!(!package.signature.is_empty());
     let stream = |arguments: &[&str]| {
@@ -156,7 +156,7 @@ fn pack_zstd_encodes_and_verifies() {
     let noise_output = dir.path().join("noise.tpk");
     assert!(pack(&noise_output, "9"));
     let mut bytes = fs::read(&noise_output).unwrap();
-    let package = teka_pkg::read(&mut std::io::Cursor::new(&bytes)).unwrap();
+    let package = teka_tpk::read(&mut std::io::Cursor::new(&bytes)).unwrap();
     assert!(package.members[0].size > noise.len() as u64);
     let envelope = 16 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
     bytes[envelope + package.members[0].offset as usize + 2048] ^= 1;
@@ -258,10 +258,10 @@ fn trusted_http_streams_third_member_and_rejects_incomplete_transport() {
         }
         let path = trust.join(format!("{id}.raw"));
         fs::write(&path, &bytes).unwrap();
-        let image = teka_pkg::file_descriptor(&path, &format!("{id}.raw")).unwrap();
+        let image = teka_tpk::file_descriptor(&path, &format!("{id}.raw")).unwrap();
         files.insert(image.path.clone(), path);
-        components.push(teka_pkg::Component {
-            kind: teka_pkg::ComponentType::App,
+        components.push(teka_tpk::Component {
+            kind: teka_tpk::ComponentType::App,
             id: id.into(),
             version: "test".into(),
             root_hash: "a".repeat(64),
@@ -270,14 +270,14 @@ fn trusted_http_streams_third_member_and_rejects_incomplete_transport() {
         });
         payloads.push(bytes);
     }
-    let manifest = teka_pkg::Manifest {
+    let manifest = teka_tpk::Manifest {
         format: 1,
         bao_root: None,
-        arch: teka_pkg::Architecture::X86_64,
+        arch: teka_tpk::Architecture::X86_64,
         components,
     };
     let mut bytes = Vec::new();
-    teka_pkg::pack(
+    teka_tpk::pack(
         &mut bytes,
         &manifest,
         &files,
@@ -285,7 +285,7 @@ fn trusted_http_streams_third_member_and_rejects_incomplete_transport() {
         common::signing(false).1,
     )
     .unwrap();
-    let package = teka_pkg::read(&mut std::io::Cursor::new(&bytes)).unwrap();
+    let package = teka_tpk::read(&mut std::io::Cursor::new(&bytes)).unwrap();
     assert!(package.members[0].size > payloads[0].len() as u64);
     assert!(package.members[1].size < payloads[1].len() as u64);
     assert!(package.members[2].size > payloads[2].len() as u64);
@@ -323,8 +323,8 @@ fn trusted_http_streams_third_member_and_rejects_incomplete_transport() {
     );
     assert_eq!(output.stdout, payloads[2][23..124]);
     let mut reader = fs::File::open(&disk).unwrap();
-    let package = teka_pkg::read(&mut reader).unwrap();
-    assert!(teka_pkg::verify(&mut reader, &package).is_err());
+    let package = teka_tpk::read(&mut reader).unwrap();
+    assert!(teka_tpk::verify(&mut reader, &package).is_err());
     let mut changed_manifest = bytes.clone();
     let manifest_offset = 16
         + package
@@ -458,7 +458,7 @@ fn inspect_groups_verification_and_publisher_trust() {
         "image":{"path":"demo.raw"}
     }]});
     let package = dir.join("demo.tpk");
-    teka_pkg::pack_manifest(
+    teka_tpk::pack_manifest(
         &mut fs::File::create(&package).unwrap(),
         &serde_json::to_vec(&draft).unwrap(),
         &std::collections::BTreeMap::from([("demo.raw".into(), image)]),
@@ -467,7 +467,7 @@ fn inspect_groups_verification_and_publisher_trust() {
         certificate,
     )
     .unwrap();
-    let parsed = teka_pkg::read(&mut fs::File::open(&package).unwrap()).unwrap();
+    let parsed = teka_tpk::read(&mut fs::File::open(&package).unwrap()).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(&parsed.manifest_bytes).unwrap();
     fs::write(dir.join("apps.pem"), certificate.to_pem().unwrap()).unwrap();
     let inspect = |trusted: bool, json: bool| {
@@ -606,7 +606,7 @@ fn verify_distinguishes_invalid_payloads_from_environment_failures() {
     ];
     let mut payload = tempfile::tempfile().unwrap();
     payload.write_all(&stored).unwrap();
-    let encoding = teka_pkg::transport::Encoder::new(&payload).unwrap();
+    let encoding = teka_tpk::transport::Encoder::new(&payload).unwrap();
     let manifest = serde_json::to_vec(
         &json!({"format":1,"arch":"x86_64","bao_root":encoding.root(),
         "components":[{"type":"app","id":"demo","version":"1","root_hash":"a".repeat(64),
@@ -623,14 +623,14 @@ fn verify_distinguishes_invalid_payloads_from_environment_failures() {
     .unwrap()
     .to_der()
     .unwrap();
-    let mut bytes = teka_pkg::MAGIC.to_vec();
+    let mut bytes = teka_tpk::MAGIC.to_vec();
     bytes.extend((cms.len() as u32).to_le_bytes());
     bytes.extend(0u32.to_le_bytes());
     bytes.extend(cms);
     encoding.write(&payload, &mut bytes).unwrap();
     let mut input = Cursor::new(&bytes);
-    let parsed = teka_pkg::read(&mut input).unwrap();
-    let error = teka_pkg::verify(&mut input, &parsed).unwrap_err();
+    let parsed = teka_tpk::read(&mut input).unwrap();
+    let error = teka_tpk::verify(&mut input, &parsed).unwrap_err();
     assert_eq!(
         error.downcast_ref::<std::io::Error>().unwrap().kind(),
         std::io::ErrorKind::Other

@@ -2,7 +2,7 @@
 
 use std::net::SocketAddr;
 
-use ::app_runtime::status_stream::SummaryStream;
+use ::teka_app::status_stream::SummaryStream;
 use axum::Router;
 use clap::Parser;
 use hello_pub::api::{self, spawn_card_bridge, spawn_generator};

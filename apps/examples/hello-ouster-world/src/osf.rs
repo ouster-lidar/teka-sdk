@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::app_runtime::api_error::ApiError;
+use ::teka_app::api_error::ApiError;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
 use axum::http::{header, HeaderValue, StatusCode};

@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use teka_pkg::{
+use teka_tpk::{
     uki::{verify, verify_component},
     Architecture, Component, ComponentType, FileDescriptor,
 };

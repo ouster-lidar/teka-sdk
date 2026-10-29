@@ -16,8 +16,8 @@ use std::io::Cursor;
 #[cfg(target_os = "linux")]
 use std::io::Read;
 #[cfg(target_os = "linux")]
-use teka_pkg::image::verify_verity_sized;
-use teka_pkg::{
+use teka_tpk::image::verify_verity_sized;
+use teka_tpk::{
     image::{Image, VeritySignature},
     Architecture, Component, ComponentType,
 };

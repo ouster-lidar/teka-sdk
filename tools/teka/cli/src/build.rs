@@ -44,7 +44,7 @@ fn builder_system() -> Result<String> {
 pub fn validate_apps(apps: &[String]) -> Result<()> {
     let mut seen = HashSet::new();
     for app in apps {
-        if !teka_pkg::valid_id(app) {
+        if !teka_tpk::valid_id(app) {
             bail!("invalid app id '{app}'");
         }
         if !seen.insert(app) {

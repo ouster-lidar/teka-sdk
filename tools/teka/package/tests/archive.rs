@@ -5,13 +5,13 @@ mod fixture;
 
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, io::Cursor};
-use teka_pkg::{pack, read, read_trusted, verify, MAX_MANIFEST, MAX_SIGNATURE};
+use teka_tpk::{pack, read, read_trusted, verify, MAX_MANIFEST, MAX_SIGNATURE};
 
 const PAYLOAD: &[u8] = b"app image bytes";
 
 fn envelope(signature: &[u8], encoded: &[u8]) -> Vec<u8> {
     [
-        teka_pkg::MAGIC.as_slice(),
+        teka_tpk::MAGIC.as_slice(),
         &(signature.len() as u32).to_le_bytes(),
         &0u32.to_le_bytes(),
         signature,
@@ -27,17 +27,17 @@ fn inspect_manifest_stops_before_bao() {
     let signature = common::sign_manifest(manifest, &cert, &key);
     let bytes = envelope(&signature, b"unread Bao payload");
     let mut source = Cursor::new(&bytes);
-    assert_eq!(teka_pkg::inspect_manifest(&mut source).unwrap(), manifest);
+    assert_eq!(teka_tpk::inspect_manifest(&mut source).unwrap(), manifest);
     let payload_offset = 16 + signature.len();
     assert_eq!(source.position(), payload_offset as u64);
     assert_eq!(&bytes[source.position() as usize..], b"unread Bao payload");
     for cut in [0, 15, payload_offset - 1] {
-        assert!(teka_pkg::inspect_manifest(&mut Cursor::new(&bytes[..cut])).is_err());
+        assert!(teka_tpk::inspect_manifest(&mut Cursor::new(&bytes[..cut])).is_err());
     }
     for (offset, size) in [(8, 0), (8, MAX_SIGNATURE as u32 + 1), (12, 1)] {
         let mut invalid = bytes.clone();
         invalid[offset..offset + 4].copy_from_slice(&size.to_le_bytes());
-        assert!(teka_pkg::inspect_manifest(&mut Cursor::new(invalid)).is_err());
+        assert!(teka_tpk::inspect_manifest(&mut Cursor::new(invalid)).is_err());
     }
 }
 
@@ -46,7 +46,7 @@ fn package_round_trip_and_rejects_invalid_input() {
     let dir = tempfile::tempdir().unwrap();
     let raw = dir.path().join("input.raw");
     fs::write(&raw, PAYLOAD).unwrap();
-    let manifest: teka_pkg::Manifest =
+    let manifest: teka_tpk::Manifest =
         serde_json::from_value(common::manifest(PAYLOAD.len())).unwrap();
     let mut bytes = Vec::new();
     let (certificate, key) = common::signer();
@@ -134,18 +134,18 @@ fn requires_exact_bounded_signature_and_unambiguous_manifest() {
         original.replacen("\"path\":", "\"unknown\":true,\"path\":", 1),
     ] {
         assert!(
-            teka_pkg::Manifest::parse(invalid.as_bytes()).is_err(),
+            teka_tpk::Manifest::parse(invalid.as_bytes()).is_err(),
             "accepted {invalid}"
         );
     }
-    let certs = teka_pkg::verify::Certificates {
+    let certs = teka_tpk::verify::Certificates {
         app: vec![certificate],
         os: vec![],
     };
     let mut changed = package.clone();
     changed.manifest_bytes.push(b' ');
     assert!(
-        teka_pkg::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
+        teka_tpk::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
             .unwrap_err()
             .to_string()
             .contains("verify package manifest signature")
@@ -153,7 +153,7 @@ fn requires_exact_bounded_signature_and_unambiguous_manifest() {
     let mut changed = package.clone();
     changed.manifest.components[0].root_hash = "b".repeat(64);
     assert!(
-        teka_pkg::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
+        teka_tpk::verify::signatures(&mut Cursor::new(&valid), &changed, Some(&certs))
             .unwrap_err()
             .to_string()
             .contains("differs from signed bytes")
@@ -163,7 +163,7 @@ fn requires_exact_bounded_signature_and_unambiguous_manifest() {
 #[test]
 fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
     let (certificate, key) = common::signer();
-    let trust = teka_pkg::verify::Certificates {
+    let trust = teka_tpk::verify::Certificates {
         app: vec![certificate.clone()],
         os: vec![],
     };
@@ -186,7 +186,7 @@ fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
         "{error:#}"
     );
     let (wrong, _) = common::signer();
-    let wrong_trust = teka_pkg::verify::Certificates {
+    let wrong_trust = teka_tpk::verify::Certificates {
         app: vec![wrong],
         os: vec![],
     };
@@ -228,7 +228,7 @@ fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
     ] {
         let mut manifest = serde_json::to_value(&package.manifest).unwrap();
         manifest[field] = value;
-        assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&manifest).unwrap()).is_err());
+        assert!(teka_tpk::Manifest::parse(&serde_json::to_vec(&manifest).unwrap()).is_err());
     }
     for version in [None, Some(json!("")), Some(json!("  ")), Some(Value::Null)] {
         let mut invalid = serde_json::to_value(&package.manifest).unwrap();
@@ -237,7 +237,7 @@ fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
         if let Some(version) = version {
             component.insert("version".into(), version);
         }
-        assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&invalid).unwrap()).is_err());
+        assert!(teka_tpk::Manifest::parse(&serde_json::to_vec(&invalid).unwrap()).is_err());
     }
     let mut duplicate = serde_json::to_value(&package.manifest).unwrap();
     let component = duplicate["components"][0].clone();
@@ -245,15 +245,15 @@ fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
         .as_array_mut()
         .unwrap()
         .push(component);
-    assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&duplicate).unwrap()).is_err());
+    assert!(teka_tpk::Manifest::parse(&serde_json::to_vec(&duplicate).unwrap()).is_err());
     let mut excessive = serde_json::to_value(&package.manifest).unwrap();
     excessive["components"] = json!((0..9)
         .map(|index| json!({
             "type":"app", "version":"1", "id":format!("app{index}"), "root_hash":"a".repeat(64),
-            "image":{"path":format!("app{index}.raw"), "size":teka_pkg::MAX_MEMBER}
+            "image":{"path":format!("app{index}.raw"), "size":teka_tpk::MAX_MEMBER}
         }))
         .collect::<Vec<_>>());
-    assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&excessive).unwrap()).is_err());
+    assert!(teka_tpk::Manifest::parse(&serde_json::to_vec(&excessive).unwrap()).is_err());
 }
 
 #[test]
@@ -275,7 +275,7 @@ fn os_manifests_require_os_role_trust() {
         &app_certificate,
         &app_key,
     );
-    let trust = teka_pkg::verify::Certificates {
+    let trust = teka_tpk::verify::Certificates {
         app: vec![app_certificate],
         os: vec![os_certificate],
     };
@@ -285,15 +285,15 @@ fn os_manifests_require_os_role_trust() {
         "{error:#}"
     );
     let package = read(&mut Cursor::new(&archive)).unwrap();
-    assert_eq!(package.manifest.signing_role(), teka_pkg::ComponentType::Os);
+    assert_eq!(package.manifest.signing_role(), teka_tpk::ComponentType::Os);
     let mut missing_uki = serde_json::to_value(&package.manifest).unwrap();
     missing_uki["components"][1]
         .as_object_mut()
         .unwrap()
         .remove("uki");
-    assert!(teka_pkg::Manifest::parse(&serde_json::to_vec(&missing_uki).unwrap()).is_err());
+    assert!(teka_tpk::Manifest::parse(&serde_json::to_vec(&missing_uki).unwrap()).is_err());
     assert!(
-        teka_pkg::verify::signatures(&mut Cursor::new(&archive), &package, Some(&trust))
+        teka_tpk::verify::signatures(&mut Cursor::new(&archive), &package, Some(&trust))
             .unwrap_err()
             .to_string()
             .contains("verify package manifest signature")
@@ -341,7 +341,7 @@ fn concatenated_payload_has_no_headers_padding_or_termination() {
     })
     .collect();
     let mut bytes = Vec::new();
-    teka_pkg::pack_manifest(
+    teka_tpk::pack_manifest(
         &mut bytes,
         &serde_json::to_vec(&manifest).unwrap(),
         &files,
@@ -361,7 +361,7 @@ fn concatenated_payload_has_no_headers_padding_or_termination() {
     assert_eq!(package.manifest.components[0].version, "1");
     assert_eq!(package.manifest.components[1].version, "2");
     let expected = [first_compressed.as_slice(), compressed.as_slice()].concat();
-    assert!(expected.len() < teka_pkg::transport::BLOCK_SIZE as usize);
+    assert!(expected.len() < teka_tpk::transport::BLOCK_SIZE as usize);
     let encoded_offset = 16 + package.signature.len();
     assert_eq!(&bytes[encoded_offset..], expected);
     assert_eq!(package.archive_size(), expected.len() as u64);
@@ -476,10 +476,10 @@ fn mixed_bundle_offsets_cross_groups_without_gaps() {
     assert_eq!(package.archive_size(), next);
     assert!(!package
         .archive_size()
-        .div_ceil(teka_pkg::transport::BLOCK_SIZE)
+        .div_ceil(teka_tpk::transport::BLOCK_SIZE)
         .is_power_of_two());
     let encoded_offset = 16 + package.signature.len();
-    let mut transport = teka_pkg::transport::StreamReader::new(
+    let mut transport = teka_tpk::transport::StreamReader::new(
         &bytes[encoded_offset..],
         package.root().unwrap(),
         next,

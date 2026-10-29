@@ -4,11 +4,11 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use ::app_runtime::devres::{NftablesLease, NftablesSet};
-use ::app_runtime::runtime::{self, ResourceAvailability};
+use ::teka_app::devres::{NftablesLease, NftablesSet};
+use ::teka_app::runtime::{self, ResourceAvailability};
 use serde_json::{json, Value};
 
-::app_runtime::declare_app_runtime!("lease-test");
+::teka_app::declare_app_runtime!("lease-test");
 
 #[derive(Default)]
 struct Host {

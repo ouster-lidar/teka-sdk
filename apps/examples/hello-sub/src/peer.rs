@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::app_runtime::runtime::app_base_url;
-use ::app_runtime::status_stream::SummaryStream;
+use ::teka_app::runtime::app_base_url;
+use ::teka_app::status_stream::SummaryStream;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::Value;

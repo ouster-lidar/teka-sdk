@@ -22,7 +22,7 @@ impl std::fmt::Display for Rejected {
 impl std::error::Error for Rejected {}
 
 fn rejection(error: anyhow::Error) -> anyhow::Error {
-    if error.is::<teka_pkg::verify::Operational>()
+    if error.is::<teka_tpk::verify::Operational>()
         || error.chain().any(|cause| {
             cause
                 .downcast_ref::<std::io::Error>()
@@ -70,7 +70,7 @@ pub enum PackageCommand {
         certificate: PathBuf,
         #[arg(long)]
         output: PathBuf,
-        #[arg(long, env = "TEKA_ZSTD_LEVEL", default_value_t = teka_pkg::DEFAULT_ZSTD_LEVEL)]
+        #[arg(long, env = "TEKA_ZSTD_LEVEL", default_value_t = teka_tpk::DEFAULT_ZSTD_LEVEL)]
         zstd_level: i32,
     },
 }
@@ -79,12 +79,12 @@ pub fn run(command: PackageCommand) -> Result<()> {
     match command {
         PackageCommand::Inspect(args) => crate::inspect::run(args),
         PackageCommand::Verify { file, trust } => {
-            use teka_pkg::verify::{signatures, Certificates};
+            use teka_tpk::verify::{signatures, Certificates};
             let mut file = File::open(file)?;
             ensure!(file.metadata()?.is_file(), "input must be a regular file");
             let certificates = Certificates::load(&trust)?;
             let verified = (|| {
-                let package = teka_pkg::read_trusted(&mut file, &certificates)?;
+                let package = teka_tpk::read_trusted(&mut file, &certificates)?;
                 signatures(&mut file, &package, Some(&certificates))
             })()
             .map_err(rejection)?;
@@ -102,7 +102,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
             offset,
             size,
         } => {
-            let certificates = teka_pkg::verify::Certificates::load(&trust)?;
+            let certificates = teka_tpk::verify::Certificates::load(&trust)?;
             if file.starts_with("http://") || file.starts_with("https://") {
                 let response = reqwest::blocking::Client::builder()
                     .redirect(reqwest::redirect::Policy::none())
@@ -120,7 +120,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
                     "package HTTP {}",
                     response.status()
                 );
-                return teka_pkg::stream(
+                return teka_tpk::stream(
                     response,
                     &certificates,
                     &member,
@@ -131,7 +131,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
             }
             let mut file = File::open(file)?;
             ensure!(file.metadata()?.is_file(), "input must be a regular file");
-            let package = teka_pkg::read_trusted(&mut file, &certificates)?;
+            let package = teka_tpk::read_trusted(&mut file, &certificates)?;
             let member = package
                 .members
                 .iter()
@@ -149,10 +149,10 @@ pub fn run(command: PackageCommand) -> Result<()> {
         } => {
             let mut bytes = Vec::new();
             File::open(manifest)?
-                .take(teka_pkg::MAX_MANIFEST + 1)
+                .take(teka_tpk::MAX_MANIFEST + 1)
                 .read_to_end(&mut bytes)?;
             ensure!(
-                bytes.len() as u64 <= teka_pkg::MAX_MANIFEST,
+                bytes.len() as u64 <= teka_tpk::MAX_MANIFEST,
                 "manifest exceeds limit"
             );
             let mut sources = BTreeMap::new();
@@ -173,7 +173,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or_else(|| std::path::Path::new("."));
             let mut staging = tempfile::NamedTempFile::new_in(parent)?;
-            teka_pkg::pack_manifest(
+            teka_tpk::pack_manifest(
                 staging.as_file_mut(),
                 &bytes,
                 &sources,
@@ -204,7 +204,7 @@ mod tests {
         let error = anyhow::Error::new(io::Error::from_raw_os_error(5)).context("read payload");
         assert!(!rejection(error).is::<Rejected>());
         let error =
-            anyhow::Error::msg("temporary output failed").context(teka_pkg::verify::Operational);
+            anyhow::Error::msg("temporary output failed").context(teka_tpk::verify::Operational);
         assert!(!rejection(error).is::<Rejected>());
     }
 }

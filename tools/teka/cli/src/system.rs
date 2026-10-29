@@ -143,7 +143,7 @@ pub fn run_status(args: StatusOptions) -> Result<()> {
 }
 
 pub fn run_update(args: UpdateOptions) -> Result<()> {
-    let manifest = teka_pkg::read_single(&args.file, teka_pkg::ComponentType::Os)?;
+    let manifest = teka_tpk::read_single(&args.file, teka_tpk::ComponentType::Os)?;
     let file = args
         .file
         .canonicalize()

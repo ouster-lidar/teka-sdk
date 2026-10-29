@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use ::app_runtime::api_error::ApiError;
+use ::teka_app::api_error::ApiError;
 use axum::extract::Extension;
 use axum::extract::Request;
 use axum::http::{HeaderMap, Method, StatusCode};

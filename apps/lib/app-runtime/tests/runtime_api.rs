@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 
-::app_runtime::declare_app_runtime!("test-app");
+::teka_app::declare_app_runtime!("test-app");
 
 #[test]
 fn macro_propagates_acquisition_failure_and_stops_before_final_release() {

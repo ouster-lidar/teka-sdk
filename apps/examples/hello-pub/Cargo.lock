@@ -77,22 +77,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "app-runtime"
-version = "0.1.0"
-dependencies = [
- "axum",
- "libc",
- "parking_lot",
- "reqwest",
- "sd-notify",
- "serde",
- "serde_json",
- "socket2",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -430,13 +414,13 @@ name = "hello-pub"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "app-runtime",
  "axum",
  "chrono",
  "clap",
  "parking_lot",
  "serde",
  "serde_json",
+ "teka-app",
  "tokio",
  "tower-http",
  "tracing",
@@ -1158,6 +1142,22 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "teka-app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "libc",
+ "parking_lot",
+ "reqwest",
+ "sd-notify",
+ "serde",
+ "serde_json",
+ "socket2",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

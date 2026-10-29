@@ -1,3 +1,3 @@
 fn main() {
-    std::process::exit(ouster_teka::main_entry());
+    std::process::exit(teka_cli::main_entry());
 }

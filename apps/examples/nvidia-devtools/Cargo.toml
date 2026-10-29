@@ -12,7 +12,7 @@ name = "nvidia-devtools"
 path = "src/main.rs"
 
 [dependencies]
-app-runtime = { path = "../../lib/app-runtime" }
+teka-app = { path = "../../lib/app-runtime" }
 axum = { version = "0.8", features = ["json", "ws"] }
 tower-http = { version = "0.6", features = ["cors"] }
 serde = { version = "1", features = ["derive"] }
