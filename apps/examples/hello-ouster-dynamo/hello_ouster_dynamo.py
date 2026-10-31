@@ -48,7 +48,7 @@ from source_config import (
     set_runtime_status,
     wait_for_source_config_change,
 )
-from viz_utils import JetstreamDisplayBridge, VizPid
+from viz_utils import TekaDisplayBridge, VizPid
 
 SOURCE_DEFAULTS = SourceDefaults(
     config_path="/var/lib/hello-ouster-dynamo/source-config.json",
@@ -60,7 +60,7 @@ SOURCE_DEFAULTS = SourceDefaults(
 # Written by ouster-dynamo on Reset ego; hello-ouster-dynamo consumes + unlinks.
 _CLEAR_SLAM_VIZ_FLAG = Path("/run/ouster-dynamo/clear_slam_viz")
 
-_active_bridge: Optional[JetstreamDisplayBridge] = None
+_active_bridge: Optional[TekaDisplayBridge] = None
 _record_runtime_cache: Optional[dict] = None
 _record_runtime_mtime: Optional[float] = None
 
@@ -108,7 +108,7 @@ def main() -> FrameSetSourceType:
     src_config = load_source_config(defaults=SOURCE_DEFAULTS)
     src_type, frame_set_source = resolve_source(src_config, defaults=SOURCE_DEFAULTS)
 
-    with JetstreamDisplayBridge(src_type, frame_set_source) as display_ctx:
+    with TekaDisplayBridge(src_type, frame_set_source) as display_ctx:
         _active_bridge = display_ctx
         try:
             src = open_source(frame_set_source)

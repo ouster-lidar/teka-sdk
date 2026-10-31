@@ -1,4 +1,4 @@
-"""PointViz helpers: key inject, VizProxy, JetstreamDisplayBridge.
+"""PointViz helpers: key inject, VizProxy, TekaDisplayBridge.
 
 Browser JPEG capture lives in the Rust backend (zwlr_screencopy). SimpleViz
 does not read back the GL swapchain.
@@ -615,7 +615,7 @@ class PointCloudViz(viz_core.LidarFrameViz):
             super()._update_fine_frame_trajectory()
 
 
-class JetstreamDisplayBridge:
+class TekaDisplayBridge:
     """Share one PointViz window between the browser and HDMI output."""
 
     def __init__(self, source_type: FrameSetSourceType) -> None:
@@ -629,7 +629,7 @@ class JetstreamDisplayBridge:
         self._demand: Optional[DemandController] = None
         self._config_watch: Any = None
 
-    def __enter__(self) -> "JetstreamDisplayBridge":
+    def __enter__(self) -> "TekaDisplayBridge":
         self._start_bridges()
         self.pointviz = self._build_pointviz()
         return self

@@ -24,7 +24,7 @@ from source_config import (
     set_runtime_status,
     wait_for_source_config_change,
 )
-from viz_utils import JetstreamDisplayBridge, PointCloudViz, VizPid
+from viz_utils import TekaDisplayBridge, PointCloudViz, VizPid
 
 SOURCE_DEFAULTS = SourceDefaults(
     config_path="/var/lib/hello-ouster-world/source-config.json",
@@ -261,7 +261,7 @@ def _run_viz(cfg, config_watch, source_type, target, src):
         sensor_frames = _start_sensor_reader(src)
         first_sensor_frame = _next_sensor_frame(sensor_frames, config_watch)
 
-    with JetstreamDisplayBridge(source_type) as display_ctx:
+    with TekaDisplayBridge(source_type) as display_ctx:
         viz_sensor_info = list(src.sensor_info)
         osf_writer = None
         osf_writer_path = ""
