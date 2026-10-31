@@ -9,7 +9,7 @@ let
 
   imageVersion =
     let
-      t = builtins.getEnv "JETSTREAM_TEST_VERSION";
+      t = builtins.getEnv "TEKA_TEST_VERSION";
       raw = if t != "" then t else "0.1.0-alpha.1";
     in
     validateImageCore raw;

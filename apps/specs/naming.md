@@ -53,6 +53,6 @@ App image `os-release`:
 | `PRETTY_NAME` | `<id> portable <IMAGE_VERSION>` |
 | `PORTABLE_PREFIXES` | app id |
 
-- Filename **`<compose>`** is **`${IMAGE_VERSION}+${BUILD_ID}`** from `apps/nix/version.nix`. **`JETSTREAM_TEST_VERSION`** overrides the SemVer core when set (flake eval reads env only with **`--impure`**); unset defaults to **`0.1.0-alpha.1`**. Malformed SemVer throws at eval.
+- Filename **`<compose>`** is **`${IMAGE_VERSION}+${BUILD_ID}`** from `apps/nix/version.nix`. **`TEKA_TEST_VERSION`** overrides the SemVer core when set (flake eval reads env only with **`--impure`**); unset defaults to **`0.1.0-alpha.1`**. Malformed SemVer throws at eval.
 - Flake **`checks.<system>.<id>`** (and **`<id>-cross-<system>`**) validates image naming and `os-release` fields against `apps/nix/version.nix`, including **`VERSION_ID=1`**.
 - Host GPU **`extension-release.portable-gl-extension`** matches **`ID=teka-portable`** via **`ID_LIKE`** and **`VERSION_ID=1`** (same GPU compatibility generation as app images). Bump both sides only for a breaking GPU extension change.
