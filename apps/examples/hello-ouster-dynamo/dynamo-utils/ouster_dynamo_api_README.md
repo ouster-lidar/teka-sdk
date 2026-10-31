@@ -2,7 +2,7 @@
 
 The ouster-dynamo producer is **Ouster proprietary software**, distributed and installed separately from this repo.
 
-This API defines how **ouster-dynamo** shares data with other Jetstream apps (for example hello-ouster-dynamo).
+This API defines how **ouster-dynamo** shares data with other Teka apps (for example hello-ouster-dynamo).
 
 It is a small, versioned wire format.
 
@@ -11,7 +11,7 @@ It is a small, versioned wire format.
 | Copy | Path |
 |------|------|
 | **Consumer copy** (hello-ouster-dynamo) | `dynamo-utils/ouster_dynamo_api.py` (this tree) |
-| **Producer** (another Jetstream app, e.g. ouster-dynamo) | ships its own copy of the same constants |
+| **Producer** (another Teka app, e.g. ouster-dynamo) | ships its own copy of the same constants |
 
 hello-ouster-dynamo’s Nix build uses only the consumer copy above. A separate producer app checkout is optional and never required to build or run hello-ouster-dynamo.
 
@@ -36,7 +36,7 @@ When you publish a frame, pass the **same** version into both channels (EventPub
 
 Consumers usually listen for the Channel 1 heartbeat, then read the matching FrameSet for that frame’s objects.
 
-Live tracking/viz/extrinsics knobs are **not** part of this API. They are adjusted only inside ouster-dynamo’s Jetstream Configs panel via a local `/live-config` HTTP endpoint (pending file → once-per-frame apply).
+Live tracking/viz/extrinsics knobs are **not** part of this API. They are adjusted only inside ouster-dynamo’s Teka Configs panel via a local `/live-config` HTTP endpoint (pending file → once-per-frame apply).
 
 ### Channel 1: Heartbeat & telemetry
 

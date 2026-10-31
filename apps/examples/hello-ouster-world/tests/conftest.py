@@ -12,7 +12,7 @@ from viewer import API, SOURCE_KEYS, Viewer
 
 def pytest_addoption(parser):
     group = parser.getgroup("hello-ouster-world")
-    group.addoption("--host", help="Jetstream hostname or HTTP(S) origin")
+    group.addoption("--host", help="Teka hostname or HTTP(S) origin")
     group.addoption(
         "--sensor", help="Sensor hostname/IP; required for discovery and recording"
     )
@@ -50,7 +50,7 @@ def app(browser, pytestconfig):
             response = context.request.post(
                 "/api/v1/auth/login", data={"password": password}
             )
-            assert response.ok, "Jetstream login failed"
+            assert response.ok, "Teka login failed"
         viewer = Viewer(context.new_page())
         response = context.request.get(API + "/record")
         assert response.status in (200, 404, 503), response.text()

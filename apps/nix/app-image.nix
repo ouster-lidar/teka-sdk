@@ -148,7 +148,7 @@ let
         NetworkNamespacePath=/proc/1/ns/net
       '';
 
-      # Jetstream appliance conveniences for app unit snippets: optional
+      # Teka appliance conveniences for app unit snippets: optional
       # `EnvironmentFile=/etc/teka/wlroots.env` and fail-fast host GPU path
       # checks (see `nix/wayland/host-gpu-checks.nix`). GPU checks are opt-in.
       hostUnitDefaults =

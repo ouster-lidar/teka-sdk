@@ -2,7 +2,7 @@
 
 Demo publisher app: owns an in-process event ring buffer and current aggregate state. Peers and browsers publish, query, and subscribe at `/api/v1/app/hello-pub/…`.
 
-Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Jetstream), not a shared platform bus.
+Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Teka), not a shared platform bus.
 
 ## Naming
 
@@ -13,7 +13,7 @@ Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstra
 | Rust package / binary | `hello-pub` |
 | Source dir | `apps/examples/hello-pub/` |
 
-## Jetstream integration
+## Teka integration
 
 | Env | Default |
 |-----|---------|
@@ -121,7 +121,7 @@ While `generator_running` is true, a background task publishes a `kind: "random"
 Static panel under `/app/hello-pub`:
 
 - Show `state` (totals, generator status)
-- **Publisher URL** for remote subscribers: `{window.location.origin}/api/v1/app/hello-pub` (scheme/host/port the browser used to reach this Jetstream host), with a one-click copy control
+- **Publisher URL** for remote subscribers: `{window.location.origin}/api/v1/app/hello-pub` (scheme/host/port the browser used to reach this Teka host), with a one-click copy control
 - Button to `POST /events` (optional message field)
 - Toggle generator and set interval 1–10s (`POST /generator`)
 - Live event list via `WS /events/stream` (or refetch on snapshot)

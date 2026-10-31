@@ -1,6 +1,6 @@
-# Jetstream Example Apps
+# Teka Example Apps
 
-Build app images from `apps/`, deploy to a Jetstream device (for example a ZedBox), and run them alongside other appliance apps.
+Build app images from `apps/`, deploy to a Teka device (for example a ZedBox), and run them alongside other appliance apps.
 
 ## Start here
 
@@ -22,14 +22,14 @@ From `apps/`:
 **Build** (image on disk only, for web UI or app distribution):
 
 ```bash
-cd jetstream-example-apps/apps
+cd teka-sdk/apps
 teka app build hello-world
 ```
 
 **Build + Deploy** (normal workflow — build for the device, upload, sample logs):
 
 ```bash
-cd jetstream-example-apps/apps
+cd teka-sdk/apps
 teka app deploy --build hello-ouster-world --host http://<device>/
 ```
 

@@ -1,6 +1,6 @@
 # Peer FrameSet sockets
 
-Jetstream apps can publish live Ouster SDK `FrameSet` streams to peer apps on the same device using a Unix-domain socket. Consumers open the path with `osf_socket.open_source()` (SDK `open_source` plus `.sock` paths).
+Teka apps can publish live Ouster SDK `FrameSet` streams to peer apps on the same device using a Unix-domain socket. Consumers open the path with `osf_socket.open_source()` (SDK `open_source` plus `.sock` paths).
 
 ## Path convention
 

@@ -3,8 +3,8 @@ theme: seriph
 background: ./ouster/hero-physical-ai.png
 title: Hello Slidev
 info: |
-  ## Hello Slidev on Jetstream
-  Ouster marketing visuals + Jetstream app demo.
+  ## Hello Slidev on Teka
+  Ouster marketing visuals + Teka app demo.
 class: text-center
 highlighter: shiki
 drawings:
@@ -22,7 +22,7 @@ mdc: true
 Sensing & perception for robotics, infrastructure, and autonomy
 
 <div class="pt-10 text-lg opacity-80">
-  Built on Jetstream apps
+  Built on Teka apps
 </div>
 
 <div class="pt-8">
@@ -98,7 +98,7 @@ image: ./ouster/sensor-os1.png
 backgroundSize: contain
 ---
 
-# What is Jetstream?
+# What is Teka?
 
 Immutable **NixOS appliance** platform for edge devices:
 
@@ -110,7 +110,7 @@ Immutable **NixOS appliance** platform for edge devices:
 
 ```mermaid {scale: 0.85}
 flowchart TB
-  Base[Base Image] --> Host[Jetstream Host]
+  Base[Base Image] --> Host[Teka Host]
   Apps[Portable Apps] --> Host
   Host --> UI[Web UI]
 ```
@@ -157,7 +157,7 @@ layout: default
 
 ### This deck
 - **hello-slidev** — you are here
-- [Slidev](https://sli.dev) + Jetstream shell
+- [Slidev](https://sli.dev) + Teka shell
 - `/app/hello-slidev/static/deck/`
 
 </div>
@@ -217,7 +217,7 @@ background: ./ouster/hero-physical-ai.png
 # Thanks!
 
 <div class="text-2xl mt-6 opacity-90">
-Ouster sensing × Jetstream apps
+Ouster sensing × Teka apps
 </div>
 
 <div class="mt-8 flex justify-center gap-6 text-sm opacity-70">

@@ -1,4 +1,4 @@
-# apps — `hello-firefox-kiosk` (Wayland kiosk + WebGL on Jetstream)
+# apps — `hello-firefox-kiosk` (Wayland kiosk + WebGL on Teka)
 
 ## Goal
 

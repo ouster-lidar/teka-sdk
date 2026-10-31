@@ -1,4 +1,4 @@
-//! Hello-sub — demo event subscriber for Jetstream inter-app pub-sub.
+//! Hello-sub — demo event subscriber for Teka inter-app pub-sub.
 
 pub mod api;
 pub mod peer;

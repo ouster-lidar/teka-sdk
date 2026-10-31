@@ -1,4 +1,4 @@
-//! Guest view vs editor access (Jetstream principal, open-mode enforcement, guest-access file).
+//! Guest view vs editor access (Teka principal, open-mode enforcement, guest-access file).
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::display_config;
 
-/// Jetstream injects this on proxied upstream requests when the browser has a session.
+/// Teka injects this on proxied upstream requests when the browser has a session.
 pub const HEADER_PRINCIPAL_ID: &str = "x-mc-principal-id";
 
 const GUEST_ACCESS_FILE: &str = "guest-access.json";
@@ -113,7 +113,7 @@ async fn mc_enforcement_enabled() -> bool {
     value
 }
 
-/// Without a Jetstream password nobody has a principal, so open mode must grant control.
+/// Without a Teka password nobody has a principal, so open mode must grant control.
 async fn fetch_mc_enforcement() -> Option<bool> {
     let base = crate::app_runtime::app_base_url();
     let url = format!("{}/api/v1/auth/status", base.trim_end_matches('/'));
@@ -156,8 +156,8 @@ fn method_is_get(method: &Method) -> bool {
     *method == Method::GET || *method == Method::HEAD
 }
 
-/// Jetstream probes `/status` with an 800 ms budget before every proxied request, so
-/// it must not wait on the Jetstream enforcement lookup. It exposes liveness only.
+/// Teka probes `/status` with an 800 ms budget before every proxied request, so
+/// it must not wait on the Teka enforcement lookup. It exposes liveness only.
 fn is_public(method: &Method, path: &str) -> bool {
     method_is_get(method) && path == "/status"
 }

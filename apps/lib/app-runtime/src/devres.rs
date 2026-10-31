@@ -1,6 +1,6 @@
 //! Loopback devres HTTP client.
 //!
-//! App backends must reach the Jetstream app runtime through this module (via
+//! App backends must reach the Teka app runtime through this module (via
 //! [`declare_app_runtime`](crate::declare_app_runtime)). Do not reimplement activate,
 //! register, resource sync, or release in app crates.
 

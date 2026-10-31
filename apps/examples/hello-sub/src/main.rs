@@ -1,4 +1,4 @@
-//! Hello-sub HTTP backend for the Jetstream `hello-sub` app.
+//! Hello-sub HTTP backend for the Teka `hello-sub` app.
 
 use std::net::SocketAddr;
 

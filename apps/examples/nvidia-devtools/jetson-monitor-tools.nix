@@ -1,5 +1,5 @@
 # Jetson CPU/GPU monitoring CLIs from L4T debs (tegrastats, jetson_clocks, nvidia-smi).
-# Host tegra sysfs + NVML libs come from the Jetstream OS — not bundled here.
+# Host tegra sysfs + NVML libs come from the Teka OS — not bundled here.
 {
   pkgs,
   nvidia-jetpack,

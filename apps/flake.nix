@@ -1,5 +1,5 @@
 {
-  description = "Jetstream app image examples (erofs DDI)";
+  description = "Teka app image examples (erofs DDI)";
 
   inputs = {
     # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).

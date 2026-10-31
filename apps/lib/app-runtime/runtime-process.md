@@ -1,6 +1,6 @@
 # App runtime contract
 
-- Jetstream owns firewall rules and resource allocations. Rust apps acquire their desired TCP/UDP leases through fallible `sync_tcp_ports` / `sync_udp_ports` before reporting readiness. Run these blocking helpers outside Tokio or in `spawn_blocking`.
+- Teka owns firewall rules and resource allocations. Rust apps acquire their desired TCP/UDP leases through fallible `sync_tcp_ports` / `sync_udp_ports` before reporting readiness. Run these blocking helpers outside Tokio or in `spawn_blocking`.
 - Generic native packet policy uses fallible `sync_nftables` with holder-local `NftablesLease` and `NftablesSet` declarations; only accepted requests enter the replay cache. Initial acquisition failure releases the activated runtime before returning an error.
 - The SDK keeps registration and reconnect inside the runtime client. A disconnected or unreachable control plane never releases resources; reconnect reactivates and replays accepted nftables leases before ports. Failed packet-policy replay blocks port replay and retries the current accepted cache.
 - Apps requiring nftables enforcement subscribe to `resource_availability()` before readiness. `Unavailable(error)` reports registration loss or failed recovery without assuming kernel state is absent; these apps pause dependent work until `Available` after complete replay and registration, or exit if they cannot pause. Final release publishes `Stopping`. This watch channel retains current availability; rapid transitions may coalesce.

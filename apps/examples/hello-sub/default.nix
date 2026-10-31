@@ -83,7 +83,7 @@ ps.makeAppImage {
   cargoChecks = helloSubBin.passthru.cargoChecks;
   unit = writeText "${name}.service" ''
     [Unit]
-    Description=hello-sub (Jetstream hello pub-sub subscriber demo)
+    Description=hello-sub (Teka hello pub-sub subscriber demo)
     Documentation=file:///usr/lib/teka/mission-control/manifest.json
     After=mission-control.service network.target
     ${ps.appBackendUnitLines}

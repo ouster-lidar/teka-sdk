@@ -68,7 +68,7 @@ symlinkJoin {
     checkGbmBackends
   ];
   meta = with lib; {
-    description = "Host GPU path assertions for Jetstream app images";
+    description = "Host GPU path assertions for Teka app images";
     license = licenses.mit;
   };
 }

@@ -1,8 +1,8 @@
 # hello-sub
 
-Demo subscriber app: connects to one or more [hello-pub](../hello-pub/README.md) publishers through Jetstream’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
+Demo subscriber app: connects to one or more [hello-pub](../hello-pub/README.md) publishers through Teka’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
 
-Supports **remote** publishers by pointing at other hosts’ Jetstream feature URLs (`/api/v1/app/hello-pub`). This demo does **not** perform remote Jetstream password login; use open-mode / unauthenticated peers for now (password auth may return later).
+Supports **remote** publishers by pointing at other hosts’ Teka feature URLs (`/api/v1/app/hello-pub`). This demo does **not** perform remote Teka password login; use open-mode / unauthenticated peers for now (password auth may return later).
 
 ## Naming
 
@@ -13,7 +13,7 @@ Supports **remote** publishers by pointing at other hosts’ Jetstream feature U
 | Rust package / binary | `hello-sub` |
 | Source dir | `apps/examples/hello-sub/` |
 
-## Jetstream integration
+## Teka integration
 
 | Env | Default |
 |-----|---------|
@@ -163,9 +163,9 @@ Dashboard STATUS/HEARTBEAT from `status.summary`. Card updates follow the status
 3. On snapshot: replace that peer’s ring, stamp `publisher_url` on events, update that peer’s `peer_state` / connected / error, fan out merged feed.
 4. On WS close/error: mark that peer disconnected, reconnect with backoff. Config remove aborts that session immediately.
 
-Local loopback peers keep today’s behavior (`kind=service` when enforcement is on). Password-protected remote Jetstream hosts are out of scope for this demo.
+Local loopback peers keep today’s behavior (`kind=service` when enforcement is on). Password-protected remote Teka hosts are out of scope for this demo.
 
-Publisher process restart or Jetstream proxy blips must not crash the subscriber.
+Publisher process restart or Teka proxy blips must not crash the subscriber.
 
 ## UI
 

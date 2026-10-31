@@ -106,7 +106,7 @@ def dom_to_glfw_key(code: str, key: str) -> Optional[int]:
 
 
 class StreamTarget:
-    """Reads whether Jetstream still wants frames from the viz.
+    """Reads whether Teka still wants frames from the viz.
 
     Rust writes ``stream_target.json`` with active/need_render, stream size,
     and max framerate; capture and pause logic poll that file.

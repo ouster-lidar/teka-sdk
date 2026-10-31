@@ -1,10 +1,10 @@
 # hello-slidev
 
-Slidev presentation demo packaged as a Jetstream app. Builds a static SPA with [Slidev](https://sli.dev/) and serves it through the Jetstream app shell.
+Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slidev](https://sli.dev/) and serves it through the Teka app shell.
 
 ## What it demonstrates
 
-- **Slidev** deck with Jetstream + example-apps overview
+- **Slidev** deck with Teka + example-apps overview
 - **Integrated panel** at `/app/hello-slidev` (Slidev deck in an iframe)
 - **Guest access toggle** (signed-in users) stored in app `StateDirectory`; the Rust backend enforces deck access from the toggle + `X-MC-Principal-Id` (host forwards session identity, does not gate the deck)
 - **Deck** at `/api/v1/app/hello-slidev/deck/…` (feature API proxy — app backend enforces guest-access; avoids host HTML login redirect on `/app/…/deck/`)

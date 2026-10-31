@@ -1,5 +1,5 @@
 flowchart LR
-    MC[Jetstream sensors roster] -->|WebSocket| API[World backend]
+    MC[Teka sensors roster] -->|WebSocket| API[World backend]
     UI[Browser controls] <-->|HTTP and WebSocket| API
     API -->|apply source and status| VIZ[Ouster SDK SimpleViz]
     OSF[OSF file] --> VIZ

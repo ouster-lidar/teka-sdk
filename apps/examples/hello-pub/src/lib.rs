@@ -1,4 +1,4 @@
-//! Hello-pub — demo event publisher for Jetstream inter-app pub-sub.
+//! Hello-pub — demo event publisher for Teka inter-app pub-sub.
 
 pub mod api;
 pub mod store;

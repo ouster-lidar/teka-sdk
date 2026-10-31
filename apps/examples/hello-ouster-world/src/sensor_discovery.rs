@@ -1,4 +1,4 @@
-//! Backend subscription to Jetstream's sensor roster.
+//! Backend subscription to Teka's sensor roster.
 
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket};
@@ -162,7 +162,7 @@ async fn discovery_loop(state: AppState) {
             publish_discovery_status(
                 &state,
                 "unavailable",
-                "Jetstream sensor roster is not configured",
+                "Teka sensor roster is not configured",
             )
             .await;
             wait_for_change(&state, &mut shutdown).await;

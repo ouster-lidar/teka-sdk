@@ -1,6 +1,6 @@
 # Canonical mkfs.erofs flags for app image DDIs.
 #
-# Same tuning as Jetstream appliance rootfs (lz4hc-9 + fragments + 16 KiB clusters,
+# Same tuning as Teka appliance rootfs (lz4hc-9 + fragments + 16 KiB clusters,
 # kernel ≥6.6). Shared with downstream appliance image builders.
 #
 # `output` and `sourceDir` are raw shell fragments (e.g. "$out/foo.raw", tree).

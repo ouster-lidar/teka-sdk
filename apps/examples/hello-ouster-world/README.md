@@ -28,7 +28,7 @@ The measured Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi
 
 ## Device tests
 
-From the repository root, build, deploy and test on a Jetstream device:
+From the repository root, build, deploy and test on a Teka device:
 
 ```sh
 nix run ./apps/examples/hello-ouster-world/tests#test-hello-ouster-world -- --host "$HOST"
@@ -58,7 +58,7 @@ nix run ./apps/examples/hello-ouster-world/tests -- --host "$HOST" --sensor "$SE
 
 ## Sources
 
-A fresh installation starts enabled in sensor mode with no selected host and recording disabled. The backend subscribes to the Jetstream `sensors` app roster, even before a browser connects. A sensor whose UDP destination is this device is applied immediately; otherwise it scans for 30 seconds after the first snapshot, then applies a sole usable sensor. Multiple sensors with none streaming here require an explicit selection. The viz placeholder shows the scan countdown and auto-configuration progress. An empty roster leaves manual hostname entry available; unavailable discovery is shown separately and retries. The sensor picker freezes its displayed rows during selection, while the backend keeps consuming roster updates. Discovery stays available while a source is selected or stopped. Choose a dropdown entry to fill the hostname/IP field, then **Apply** to start it. Sensors whose UDP destination is this device are starred and listed first when Jetstream's sensors app reports `udp_dest`.
+A fresh installation starts enabled in sensor mode with no selected host and recording disabled. The backend subscribes to the Teka `sensors` app roster, even before a browser connects. A sensor whose UDP destination is this device is applied immediately; otherwise it scans for 30 seconds after the first snapshot, then applies a sole usable sensor. Multiple sensors with none streaming here require an explicit selection. The viz placeholder shows the scan countdown and auto-configuration progress. An empty roster leaves manual hostname entry available; unavailable discovery is shown separately and retries. The sensor picker freezes its displayed rows during selection, while the backend keeps consuming roster updates. Discovery stays available while a source is selected or stopped. Choose a dropdown entry to fill the hostname/IP field, then **Apply** to start it. Sensors whose UDP destination is this device are starred and listed first when Teka's sensors app reports `udp_dest`.
 
 Before streaming, the app applies supported measurement defaults, sets NORMAL mode and UDP ports 7502/7503, and verifies the active configuration. A configuration error remains visible for retry. A saved sensor target receives the same setup. The app does not factory-reset sensor networking or identity.
 
@@ -130,7 +130,7 @@ On a local USB keyboard, Shift with mouse drag translates the camera and Esc exi
 
 ## Guest view
 
-Signed-out visitors can watch the browser point-cloud stream only (no console, source settings, or remote control). **Guest view** defaults on and is toggled by signed-in users in the Display panel. Jetstream without a password (open mode) treats everyone as signed in for API access.
+Signed-out visitors can watch the browser point-cloud stream only (no console, source settings, or remote control). **Guest view** defaults on and is toggled by signed-in users in the Display panel. Teka without a password (open mode) treats everyone as signed in for API access.
 
 | Surface | Who decides |
 |---------|-------------|
@@ -138,7 +138,7 @@ Signed-out visitors can watch the browser point-cloud stream only (no console, s
 | `GET /api/v1/app/hello-ouster-world/status` | App backend: public liveness probe (`ok`, `app` only) |
 | `GET /api/v1/app/hello-ouster-world/guest-access` | App backend: public (guest view flag) |
 | `GET /api/v1/app/hello-ouster-world/display/stream`, `/display/status` | App backend: guests when guest view is on (view only; input rejected) |
-| All other app API routes | App backend: signed-in Jetstream session (`X-MC-Principal-Id`) or open-mode Jetstream (no password) |
+| All other app API routes | App backend: signed-in Teka session (`X-MC-Principal-Id`) or open-mode Teka (no password) |
 
 ## Existing installations
 
@@ -148,7 +148,7 @@ Stop both viewer apps before migrating the previous combined demo. Move its stat
 
 ```mermaid
 flowchart LR
-    MC[Jetstream sensors roster] -->|WebSocket| API[World backend]
+    MC[Teka sensors roster] -->|WebSocket| API[World backend]
     UI[Browser controls] <-->|HTTP and WebSocket| API
     API -->|apply source and status| VIZ[Ouster SDK SimpleViz]
     OSF[OSF file] --> VIZ

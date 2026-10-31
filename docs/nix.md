@@ -21,7 +21,7 @@ $ nix run nixpkgs#hello
 Hello, world!
 ```
 
-From `apps/` (repository path `jetstream-example-apps/apps`), read `flake.nix` and list the example apps that can be built:
+From `apps/` (repository path `teka-sdk/apps`), read `flake.nix` and list the example apps that can be built:
 
 ```bash
 $ nix flake show

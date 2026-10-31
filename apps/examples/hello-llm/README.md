@@ -67,9 +67,9 @@ teka app deploy --build hello-llm --host http://HOST/
 
 ## App UI
 
-Guide panel at `/app/hello-llm` in Jetstream (how it works, first-boot tips).
+Guide panel at `/app/hello-llm` in Teka (how it works, first-boot tips).
 Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](../../lib/app-runtime/runtime-process.md)).
-Ollama stays on loopback 11434 without a public lease; Jetstream must use a different port from Open WebUI.
+Ollama stays on loopback 11434 without a public lease; Teka must use a different port from Open WebUI.
 Open WebUI's sandbox receives a read-only snapshot of the service's resolver configuration at launch so host file replacement cannot break startup.
 
 First boot downloads the model (network required; `TimeoutStartSec=900`). Open WebUI data
@@ -83,7 +83,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://<host>:8080/
 curl -sS http://127.0.0.1:11434/api/tags
 ```
 
-In Jetstream, open **Apps** → **Hello LLM** → **Logs**.
+In Teka, open **Apps** → **Hello LLM** → **Logs**.
 
 On Jetson, logs should show `Ollama CUDA (JETSON_JETPACK=6, …)` and inference with GPU layers (`size_vram` > 0 in `/api/ps`). No `/etc/nv_tegra_release` in the DDI — `start.sh` sets `JETSON_JETPACK=6` and `OLLAMA_LLM_LIBRARY=cuda_jetpack6`. The unit uses `X-Teka-PortableGPU=cuda` so the host GPU generator binds CUDA store roots without claiming a display connector. Do not `BindReadOnlyPaths=/run/opengl-driver` (symlink breaks namespace setup).
 

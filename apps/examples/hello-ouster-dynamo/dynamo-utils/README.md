@@ -16,4 +16,4 @@ Installed under `/usr/lib/hello-ouster-dynamo/dynamo-utils` on `PYTHONPATH` when
 
 ## Ownership
 
-These files are **part of hello-ouster-dynamo** and are required for its Nix build. They define the consumer-side peer API for another Jetstream app (for example ouster-dynamo). Keep the peer API constants compatible with the producer when that app changes; optional live knobs stay on the producer.
+These files are **part of hello-ouster-dynamo** and are required for its Nix build. They define the consumer-side peer API for another Teka app (for example ouster-dynamo). Keep the peer API constants compatible with the producer when that app changes; optional live knobs stay on the producer.

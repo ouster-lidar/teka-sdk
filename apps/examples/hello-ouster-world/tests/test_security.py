@@ -38,7 +38,7 @@ DENIED = (401, 403)
 @pytest.fixture
 def signed_out(browser, app):
     if app["auth"]["auth_disabled"] or not app["auth"]["enforcement"]:
-        pytest.skip("Jetstream open mode has no signed-out callers")
+        pytest.skip("Teka open mode has no signed-out callers")
     with browser.new_context(base_url=app["base_url"]) as context:
         yield context.request
 

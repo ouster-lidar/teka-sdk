@@ -50,7 +50,7 @@ let
   # HACK (x86 Mesa): host libgallium NEEDEDs libLLVM via DT_RUNPATH; ld.so does not
   # fall back to LD_LIBRARY_PATH for that edge, so a missing/unbound llvm store root in
   # the app unit namespace breaks gallium. LD_PRELOAD forces our libLLVM into the
-  # link map before gallium loads. Prefer fixing jetstream host GL extension roots
+  # link map before gallium loads. Prefer fixing teka host GL extension roots
   # + BindReadOnlyPaths so host RUNPATH works, then drop this closure and preload.
   #
   # Symptom was ouster-cli viz only: Sway/wlroots/foot already use host EGL/GBM; viz
@@ -104,7 +104,7 @@ let
 
     ## Network
 
-    - UDP ${ousterUdpFirewallRange} leased from Jetstream for the kiosk lifetime.
+    - UDP ${ousterUdpFirewallRange} leased from Teka for the kiosk lifetime.
     - Point the sensor at this host (ports +100 vs appliance defaults 7502–7504):
       - Lidar ${toString ousterLidarDataPort}/udp
       - IMU ${toString ousterImuDataPort}/udp

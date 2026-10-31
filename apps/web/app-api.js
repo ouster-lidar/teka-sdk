@@ -94,7 +94,7 @@
         return global.connectWebSocket(apiPath(appId, p), onMessage, options);
     }
 
-    /** Version chip HTML for jet-version-value spans (Jetstream sysupdate/install). */
+    /** Version chip HTML for jet-version-value spans (Teka sysupdate/install). */
     function versionValueHtml(value, variant) {
         var esc = global.escapeHtml || function (s) { return s; };
         var cls = 'jet-version-value' + (variant ? ' jet-version-value--' + variant : '');

@@ -1,4 +1,4 @@
-//! Supervise a Jetstream app and its TCP/UDP leases.
+//! Supervise a Teka app and its TCP/UDP leases.
 
 use std::io;
 use std::os::unix::process::ExitStatusExt;

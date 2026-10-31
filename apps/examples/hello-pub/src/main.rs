@@ -1,4 +1,4 @@
-//! Hello-pub HTTP backend for the Jetstream `hello-pub` app.
+//! Hello-pub HTTP backend for the Teka `hello-pub` app.
 
 use std::net::SocketAddr;
 

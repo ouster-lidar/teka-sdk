@@ -122,7 +122,7 @@ def test_console(viewer):
 
 def test_guest_access(replay, browser, app):
     if app["auth"]["auth_disabled"] or not app["auth"]["enforcement"]:
-        pytest.skip("Jetstream open mode has no guest restrictions")
+        pytest.skip("Teka open mode has no guest restrictions")
     replay.configure()
     replay.toggle("guest-access-toggle", True)
     replay.wait(lambda: replay.api("/guest-access")["enabled"])

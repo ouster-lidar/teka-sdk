@@ -2,9 +2,9 @@
 
 ## Description
 
-An optional advanced companion to `hello-ouster-world`, illustrating multiple capabilities of the Ouster SDK and Jetstream. Visualize and interact with LiDAR data sourced from an .osf file on disk, a live LiDAR sensor on the network, or through the separately installed Ouster Dynamo app to detect and track objects. This app utilizes the Ouster SDK's SimpleViz to visualize LiDAR point clouds. The app window is displayed on the device's local monitor (e.g., hdmi out), and accepts mouse and keyboard input to interact with the visuals. It also transmits a live feed of the app window to the app's web interface's remote display. The web interface also accepts mouse and keyboard inputs to control the app remotely.
+An optional advanced companion to `hello-ouster-world`, illustrating multiple capabilities of the Ouster SDK and Teka. Visualize and interact with LiDAR data sourced from an .osf file on disk, a live LiDAR sensor on the network, or through the separately installed Ouster Dynamo app to detect and track objects. This app utilizes the Ouster SDK's SimpleViz to visualize LiDAR point clouds. The app window is displayed on the device's local monitor (e.g., hdmi out), and accepts mouse and keyboard input to interact with the visuals. It also transmits a live feed of the app window to the app's web interface's remote display. The web interface also accepts mouse and keyboard inputs to control the app remotely.
 
-## Build for Jetstream (Ouster Box Jetson)
+## Build for Teka (Ouster Box Jetson)
 
 ```bash
 nix build .#hello-ouster-dynamo .#hello-ouster-dynamo-cross-aarch64-linux
@@ -58,7 +58,7 @@ Set source to **connected sensor**, enter hostname/IP, Apply.
 | **connected sensor**   | hostname / IP                                                                              | off: hello-ouster-dynamo owns UDP lidar; on: Dynamo owns lidar, hello-ouster-dynamo reads the FrameSet socket |
 
 
-Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and exposed at `GET/POST /api/v1/app/hello-ouster-dynamo/source-config` (Jetstream app proxy). **Lidar** is OSF vs sensor. **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo** is proprietary Ouster software, installed separately (not built from this repo). Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet sockets: see [apps/specs/frameset-socket.md](../../specs/frameset-socket.md).
+Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and exposed at `GET/POST /api/v1/app/hello-ouster-dynamo/source-config` (Teka app proxy). **Lidar** is OSF vs sensor. **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo** is proprietary Ouster software, installed separately (not built from this repo). Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet sockets: see [apps/specs/frameset-socket.md](../../specs/frameset-socket.md).
 
 ## Ouster SDK
 
@@ -102,7 +102,7 @@ Dynamo API v1 `kind=frame` events are timing-only (`ouster_dynamo_api_version` +
 
 ## Display panel
 
-- **HDMI** / **Browser** toggles are independent; when both are on they show the same PointViz. Browser stream keeps working if HDMI is blanked or unplugged (persistent Sway `HEADLESS` home output). HDMI/browser settings persist in `/var/lib/hello-ouster-dynamo/display-config.json`. Disable the Jetstream app to stop Sway/SimpleViz.
+- **HDMI** / **Browser** toggles are independent; when both are on they show the same PointViz. Browser stream keeps working if HDMI is blanked or unplugged (persistent Sway `HEADLESS` home output). HDMI/browser settings persist in `/var/lib/hello-ouster-dynamo/display-config.json`. Disable the Teka app to stop Sway/SimpleViz.
 - **Lidar** (Local file / Sensor) + **via ouster-dynamo** toggle + Apply. Direct: SimpleViz opens the OSF or sensor. Via Dynamo: SimpleViz reads `/run/ouster-dynamo/frameset.sock` and waits until FrameSets arrive.
 - When neither HDMI nor a browser stream consumer is active, SimpleViz pauses.
 - Hover the stream for mouse/keyboard into the viz. **Console** follows app stdout/stderr; Ctrl-C interrupts SimpleViz only (Sway stays up).

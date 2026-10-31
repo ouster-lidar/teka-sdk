@@ -1,6 +1,6 @@
 # Developer Guide
 
-Task-oriented workflow for building app images from `apps/` and deploying them to a Jetstream device.
+Task-oriented workflow for building app images from `apps/` and deploying them to a Teka device.
 
 ## Workflows
 
@@ -17,14 +17,14 @@ flowchart TD
     subgraph manual [2. Manual build + web UI install]
         D[nix build .#hello-ouster-terminal-cross-aarch64-linux]
         E[result/*.tpk]
-        F[Upload in Jetstream web UI]
+        F[Upload in Teka web UI]
         G[Open app and verify]
         D --> E --> F --> G
     end
 
     subgraph auto [3. teka app deploy auto flow]
         H[Confirm Teka web UI loads]
-        I[teka app deploy --build --host http://jetstream-$SN/ hello-ouster-terminal]
+        I[teka app deploy --build --host http://teka-$SN/ hello-ouster-terminal]
         J[Open app and verify]
         H --> I --> J
     end
@@ -43,7 +43,7 @@ The first workflow is required once. Choose either manual web UI installation or
 4. Change to `apps/`, the directory containing `flake.nix`:
 
    ```bash
-   cd jetstream-example-apps/apps
+   cd teka-sdk/apps
    ```
 
 5. List available app ids:
@@ -67,8 +67,8 @@ Replace `hello-ouster-terminal` with another app id as needed.
 
 ## Workflow 3: `teka app deploy` auto flow
 
-1. Open the Jetstream device web interface in a browser and confirm it loads.
-2. Note the Jetstream administrator password set during initial setup.
+1. Open the Teka device web interface in a browser and confirm it loads.
+2. Note the Teka administrator password set during initial setup.
 3. From `apps/`, run:
 
    ```bash
