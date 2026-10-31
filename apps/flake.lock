@@ -49,11 +49,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792429124,
-        "narHash": "sha256-ob9F5dUrqWPL9nY+BOpnrmSC6us8JE+nsbDFriJ/b4c=",
+        "lastModified": 1793150277,
+        "narHash": "sha256-BiGHn6cYXtDT2jFlAxYmfpEu5yIMtCFWpRiCI7wqyDo=",
         "owner": "anduril",
         "repo": "jetpack-nixos",
-        "rev": "8c412601a4918a879a4990878cb5a8c252372bbd",
+        "rev": "7fde791978b0b476abda2a6fc9b96d813d39c640",
         "type": "github"
       },
       "original": {
@@ -108,11 +108,11 @@
     "rustsecAdvisoryDb": {
       "flake": false,
       "locked": {
-        "lastModified": 1792250639,
-        "narHash": "sha256-NsRcWUOIJ2Qy/aVB1oeSoUw5Q7PEQZuMNJxD5R+l5Nk=",
+        "lastModified": 1793358759,
+        "narHash": "sha256-hxKuHEEXkeXPb6jP2EZu1Bl/Q4d4wihs/PYBN/b2Ntw=",
         "owner": "RustSec",
         "repo": "advisory-db",
-        "rev": "999ec89d5d3f10f20be14750ec8c2d8b44e0ac9b",
+        "rev": "2295466c4e9df26647fd67d8fa1c705ac2fc7f81",
         "type": "github"
       },
       "original": {
