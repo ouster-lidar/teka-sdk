@@ -84,7 +84,7 @@ ps.makeAppImage {
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-pub (Jetstream hello pub-sub publisher demo)
-    Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
+    Documentation=file:///usr/lib/teka/mission-control/manifest.json
     After=mission-control.service network.target
     ${ps.appBackendUnitLines}
     Wants=network.target
@@ -105,7 +105,7 @@ ps.makeAppImage {
     Restart=on-failure
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
   copyFiles = app.appManifestCopyFiles {
     inherit name appManifest webTree;

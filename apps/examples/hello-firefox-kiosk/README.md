@@ -25,7 +25,7 @@ A signed **`.tpk` app package** that runs **Cage** (single-client wlroots compos
 
 ## Host integration (GPU)
 
-- **`X-Jetstream-PortableGPU=wayland`** (same as **`hello-wayland-gpu`**).
+- **`X-Teka-PortableGPU=wayland`** (same as **`hello-wayland-gpu`**).
 - Host **`seatd`**: bind **`/run/seatd.sock`**, order after **`seatd.service`** (see **Input / seat handling** above).
 
 ## Seat management

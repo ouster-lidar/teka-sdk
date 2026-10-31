@@ -68,8 +68,8 @@ let
 
     ${lib.optionalString isAarch64 ''
       # App image /etc has no nv_tegra_release; Ollama skips cuda_jetpack6 without this
-      # (discover/runner.go). Host libcuda comes from jetstream-portable-gpu-generator
-      # (X-Jetstream-PortableGPU=cuda), not BindReadOnlyPaths=/run/opengl-driver.
+      # (discover/runner.go). Host libcuda comes from teka-portable-gpu-generator
+      # (X-Teka-PortableGPU=cuda), not BindReadOnlyPaths=/run/opengl-driver.
       export JETSON_JETPACK="''${JETSON_JETPACK:-6}"
       export OLLAMA_LLM_LIBRARY="''${OLLAMA_LLM_LIBRARY:-cuda_jetpack6}"
 
@@ -248,7 +248,7 @@ ps.makeAppImage {
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-llm (Open WebUI + Ollama/${modelTag})
-    ${lib.optionalString isAarch64 "X-Jetstream-PortableGPU=cuda"}
+    ${lib.optionalString isAarch64 "X-Teka-PortableGPU=cuda"}
     After=mission-control.service network-online.target
     Wants=mission-control.service network-online.target
 
@@ -276,6 +276,6 @@ ps.makeAppImage {
     TimeoutStartSec=900
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
 }

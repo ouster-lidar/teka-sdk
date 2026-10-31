@@ -10,7 +10,7 @@ Portable **Sway** + **Firefox** on Wayland. Default start URL is a Babylon.js 3D
 
 ## Host
 
-**`X-Jetstream-PortableGPU=wayland`**, host **`seatd`** socket, CA bundle overlay for HTTPS. Use **`WLR_BACKENDS=drm,libinput`** (not **`drm`** alone).
+**`X-Teka-PortableGPU=wayland`**, host **`seatd`** socket, CA bundle overlay for HTTPS. Use **`WLR_BACKENDS=drm,libinput`** (not **`drm`** alone).
 
 ## Deploy
 

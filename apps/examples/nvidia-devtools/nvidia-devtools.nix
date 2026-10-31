@@ -1,6 +1,6 @@
 # CUDA developer / profiling tools for Jetstream aarch64 targets.
 # Cross x86→aarch64: ncu from Jetpack debs (nsight-compute-target.nix).
-# libcuda comes from the host via X-Jetstream-PortableGPU=cuda — not bundled here.
+# libcuda comes from the host via X-Teka-PortableGPU=cuda — not bundled here.
 {
   pkgs,
   lib,

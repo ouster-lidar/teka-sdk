@@ -28,9 +28,9 @@ let
         else
           null;
 
-      etcHostsStub = writeText "jetstream-portable-etc-hosts" "127.0.0.1 localhost\n::1 localhost\n";
+      etcHostsStub = writeText "teka-portable-etc-hosts" "127.0.0.1 localhost\n::1 localhost\n";
 
-      nsswitchConf = writeText "jetstream-portable-nsswitch.conf" ''
+      nsswitchConf = writeText "teka-portable-nsswitch.conf" ''
         passwd: files
         group: files
         shadow: files
@@ -149,7 +149,7 @@ let
       '';
 
       # Jetstream appliance conveniences for app unit snippets: optional
-      # `EnvironmentFile=/etc/jetstream/wlroots.env` and fail-fast host GPU path
+      # `EnvironmentFile=/etc/teka/wlroots.env` and fail-fast host GPU path
       # checks (see `nix/wayland/host-gpu-checks.nix`). GPU checks are opt-in.
       hostUnitDefaults =
         {
@@ -167,16 +167,16 @@ let
         in
         {
           serviceFragment = lib.concatStringsSep "\n" (
-            lib.optional environmentFileWlroots "EnvironmentFile=/etc/jetstream/wlroots.env"
+            lib.optional environmentFileWlroots "EnvironmentFile=/etc/teka/wlroots.env"
             ++ [
               "Environment=LANG=C.UTF-8"
               "Environment=LC_ALL=C.UTF-8"
             ]
             ++ lib.optionals hc.enable (
-              lib.optional hc.vulkanIcds "ExecStartPre=${hostGpuChecks}/bin/jetstream-portable-check-vulkan-icds"
-              ++ lib.optional hc.glvndEglVendors "ExecStartPre=${hostGpuChecks}/bin/jetstream-portable-check-glvnd-egl-vendors"
-              ++ lib.optional hc.seatdSocket "ExecStartPre=${hostGpuChecks}/bin/jetstream-portable-check-seatd-socket"
-              ++ lib.optional hc.gbmBackends "ExecStartPre=${hostGpuChecks}/bin/jetstream-portable-check-gbm-backends"
+              lib.optional hc.vulkanIcds "ExecStartPre=${hostGpuChecks}/bin/teka-portable-check-vulkan-icds"
+              ++ lib.optional hc.glvndEglVendors "ExecStartPre=${hostGpuChecks}/bin/teka-portable-check-glvnd-egl-vendors"
+              ++ lib.optional hc.seatdSocket "ExecStartPre=${hostGpuChecks}/bin/teka-portable-check-seatd-socket"
+              ++ lib.optional hc.gbmBackends "ExecStartPre=${hostGpuChecks}/bin/teka-portable-check-gbm-backends"
             )
           );
           runtimeClosures = lib.optionals hc.enable [ hostGpuChecks ];

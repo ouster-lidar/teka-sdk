@@ -2,7 +2,7 @@
 
 ## Goal
 
-Portable **Sway** compositor with **`vkcube --wsi wayland`** and **`glmark2-wayland`** demo loops. Uses host DRM/Vulkan/EGL via **`X-Jetstream-PortableGPU=wayland`** and optional **`EnvironmentFile=/etc/jetstream/wlroots.env`**.
+Portable **Sway** compositor with **`vkcube --wsi wayland`** and **`glmark2-wayland`** demo loops. Uses host DRM/Vulkan/EGL via **`X-Teka-PortableGPU=wayland`** and optional **`EnvironmentFile=/etc/teka/wlroots.env`**.
 
 ## Build
 

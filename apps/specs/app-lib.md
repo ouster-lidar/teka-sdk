@@ -55,7 +55,7 @@ The snippet can inspect the image at `$raw`; generic filesystem, unit, and `os-r
 
 ## Host contract
 
-Install app manifests and web assets at host paths under `usr/lib/jetstream/mission-control/…`.
+Install app manifests and web assets at host paths under `usr/lib/teka/mission-control/…`.
 
 ## Runtime nftables leases
 

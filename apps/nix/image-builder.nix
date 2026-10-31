@@ -23,7 +23,7 @@ let
     builtins.toFile "os-release" ''
       NAME="${name} portable"
       ID=${name}
-      ID_LIKE=jetstream-portable
+      ID_LIKE=teka-portable
       IMAGE_ID=${name}
       IMAGE_VERSION="${imageVersion}"
       VERSION="${imageVersion}"

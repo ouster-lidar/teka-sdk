@@ -70,7 +70,7 @@ ps.makeAppImage {
     RemainAfterExit=yes
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
   copyFiles = app.appManifestCopyFiles {
     inherit name appManifest webTree;

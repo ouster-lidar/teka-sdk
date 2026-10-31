@@ -51,7 +51,7 @@ let
   howSrc = app.appRustSrc { srcDir = ./.; };
 
   # DDI GStreamer. nvvidconv/nvjpegenc are L4T; NVIDIA userspace comes from
-  # X-Jetstream-PortableGPU (not BindReadOnlyPaths of host /usr).
+  # X-Teka-PortableGPU (not BindReadOnlyPaths of host /usr).
   gstPluginSystemPath = lib.concatStringsSep ":" [
     "${pkgs.gst_all_1.gstreamer}/lib/gstreamer-1.0"
     "${pkgs.gst_all_1.gst-plugins-base}/lib/gstreamer-1.0"
@@ -399,8 +399,8 @@ let
   displayUnit = writeText "${name}-display.service" ''
     [Unit]
     Description=hello-ouster-world display (Sway + SimpleViz)
-    Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
-    X-Jetstream-PortableGPU=wayland
+    Documentation=file:///usr/lib/teka/mission-control/manifest.json
+    X-Teka-PortableGPU=wayland
     After=${name}.service seatd.service
     Requires=${name}.service
     Wants=seatd.service
@@ -429,7 +429,7 @@ let
     TimeoutStopSec=15
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
 in
 ps.makeAppImage {
@@ -455,10 +455,10 @@ ps.makeAppImage {
   unit = writeText "${name}.service" ''
     [Unit]
     Description=hello-ouster-world (MC Console/Display API)
-    Documentation=file:///usr/lib/jetstream/mission-control/manifest.json
+    Documentation=file:///usr/lib/teka/mission-control/manifest.json
     # Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
     # Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.
-    X-Jetstream-PortableGPU=cuda
+    X-Teka-PortableGPU=cuda
     After=mission-control.service systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
     Wants=network-online.target time-sync.target seatd.service
     ${ps.appBackendUnitLines}
@@ -487,7 +487,7 @@ ps.makeAppImage {
     ${ps.appBackendServiceLines}
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
   runtimeClosures = [
     howBin

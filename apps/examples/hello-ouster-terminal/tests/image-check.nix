@@ -1,7 +1,7 @@
 { pkgs, imageVersion }:
 
 ''
-  ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=usr/lib/jetstream/mission-control/manifest.json "$raw" >manifest.json
+  ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=usr/lib/teka/mission-control/manifest.json "$raw" >manifest.json
   ${pkgs.jq}/bin/jq -e '
     .id == "hello-ouster-terminal" and .version == "${imageVersion}" and
     .nav.label == "Hello Ouster Terminal" and .nav.path == "/app/hello-ouster-terminal" and

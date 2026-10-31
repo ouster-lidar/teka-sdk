@@ -11,7 +11,7 @@ The manifest uses `backend.mode = none`; the host must support resource-only act
 
 ## Host
 
-**`X-Jetstream-PortableGPU=wayland`**, **`/run/opengl-driver`**, **`seatd`**. x86 hosts may need the portable GL extension to bind Mesa **`libLLVM`** store roots (see comments in `default.nix`).
+**`X-Teka-PortableGPU=wayland`**, **`/run/opengl-driver`**, **`seatd`**. x86 hosts may need the portable GL extension to bind Mesa **`libLLVM`** store roots (see comments in `default.nix`).
 
 ## Deploy
 

@@ -10,7 +10,7 @@
 }:
 
 let
-  dbusSessionConf = writeText "jetstream-portable-dbus-session.conf" ''
+  dbusSessionConf = writeText "teka-portable-dbus-session.conf" ''
     <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
      "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
     <busconfig>
@@ -44,11 +44,11 @@ let
     </busconfig>
   '';
 
-  seatdSockStub = builtins.toFile "jetstream-portable-seatd.sock" "";
+  seatdSockStub = builtins.toFile "teka-portable-seatd.sock" "";
 
   # Shared PATH / client LD append / wlroots stderr filter for app Sway and
   # Cage+wlroots run loops. Host GPU defaults (WLR_*, LD_LIBRARY_PATH, …) come from
-  # `EnvironmentFile=/etc/jetstream/wlroots.env` on the unit; this snippet only adds
+  # `EnvironmentFile=/etc/teka/wlroots.env` on the unit; this snippet only adds
   # closure-specific bits and per-service XDG paths.
   wlrootsSwayEnvShSubst =
     {
@@ -128,7 +128,7 @@ let
     }:
     [
       {
-        path = "usr/lib/jetstream/mission-control/manifest.json";
+        path = "usr/lib/teka/mission-control/manifest.json";
         source = appGpuManifestJson {
           id = name;
           inherit gpu;
@@ -153,7 +153,7 @@ let
     writeText "${name}.service" ''
       [Unit]
       Description=${description}
-      X-Jetstream-PortableGPU=wayland
+      X-Teka-PortableGPU=wayland
       After=systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
       Wants=network-online.target time-sync.target seatd.service
       Conflicts=getty@tty1.service display-manager.service
@@ -184,7 +184,7 @@ let
       ${extraService}
 
       [Install]
-      WantedBy=jetstream-apps.target
+      WantedBy=teka-apps.target
     '';
 
 in

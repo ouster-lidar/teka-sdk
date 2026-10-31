@@ -319,7 +319,7 @@ ps.makeAppImage {
     ++ ps.waylandAppBaseCopyFiles
     ++ [
       {
-        path = "usr/lib/jetstream/mission-control/manifest.json";
+        path = "usr/lib/teka/mission-control/manifest.json";
         source = appManifest;
       }
       {

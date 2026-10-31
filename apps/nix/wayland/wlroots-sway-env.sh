@@ -1,5 +1,5 @@
 export PATH="@clientPath@${PATH:+:$PATH}"
-# Base GPU library path comes from EnvironmentFile=/etc/jetstream/wlroots.env; append
+# Base GPU library path comes from EnvironmentFile=/etc/teka/wlroots.env; append
 # closure-specific dirs (Vulkan, libc, …) baked in at eval time.
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}@clientLd@"
 export XDG_RUNTIME_DIR=@xdgRuntimeDir@

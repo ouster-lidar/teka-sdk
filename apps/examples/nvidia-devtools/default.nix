@@ -221,7 +221,7 @@ let
   unit = writeText "${name}.service" ''
     [Unit]
     Description=${displayName} app (sshd :${toString sshPort})
-    X-Jetstream-PortableGPU=cuda
+    X-Teka-PortableGPU=cuda
     After=network.target mission-control.service
     Wants=network.target
     ${ps.appBackendUnitLines}
@@ -252,7 +252,7 @@ let
     TimeoutStopSec=30
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
 in
 ps.makeAppImage {

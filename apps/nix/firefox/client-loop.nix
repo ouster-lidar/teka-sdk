@@ -6,7 +6,7 @@
 }:
 
 let
-  firefoxAppPrefs = writeText "jetstream-portable-firefox-user.js" ''
+  firefoxAppPrefs = writeText "teka-portable-firefox-user.js" ''
     user_pref("network.trr.mode", 0);
     user_pref("network.captive-portal-service.enabled", false);
     user_pref("network.connectivity-service.enabled", false);
@@ -18,7 +18,7 @@ let
     user_pref("layers.acceleration.force-enabled", true);
   '';
 
-  firefoxAppProfileSeed = runCommand "jetstream-portable-firefox-profile-seed" { } ''
+  firefoxAppProfileSeed = runCommand "teka-portable-firefox-profile-seed" { } ''
     mkdir -p "$out"
     install -m444 ${firefoxAppPrefs} "$out/user.js"
   '';

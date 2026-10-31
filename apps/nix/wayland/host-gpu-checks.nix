@@ -1,5 +1,5 @@
 # Small fail-fast helpers for app GPU services: host generator paths under
-# $JETSTREAM_OPENGL_DRIVER (default /run/opengl-driver) and seatd for Wayland.
+# $TEKA_OPENGL_DRIVER (default /run/opengl-driver) and seatd for Wayland.
 # Units invoke these from ExecStartPre= before ExecStart=.
 {
   lib,
@@ -8,38 +8,38 @@
 }:
 
 let
-  # jetstream-portable-check-vulkan-icds — Vulkan ICD directory (VK_DRIVER_FILES).
-  checkVulkanIcds = writeShellScriptBin "jetstream-portable-check-vulkan-icds" ''
+  # teka-portable-check-vulkan-icds — Vulkan ICD directory (VK_DRIVER_FILES).
+  checkVulkanIcds = writeShellScriptBin "teka-portable-check-vulkan-icds" ''
     set -euo pipefail
-    die() { echo "''${JETSTREAM_PORTABLE_LOG_TAG:-jetstream-portable}: $*" >&2; exit 1; }
-    root="''${JETSTREAM_OPENGL_DRIVER:-/run/opengl-driver}"
+    die() { echo "''${TEKA_PORTABLE_LOG_TAG:-teka-portable}: $*" >&2; exit 1; }
+    root="''${TEKA_OPENGL_DRIVER:-/run/opengl-driver}"
     icd="$root/share/vulkan/icd.d"
     [[ -d "$icd" ]] \
-      || die "missing $icd (VK_DRIVER_FILES; jetstream-portable-gpu-generator?)"
+      || die "missing $icd (VK_DRIVER_FILES; teka-portable-gpu-generator?)"
   '';
 
-  # jetstream-portable-check-glvnd-egl-vendors — GLVND EGL vendor JSON dir (__EGL_VENDOR_LIBRARY_DIRS).
-  checkGlvndEglVendors = writeShellScriptBin "jetstream-portable-check-glvnd-egl-vendors" ''
+  # teka-portable-check-glvnd-egl-vendors — GLVND EGL vendor JSON dir (__EGL_VENDOR_LIBRARY_DIRS).
+  checkGlvndEglVendors = writeShellScriptBin "teka-portable-check-glvnd-egl-vendors" ''
     set -euo pipefail
-    die() { echo "''${JETSTREAM_PORTABLE_LOG_TAG:-jetstream-portable}: $*" >&2; exit 1; }
-    root="''${JETSTREAM_OPENGL_DRIVER:-/run/opengl-driver}"
+    die() { echo "''${TEKA_PORTABLE_LOG_TAG:-teka-portable}: $*" >&2; exit 1; }
+    root="''${TEKA_OPENGL_DRIVER:-/run/opengl-driver}"
     egl="$root/share/glvnd/egl_vendor.d"
     [[ -d "$egl" ]] \
-      || die "missing $egl (__EGL_VENDOR_LIBRARY_DIRS; jetstream-portable-gpu-generator?)"
+      || die "missing $egl (__EGL_VENDOR_LIBRARY_DIRS; teka-portable-gpu-generator?)"
   '';
 
-  checkSeatdSocket = writeShellScriptBin "jetstream-portable-check-seatd-socket" ''
+  checkSeatdSocket = writeShellScriptBin "teka-portable-check-seatd-socket" ''
     set -euo pipefail
-    die() { echo "''${JETSTREAM_PORTABLE_LOG_TAG:-jetstream-portable}: $*" >&2; exit 1; }
+    die() { echo "''${TEKA_PORTABLE_LOG_TAG:-teka-portable}: $*" >&2; exit 1; }
     [[ -S /run/seatd.sock ]] \
       || die "missing /run/seatd.sock (enable host seatd.service)"
   '';
 
   # wlroots DRM/KMS compositors need a usable GBM backend under the merged opengl-driver tree.
-  checkGbmBackends = writeShellScriptBin "jetstream-portable-check-gbm-backends" ''
+  checkGbmBackends = writeShellScriptBin "teka-portable-check-gbm-backends" ''
     set -euo pipefail
-    die() { echo "''${JETSTREAM_PORTABLE_LOG_TAG:-jetstream-portable}: $*" >&2; exit 1; }
-    root="''${JETSTREAM_OPENGL_DRIVER:-/run/opengl-driver}"
+    die() { echo "''${TEKA_PORTABLE_LOG_TAG:-teka-portable}: $*" >&2; exit 1; }
+    root="''${TEKA_OPENGL_DRIVER:-/run/opengl-driver}"
     default_gbm="$root/lib/gbm"
     search="''${GBM_BACKENDS_PATH:-$default_gbm}"
     found=
@@ -60,7 +60,7 @@ let
   '';
 in
 symlinkJoin {
-  name = "jetstream-portable-host-gpu-checks";
+  name = "teka-portable-host-gpu-checks";
   paths = [
     checkVulkanIcds
     checkGlvndEglVendors

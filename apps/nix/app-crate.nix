@@ -131,7 +131,7 @@ let
   # Keep web assets out of evaluation so other platforms need no native builder.
   appWebCopyFiles = webTree: [
     {
-      path = "usr/lib/jetstream/mission-control/web";
+      path = "usr/lib/teka/mission-control/web";
       source = "${webTree}/web/.";
     }
   ];
@@ -146,7 +146,7 @@ let
     }:
     [
       {
-        path = "usr/lib/jetstream/mission-control/manifest.json";
+        path = "usr/lib/teka/mission-control/manifest.json";
         source = appManifest;
       }
       {

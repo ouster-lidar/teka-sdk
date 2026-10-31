@@ -1,6 +1,6 @@
 # Ouster SDK integration
 
-HDMI GPU apps use Sway and host `/run/opengl-driver` (`X-Jetstream-PortableGPU`). The two Ouster SDK viewers build the public SDK source as part of their Nix closures. `hello-ouster-world` is the direct sensor and OSF viewer; `hello-ouster-dynamo` retains the advanced peer FrameSet workflow.
+HDMI GPU apps use Sway and host `/run/opengl-driver` (`X-Teka-PortableGPU`). The two Ouster SDK viewers build the public SDK source as part of their Nix closures. `hello-ouster-world` is the direct sensor and OSF viewer; `hello-ouster-dynamo` retains the advanced peer FrameSet workflow.
 
 ## Viz: follow hello-ouster-terminal
 

@@ -16,7 +16,7 @@ tegrastats --interval 1000
 sudo nsys profile --pid <PID> --duration 30
 ```
 
-`libcuda` comes from the host via `X-Jetstream-PortableGPU=cuda`.
+`libcuda` comes from the host via `X-Teka-PortableGPU=cuda`.
 
 ## Build and deploy
 

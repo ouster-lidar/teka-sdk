@@ -85,7 +85,7 @@ curl -sS http://127.0.0.1:11434/api/tags
 
 In Jetstream, open **Apps** → **Hello LLM** → **Logs**.
 
-On Jetson, logs should show `Ollama CUDA (JETSON_JETPACK=6, …)` and inference with GPU layers (`size_vram` > 0 in `/api/ps`). No `/etc/nv_tegra_release` in the DDI — `start.sh` sets `JETSON_JETPACK=6` and `OLLAMA_LLM_LIBRARY=cuda_jetpack6`. The unit uses `X-Jetstream-PortableGPU=cuda` so the host GPU generator binds CUDA store roots without claiming a display connector. Do not `BindReadOnlyPaths=/run/opengl-driver` (symlink breaks namespace setup).
+On Jetson, logs should show `Ollama CUDA (JETSON_JETPACK=6, …)` and inference with GPU layers (`size_vram` > 0 in `/api/ps`). No `/etc/nv_tegra_release` in the DDI — `start.sh` sets `JETSON_JETPACK=6` and `OLLAMA_LLM_LIBRARY=cuda_jetpack6`. The unit uses `X-Teka-PortableGPU=cuda` so the host GPU generator binds CUDA store roots without claiming a display connector. Do not `BindReadOnlyPaths=/run/opengl-driver` (symlink breaks namespace setup).
 
 **Nemotron reasoning:** Ollama may emit reasoning traces by default. For CLI smoke tests:
 

@@ -109,7 +109,7 @@ ps.makeAppImage {
     TimeoutStartSec=90
 
     [Install]
-    WantedBy=jetstream-apps.target
+    WantedBy=teka-apps.target
   '';
   copyFiles =
     app.appManifestCopyFiles {
