@@ -1393,17 +1393,14 @@ fn system_status_prints_json_and_update_streams() {
         .unwrap();
     success(&out);
     let requests = server.join().unwrap();
-    assert_eq!(
-        requests[1].line,
-        "GET /api/v1/app/jetstream/status HTTP/1.1"
-    );
+    assert_eq!(requests[1].line, "GET /api/v1/app/teka/status HTTP/1.1");
     assert_eq!(
         requests[3].line,
         "GET /api/v1/platform/architecture HTTP/1.1"
     );
     assert_eq!(
         requests[4].line,
-        "POST /api/v1/app/jetstream/sysupdate/apply?reboot=false HTTP/1.1"
+        "POST /api/v1/app/teka/sysupdate/apply?reboot=false HTTP/1.1"
     );
     assert_eq!(requests[4].body, fs::read(&image).unwrap());
 }

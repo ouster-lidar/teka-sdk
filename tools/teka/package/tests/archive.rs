@@ -260,7 +260,7 @@ fn authenticates_before_parsing_json_and_enforces_signed_geometry() {
 fn os_manifests_require_os_role_trust() {
     let mut manifest = common::manifest(PAYLOAD.len());
     manifest["components"].as_array_mut().unwrap().push(json!({
-        "type":"os","id":"jetstream","version":"1.0","root_hash":"b".repeat(64),
+        "type":"os","id":"teka","version":"1.0","root_hash":"b".repeat(64),
         "image":{"path":"test-machine.raw","size":PAYLOAD.len()},
         "uki":{"path":"test-machine.efi","size":PAYLOAD.len()}}));
     let (app_certificate, app_key) = common::signer();
@@ -440,7 +440,7 @@ fn mixed_bundle_offsets_cross_groups_without_gaps() {
     let stored_app = compress(&app);
     let manifest = json!({"format":1,"arch":"x86_64",
     "components":[
-        {"type":"os","id":"jetstream","version":"1","root_hash":"a".repeat(64),
+        {"type":"os","id":"teka","version":"1","root_hash":"a".repeat(64),
             "image":{"path":"os.raw","size":raw.len()},
             "uki":{"path":"os.efi","size":decoded.len()}},
         {"type":"app","id":"first","version":"1","root_hash":"b".repeat(64),

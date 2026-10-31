@@ -150,12 +150,12 @@ impl DeviceClient {
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }
 
-    pub fn jetstream_status(&self) -> Result<Value> {
-        self.get_json("api/v1/app/jetstream/status")
+    pub fn teka_status(&self) -> Result<Value> {
+        self.get_json("api/v1/app/teka/status")
     }
 
     pub fn sysupdate_apply(&self, path: &Path, reboot: bool) -> Result<Value> {
-        let mut url = self.endpoint("api/v1/app/jetstream/sysupdate/apply")?;
+        let mut url = self.endpoint("api/v1/app/teka/sysupdate/apply")?;
         if !reboot {
             url.query_pairs_mut().append_pair("reboot", "false");
         }

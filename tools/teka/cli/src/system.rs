@@ -58,7 +58,7 @@ pub fn update_deadline() -> Result<Instant> {
 fn fetch_status(host: &str) -> Result<Value> {
     let client = DeviceClient::new(host)?;
     client.authenticate()?;
-    client.jetstream_status()
+    client.teka_status()
 }
 
 fn status_version(status: &Value) -> &str {
@@ -137,7 +137,7 @@ fn failed_units(status: &Value) -> String {
 pub fn run_status(args: StatusOptions) -> Result<()> {
     let client = DeviceClient::new(&args.host)?;
     client.authenticate()?;
-    let status = client.jetstream_status()?;
+    let status = client.teka_status()?;
     println!("{}", serde_json::to_string(&status)?);
     Ok(())
 }
@@ -158,7 +158,7 @@ pub fn run_update(args: UpdateOptions) -> Result<()> {
         manifest.arch.as_str()
     );
     let before_version = if args.wait {
-        Some(status_version(&client.jetstream_status()?).to_owned())
+        Some(status_version(&client.teka_status()?).to_owned())
     } else {
         None
     };

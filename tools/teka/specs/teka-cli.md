@@ -34,7 +34,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ## System
 
-- `teka system` uses `GET /api/v1/app/jetstream/status` and `POST /api/v1/app/jetstream/sysupdate/apply`.
+- `teka system` uses `GET /api/v1/app/teka/status` and `POST /api/v1/app/teka/sysupdate/apply`.
 - `update` validates package structure and transport, a single OS component and architecture, then streams `FILE` as `application/octet-stream`, adds `?reboot=false` with `--no-reboot`, and prints the apply response JSON. The response `result` is `REBOOTING`, `INSTALLED_NO_REBOOT`, or `NO_UPDATE_NEEDED`.
 - `--wait` records the status `version` before upload. For `REBOOTING`, it reauthenticates and polls `update.commit_state`:
     - `COMMITTED` or `NONE` with a changed `version`: success; print the final status JSON.
