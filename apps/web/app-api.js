@@ -6,7 +6,7 @@
         return '/api/v1/app/' + encodeURIComponent(id) + p;
     }
 
-    function jetstreamAppApi(defaultId) {
+    function tekaAppApi(defaultId) {
         var appHost = document.querySelector('.app-panel-host');
         var appId =
             (appHost && appHost.getAttribute('data-app-id')) ||
@@ -141,7 +141,7 @@
         return 'Disabled';
     }
 
-    global.jetstreamAppApi = jetstreamAppApi;
+    global.tekaAppApi = tekaAppApi;
     global.refetchOnStatus = refetchOnStatus;
     global.fetchApp = fetchApp;
     global.fetchAppJson = fetchAppJson;

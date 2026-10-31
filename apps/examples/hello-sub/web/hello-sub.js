@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = jetstreamAppApi('hello-sub');
+    var appApi = tekaAppApi('hello-sub');
     var appId = appApi.appId;
     var FILTER_KEY = 'hello-sub.subscriber.feedFilters';
     var draftUrls = [];

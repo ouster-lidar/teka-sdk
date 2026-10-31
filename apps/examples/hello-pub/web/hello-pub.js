@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = jetstreamAppApi('hello-pub');
+    var appApi = tekaAppApi('hello-pub');
     var appId = appApi.appId;
 
     function api(path) {

@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = jetstreamAppApi('hello-ouster-world');
+    var appApi = tekaAppApi('hello-ouster-world');
     var howStack = document.querySelector('.how-stack');
     var guestAccessToggle = document.getElementById('guest-access-toggle');
     var guestView = false;

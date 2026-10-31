@@ -16,7 +16,7 @@ Web assets install under `usr/lib/jetstream/mission-control/web/`.
 | App guide | `README.md` | `examples/hello-http/README.md` |
 | Shared web helper (source) | `apps/web/app-api.js` | — |
 | Shared web helper (DDI install) | `usr/lib/jetstream/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
-| App panel JS global | `jetstreamAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
+| App panel JS global | `tekaAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
 
 The Ouster viewers use distinct IDs and roles: `hello-ouster-world` is the direct SDK viewer, and `hello-ouster-dynamo` preserves the advanced FrameSet and tracked-object workflow. See [hello-ouster-viewers.md](hello-ouster-viewers.md).
 

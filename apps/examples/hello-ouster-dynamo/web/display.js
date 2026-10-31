@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var appApi = jetstreamAppApi('hello-ouster-dynamo');
+    var appApi = tekaAppApi('hello-ouster-dynamo');
     var ws = null;
     var controlling = false;
     var hoverStream = false;

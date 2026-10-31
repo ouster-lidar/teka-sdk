@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    var mc = jetstreamAppApi('nvidia-devtools');
+    var mc = tekaAppApi('nvidia-devtools');
     var SSH_PORT = 2223;
     var WINDOW_SEC = 300;
     var RAW_WINDOW_SEC = 30;
