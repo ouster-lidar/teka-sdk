@@ -65,6 +65,8 @@ pub enum AppCommand {
         after_help = "Examples:\n  teka app deploy --host http://device.local my-app another-app\n  teka app deploy --host http://device.local ./my-app.tpk\n  teka app deploy --build --host http://box-1/ --host http://box-2/ my-app another-app"
     )]
     Deploy(deploy::DeployOptions),
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 pub fn run(command: Command) -> Result<()> {
@@ -75,6 +77,7 @@ pub fn run(command: Command) -> Result<()> {
             AppCommand::Deploy(args) => deploy::run(args),
             AppCommand::Build(args) => build::run(args),
             AppCommand::List(args) => build::list(args),
+            AppCommand::External(args) => plugins::run_external_in(&["app"], args),
         },
         Command::System { command } => match command {
             system::SystemCommand::Status(args) => system::run_status(args),

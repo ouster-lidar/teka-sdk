@@ -1242,46 +1242,130 @@ fn plugin_bin(dir: &Path, name: &str, body: &str) {
 }
 
 #[test]
-fn plugin_dispatches_and_lists_in_help() {
+fn plugins_dispatch_with_builtin_precedence() {
     let d = TempDir::new().unwrap();
-    fs::create_dir(d.path().join("bin")).unwrap();
-    plugin_bin(
-        d.path(),
-        "foo",
-        r#"printf '%s\n' "$@" >> "$TEKA_PLUGIN_LOG"
-exit 7"#,
-    );
-    plugin_bin(
-        d.path(),
-        "system",
-        r#"echo ran-system >> "$TEKA_PLUGIN_LOG"
-exit 0"#,
-    );
-    let log = d.path().join("plugin-log");
-    let out = cli(d.path())
-        .env("TEKA_PLUGIN_LOG", &log)
-        .args(["foo", "a", "b"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(7));
-    assert_eq!(fs::read_to_string(&log).unwrap(), "a\nb\n");
-    let out = cli(d.path())
-        .env("TEKA_PLUGIN_LOG", &log)
-        .args(["system"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(2));
-    assert!(!fs::read_to_string(&log).unwrap().contains("ran-system"));
-    let out = cli(d.path())
-        .env("PATH", d.path().join("bin"))
-        .args(["--help"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(0));
-    let help = String::from_utf8_lossy(&out.stdout);
-    assert!(help.contains("Plugins:\n  foo  External plugin\n"));
-    let out = cli(d.path()).args(["nope"]).output().unwrap();
-    assert_eq!(out.status.code(), Some(2));
+    let bin = d.path().join("bin");
+    let shadow = d.path().join("shadow");
+    fs::create_dir(&bin).unwrap();
+    fs::create_dir(&shadow).unwrap();
+    for (parents, name, builtins) in [
+        (&[][..], "foo", &["system", "app", "help"][..]),
+        (
+            &["app"][..],
+            "test",
+            &["build", "list", "deploy", "help"][..],
+        ),
+        (&["app"][..], "another-name", &[][..]),
+    ] {
+        let plugin = [parents, &[name]].concat().join("-");
+        plugin_bin(d.path(), &plugin, "printf '%s\\n' \"$@\"; exit 7");
+        script(&shadow.join(format!("teka-{plugin}")), "exit 99");
+        for args in [
+            vec!["init"],
+            vec!["check"],
+            vec!["cmd", "--", "two words", "--flag", ""],
+            vec!["--help"],
+        ] {
+            let out = cli(d.path())
+                .env("PATH", std::env::join_paths([&bin, &shadow]).unwrap())
+                .args(parents)
+                .arg(name)
+                .args(&args)
+                .output()
+                .unwrap();
+            assert_eq!(out.status.code(), Some(7), "{out:?}");
+            assert_eq!(out.stdout, format!("{}\n", args.join("\n")).as_bytes());
+        }
+        for builtin in builtins {
+            plugin_bin(
+                d.path(),
+                &[parents, &[*builtin]].concat().join("-"),
+                "exit 99",
+            );
+            let mut command = cli(d.path());
+            command.env("PATH", &bin).args(parents).arg(builtin);
+            if *builtin != "help" {
+                command.arg("--help");
+            }
+            success(&command.output().unwrap());
+        }
+    }
+    plugin_bin(d.path(), "missing", "exit 99");
+    for args in [
+        &["app", "missing", "init"][..],
+        &["app", "build", "--unknown"],
+        &["system"],
+        &["nope"],
+    ] {
+        let out = cli(d.path()).env("PATH", &bin).args(args).output().unwrap();
+        assert_eq!(out.status.code(), Some(2), "{out:?}");
+        if args.contains(&"missing") {
+            assert!(String::from_utf8_lossy(&out.stderr).contains("no teka-app-missing on PATH"));
+        }
+    }
+}
+
+#[test]
+fn nested_plugins_appear_only_in_their_parent_help() {
+    let d = TempDir::new().unwrap();
+    let bin = d.path().join("bin");
+    let shadow = d.path().join("shadow");
+    fs::create_dir(&bin).unwrap();
+    fs::create_dir(&shadow).unwrap();
+    for name in [
+        "app-test",
+        "app-another-name",
+        "app-build",
+        "app-help",
+        "osdev",
+        "system-tool",
+    ] {
+        plugin_bin(d.path(), name, "echo ran > plugin-ran");
+    }
+    script(&shadow.join("teka-app-test"), "exit 99");
+    fs::write(
+        bin.join("teka-app-test.completion.json"),
+        r#"{"version":1,"about":"Nested test plugin"}"#,
+    )
+    .unwrap();
+    fs::write(
+        shadow.join("teka-app-test.completion.json"),
+        r#"{"version":1,"about":"Shadow plugin"}"#,
+    )
+    .unwrap();
+    for args in [
+        vec![],
+        vec!["--help"],
+        vec!["app"],
+        vec!["app", "--help"],
+        vec!["help", "app"],
+    ] {
+        let out = cli(d.path())
+            .env("PATH", std::env::join_paths([&bin, &shadow]).unwrap())
+            .args(&args)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(if args == ["app"] { 2 } else { 0 }));
+        let help = format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(!help.contains("app-test"), "{help}");
+        assert!(!help.contains("app-build"), "{help}");
+        assert!(!help.contains("app-help"), "{help}");
+        assert!(!help.contains("Shadow plugin"), "{help}");
+        if args.contains(&"app") {
+            assert!(help.contains("Nested test plugin"), "{help}");
+            assert!(help.contains("another-name"), "{help}");
+            assert!(!help.contains("osdev"), "{help}");
+        } else {
+            assert!(help.contains("osdev"), "{help}");
+            assert!(help.contains("system-tool"), "{help}");
+            assert!(!help.contains("Nested test plugin"), "{help}");
+        }
+    }
+    assert!(!d.path().join("plugin-ran").exists());
 }
 
 #[test]

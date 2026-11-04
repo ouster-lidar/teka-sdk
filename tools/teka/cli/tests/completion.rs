@@ -47,6 +47,9 @@ fn composes_plugins_without_changing_dispatch() {
         "plain",
         "example-tool",
         "app",
+        "app-test",
+        "app-build",
+        "app-help",
         "package",
         "help",
         "completion",
@@ -84,6 +87,8 @@ fn composes_plugins_without_changing_dispatch() {
             assert!(script.contains(word), "missing {word} in {shell}");
         }
         assert!(!script.contains("not-executable"));
+        assert!(!script.contains("app-test"));
+        assert!(!script.contains("app-build"));
         assert!(!script.contains("touch injected"));
         assert!(!script.contains("bad__subcmd__name"));
     }
@@ -225,11 +230,14 @@ fn shells_load_and_refresh_snapshots() {
     let dir = TempDir::new().unwrap();
     plugin(dir.path(), "example");
     fs::write(dir.path().join("teka-example.completion.json"), METADATA).unwrap();
+    plugin(dir.path(), "app-test");
+    fs::write(dir.path().join("teka-app-test.completion.json"), METADATA).unwrap();
     for shell in ["bash", "fish", "zsh"] {
         let script = completion(dir.path(), dir.path().as_os_str(), shell);
         fs::write(dir.path().join(format!("before.{shell}")), script).unwrap();
     }
     fs::remove_file(dir.path().join("teka-example")).unwrap();
+    fs::remove_file(dir.path().join("teka-app-test")).unwrap();
     for shell in ["bash", "fish", "zsh"] {
         let script = completion(dir.path(), dir.path().as_os_str(), shell);
         fs::write(dir.path().join(format!("after.{shell}")), script).unwrap();
@@ -243,9 +251,24 @@ _teka teka j --format
 COMP_WORDS=(teka example vm start --boot-disk n); COMP_CWORD=5
 _teka teka n --boot-disk
 [[ ${COMPREPLY[*]} == nvme ]] || exit 1
+COMP_WORDS=(teka te); COMP_CWORD=1
+_teka teka te teka
+[[ ${#COMPREPLY[@]} == 0 ]] || exit 1
+COMP_WORDS=(teka app te); COMP_CWORD=2
+_teka teka te app
+[[ ${COMPREPLY[*]} == test ]] || exit 1
+COMP_WORDS=(teka app test --format j); COMP_CWORD=4
+_teka teka j --format
+[[ ${COMPREPLY[*]} == json ]] || exit 1
+COMP_WORDS=(teka app test vm start --boot-disk n); COMP_CWORD=6
+_teka teka n --boot-disk
+[[ ${COMPREPLY[*]} == nvme ]] || exit 1
 source after.bash
 COMP_WORDS=(teka ex); COMP_CWORD=1
 _teka teka ex teka
+[[ ${#COMPREPLY[@]} == 0 ]] || exit 1
+COMP_WORDS=(teka app te); COMP_CWORD=2
+_teka teka te app
 [[ ${#COMPREPLY[@]} == 0 ]]
 "#
             }
@@ -254,8 +277,13 @@ _teka teka ex teka
 source before.fish
 test (complete -C 'teka example --format j') = json; or exit 1
 test (complete -C 'teka example vm start --boot-disk n') = nvme; or exit 1
+test -z (complete -C 'teka app-t' | string collect); or exit 1
+complete -C 'teka app te' | string match -qr '^test(\t|$)'; or exit 1
+test (complete -C 'teka app test --format j') = json; or exit 1
+test (complete -C 'teka app test vm start --boot-disk n') = nvme; or exit 1
 source after.fish
-test -z (complete -C 'teka ex' | string collect)
+test -z (complete -C 'teka ex' | string collect); or exit 1
+test -z (complete -C 'teka app te' | string collect)
 "#
             }
             "zsh" => {
@@ -266,8 +294,12 @@ source before.zsh
 [[ $_comps[teka] == _teka ]] || exit 1
 _describe() { print -rl -- "${commands[@]}"; }
 [[ $(_teka_commands) == *example* ]] || exit 1
+[[ $(_teka_commands) != *app-test* ]] || exit 1
+[[ $(_teka_commands) != *app-help* ]] || exit 1
+[[ $(_teka__subcmd__app_commands) == *test* ]] || exit 1
 source after.zsh
-[[ $(_teka_commands) != *example* ]]
+[[ $(_teka_commands) != *example* ]] || exit 1
+[[ $(_teka__subcmd__app_commands) != *test* ]]
 "#
             }
             _ => unreachable!(),

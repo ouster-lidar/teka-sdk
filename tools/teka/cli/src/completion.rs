@@ -266,13 +266,12 @@ pub fn run(shell: Option<Shell>) -> Result<()> {
         plugins::usage("cannot detect shell; use `teka completion bash`, `fish`, or `zsh`")
     })?;
     let mut command = Cli::command().bin_name("teka");
-    for (name, path) in plugins::discover_plugin_paths() {
+    plugins::augment_plugins(&mut command, |cmd, plugins| {
         // Bash uses this marker to split command paths during generation.
-        if token(&name) && !name.contains("__subcmd__") {
-            let plugin = metadata_command(&name, &path).unwrap_or_else(|| Command::new(name));
-            command = command.subcommand(plugin);
-        }
-    }
+        *cmd = std::mem::take(cmd).subcommands(plugins.into_iter().filter(|plugin| {
+            token(plugin.get_name()) && !plugin.get_name().contains("__subcmd__")
+        }));
+    });
     command.build();
     let mut output = std::io::stdout().lock();
     match shell {

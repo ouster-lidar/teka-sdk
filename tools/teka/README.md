@@ -75,6 +75,10 @@ App builds use `apps/flake.nix` at the root of the enclosing git checkout; it mu
 
 Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 
+### Nested plugins
+
+Built-in command groups can opt into the same runtime plugin dispatch using their command path as the executable prefix. The `app` group enables this: `teka app <name> ARGS…` runs `teka-app-<name> ARGS…` from `PATH`. Help and completion list these plugins under `app`, using the local name instead of listing `app-<name>` at the root. Built-in commands and `help` take precedence. Plugins parse their own arguments, including `--help`.
+
 ## Shell completion
 
 `teka completion [bash|fish|zsh]` prints completion code. Without an argument, it detects the invoking shell, then falls back to `$SHELL`. If neither identifies a supported shell, pass one explicitly.
@@ -114,7 +118,7 @@ A plugin can supply a `teka-<name>.completion.json` file beside its executable o
 }
 ```
 
-The optional `about` field also supplies its description in `teka --help`; plugins without a description show “External plugin.”
+The optional `about` field also supplies its description in the parent command's help; plugins without a description show “External plugin.” Nested plugins use the full executable name for their sidecar, such as `teka-app-test.completion.json`.
 
 Options require `long`, `short`, or both, without leading dashes. Without `value`, an option is a boolean flag; `value` makes it take one argument. A value may provide nonempty `choices`, a `file` or `directory` hint, or neither. Set `value.optional` to `true` for an optional argument. Choices and hints cannot be combined. `options` defaults to an empty list; `about` and option `help` are optional. Positional metadata is not supported.
 

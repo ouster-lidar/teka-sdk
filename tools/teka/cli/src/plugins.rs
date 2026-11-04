@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
+use clap::Command;
 use std::{
     collections::BTreeSet,
     fs,
     os::unix::{fs::PermissionsExt, process::CommandExt},
     path::{Path, PathBuf},
-    process::Command,
+    process::Command as ProcessCommand,
 };
 
 /// Usage failure (exit 2).
@@ -108,33 +109,77 @@ pub fn find_plugin(name: &str) -> Option<PathBuf> {
     None
 }
 
-pub fn augment_help(cmd: &mut clap::Command) {
-    let plugins = discover_plugin_paths();
-    if plugins.is_empty() {
-        return;
+pub(crate) fn augment_plugins(cmd: &mut Command, add: impl Fn(&mut Command, Vec<Command>)) {
+    fn visit(
+        cmd: &mut Command,
+        prefix: &str,
+        paths: &mut Vec<(String, PathBuf)>,
+        add: &impl Fn(&mut Command, Vec<Command>),
+    ) {
+        // Consume nested matches first so parents cannot list them again.
+        for child in cmd.get_subcommands_mut() {
+            visit(child, &format!("{prefix}{}-", child.get_name()), paths, add);
+        }
+        // Building a copy exposes derived settings without finalizing completion.
+        let mut scope = cmd.clone();
+        scope.build();
+        if !scope.is_allow_external_subcommands_set() {
+            return;
+        }
+        let mut plugins = Vec::new();
+        paths.retain(|(full_name, path)| {
+            let Some(name) = full_name.strip_prefix(prefix) else {
+                return true;
+            };
+            if !name.is_empty() && name != "help" && scope.find_subcommand(name).is_none() {
+                let plugin = crate::completion::metadata_command(full_name, path)
+                    .unwrap_or_else(|| Command::new(full_name.clone()));
+                plugins.push(plugin.name(name.to_owned()));
+            }
+            false
+        });
+        if !plugins.is_empty() {
+            add(cmd, plugins);
+        }
     }
-    let mut help = clap::Command::new("teka")
-        .styles(cmd.get_styles().clone())
-        .disable_help_flag(true)
-        .disable_help_subcommand(true)
-        .subcommand_help_heading("Plugins")
-        .help_template("{all-args}");
-    for (name, path) in plugins {
-        let about = crate::completion::metadata_command(&name, &path)
-            .and_then(|command| command.get_about().cloned())
-            .unwrap_or_else(|| "External plugin".into());
-        help = help.subcommand(clap::Command::new(name).about(about));
-    }
-    *cmd = cmd.clone().after_help(help.render_help());
+    visit(cmd, "", &mut discover_plugin_paths(), &add);
+}
+
+pub fn augment_help(cmd: &mut Command) {
+    augment_plugins(cmd, |cmd, plugins| {
+        let mut help = Command::new("teka")
+            .styles(cmd.get_styles().clone())
+            .disable_help_flag(true)
+            .disable_help_subcommand(true)
+            .subcommand_help_heading("Plugins")
+            .help_template("{all-args}");
+        for plugin in plugins {
+            let about = plugin
+                .get_about()
+                .cloned()
+                .unwrap_or_else(|| "External plugin".into());
+            help = help.subcommand(plugin.about(about));
+        }
+        *cmd = std::mem::take(cmd).after_help(help.render_help());
+    });
 }
 
 pub fn run_external(args: Vec<std::ffi::OsString>) -> Result<()> {
+    run_external_in(&[], args)
+}
+
+/// Dispatch an external child relative to its built-in parent command path.
+pub fn run_external_in(parents: &[&str], args: Vec<std::ffi::OsString>) -> Result<()> {
     let (name, rest) = args
         .split_first()
         .context("external command missing name")?;
     let name = name.to_string_lossy();
-    let path = find_plugin(&name)
-        .ok_or_else(|| usage(format!("unknown command '{name}'; no teka-{name} on PATH")))?;
-    let err = Command::new(&path).args(rest).exec();
+    let plugin = [parents, &[name.as_ref()]].concat().join("-");
+    let path = find_plugin(&plugin).ok_or_else(|| {
+        usage(format!(
+            "unknown command '{name}'; no teka-{plugin} on PATH"
+        ))
+    })?;
+    let err = ProcessCommand::new(&path).args(rest).exec();
     Err(anyhow::Error::from(err).context(format!("run {}", path.display())))
 }
