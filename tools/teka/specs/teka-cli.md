@@ -47,9 +47,10 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 ## Plugins
 
 - An unknown command `<name>` runs `teka-<name>` from `PATH` with the remaining arguments; the plugin's exit status is teka's exit status. On Unix, teka replaces itself with the plugin.
+- Built-in command groups can opt into nested plugin dispatch. An unknown child `<name>` under a command path `<parent>…` runs `teka-<parent>-…-<name>` from `PATH`, forwarding only the arguments after `<name>` using the same lookup and process replacement as top-level plugins. The plugin owns parsing of its remaining arguments, including help.
 - Built-in commands and `help` always win over plugins.
 - An unknown command with no plugin on `PATH` is a usage error.
-- `teka --help` lists plugins discovered on `PATH`, excluding built-ins; the first match on `PATH` wins.
+- Help and completion list plugins under matching built-in command groups that accept external children, using the local child name. Nested plugins and collisions with built-in children or `help` are omitted from root listings. Hyphenated names without a matching extensible command prefix remain top-level. The first executable on `PATH` wins, and its full executable name determines the metadata sidecar path.
 
 ## Shell completion
 
