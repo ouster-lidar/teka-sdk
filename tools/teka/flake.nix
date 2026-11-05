@@ -72,13 +72,39 @@
           default = teka;
         }
       );
-      apps = forAllSystems (system: {
-        teka = {
-          type = "app";
-          program = "${self.packages.${system}.teka}/bin/teka";
-        };
-        default = self.apps.${system}.teka;
-      });
+      apps = forAllSystems (
+        system:
+        {
+          teka = {
+            type = "app";
+            program = "${self.packages.${system}.teka}/bin/teka";
+          };
+          default = self.apps.${system}.teka;
+        }
+        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux" || system == "aarch64-darwin") {
+          test-build-init = {
+            type = "app";
+            program = nixpkgs.lib.getExe (
+              let
+                pkgs = import nixpkgs {
+                  inherit system;
+                  config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "tart";
+                };
+              in
+              pkgs.callPackage
+                (if system == "aarch64-darwin" then ./tests/installer-darwin.nix else ./tests/installer.nix)
+                (
+                  {
+                    dist = self.packages.${system}.teka.dist;
+                  }
+                  // nixpkgs.lib.optionalAttrs (system == "aarch64-darwin") {
+                    nixpkgsRev = nixpkgs.rev;
+                  }
+                )
+            );
+          };
+        }
+      );
       overlays.default = final: _: {
         teka = self.packages.${final.stdenv.hostPlatform.system}.teka;
       };

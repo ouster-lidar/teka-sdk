@@ -184,4 +184,6 @@ cargo run -p teka-cli -- --help
 
 Build downloadable binaries for the current platform from the repository root with `nix build .#teka.dist`. The `result/` directory contains the executable and `SHA256SUMS`.
 
+`nix run .#test-build-init` tests installation and AArch64 Linux compilation in a fresh Ubuntu VM on x86_64 Linux or an ARM macOS guest on Apple Silicon, streaming guest output and build logs. On macOS, a software-emulated Linux builder runs inside the Tart guest without nested hardware virtualization. See the [test spec](specs/installer-test.md).
+
 Agent implementation requirements live in [specs/teka-cli.md](specs/teka-cli.md). See the [developer guide](../../docs/developer-guide.md) for app workflows.
