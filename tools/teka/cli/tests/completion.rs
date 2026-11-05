@@ -225,6 +225,33 @@ fn detects_shell_and_preserves_explicit_override() {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn detects_shell_from_process_name() {
+    if std::env::var_os("TEKA_TEST_PROCESS_NAME").is_none() {
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "detects_shell_from_process_name",
+                "--test-threads=1",
+            ])
+            .env("TEKA_TEST_PROCESS_NAME", "1")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        return;
+    }
+    fs::write("/proc/self/comm", b"bash").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_teka"))
+        .arg("completion")
+        .env("PATH", "")
+        .env("SHELL", "/bin/unsupported")
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stdout).starts_with("_teka()"));
+}
+
 #[test]
 fn shells_load_and_refresh_snapshots() {
     let dir = TempDir::new().unwrap();

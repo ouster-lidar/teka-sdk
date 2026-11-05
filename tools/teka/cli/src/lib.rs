@@ -1,7 +1,10 @@
 pub mod build;
+pub mod build_check;
+pub mod build_init;
 pub mod completion;
 pub mod deploy;
 pub mod device;
+mod host;
 pub mod inspect;
 pub mod package;
 pub use package::PackageCommand;
@@ -23,6 +26,11 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Check and prepare the build environment
+    Build {
+        #[command(subcommand)]
+        command: build_check::BuildCommand,
+    },
     /// Create, verify, stream, and inspect TPK packages
     Package {
         #[command(subcommand)]
@@ -71,6 +79,7 @@ pub enum AppCommand {
 
 pub fn run(command: Command) -> Result<()> {
     match command {
+        Command::Build { command } => build_check::run(command),
         Command::Package { command } => package::run(command),
         Command::Completion { shell } => completion::run(shell),
         Command::App { command } => match command {
@@ -112,7 +121,9 @@ pub fn main_entry() -> i32 {
     }) {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("teka: error: {e:#}");
+            if !e.is::<build_check::BuildFailed>() {
+                eprintln!("teka: error: {e:#}");
+            }
             if plugins::is_usage(&e) {
                 2
             } else if e.is::<package::Rejected>() {

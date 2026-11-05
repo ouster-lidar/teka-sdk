@@ -4,24 +4,19 @@ Build app images and deploy them to Teka devices.
 
 ## Install
 
-### Shell only (Nix)
-
-Run `nix develop` at the repository root or in `apps/` to put `teka` on `PATH` without installing anything.
-
-### Persistent install
-
 From the repository root, run:
 
 ```sh
 ./bootstrap.sh
 ```
 
-It builds with Nix (or Cargo) and installs to `~/.local/bin/teka` if that is on `PATH`, else `/usr/local/bin/teka` via `sudo`.
+Bootstrap installs Nix if needed, builds Teka, and installs it to `~/.local/bin` when that directory is on `PATH`, otherwise `/usr/local/bin`. Rerun it after updating your checkout. For a downloaded portable binary, run `./teka-<system> build init`.
 
-Nix builds include the UKI verifier.
-Cargo installs require `sbverify` from `sbsigntool` on Linux, or `brew install osslsigncode` on Darwin.
+For a temporary shell without installing Teka, run `nix develop` at the repository root, in `apps/`, or in `tools/teka/`. If Fish startup configuration puts an older installed Teka first on `PATH`, use `nix develop --command fish --no-config`, or run commands directly with `nix develop --command teka …`.
 
-Verify with `teka --version`. Rerun the bootstrap after updating your checkout. Remove the binary from the install path it reported to uninstall.
+Nix packages include the UKI verifier. Portable and Cargo installs require `sbverify` from `sbsigntool` on Linux, or `brew install osslsigncode` on Darwin.
+
+Supports Linux x86_64/AArch64 and macOS Apple Silicon.
 
 ### NixOS / Home Manager
 
@@ -40,8 +35,6 @@ Then apply `overlays.default` and install `pkgs.teka`:
 nixpkgs.overlays = [ inputs.teka.overlays.default ];
 environment.systemPackages = [ pkgs.teka ]; # Home Manager: home.packages
 ```
-
-The package is dynamically linked and prebuilt per system; `nix run` also works via `apps.<system>.teka`. The `tools/teka` flake's `portable` package is used for bootstrap installs.
 
 ## Use
 
@@ -78,6 +71,15 @@ Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP 
 ### Nested plugins
 
 Built-in command groups can opt into the same runtime plugin dispatch using their command path as the executable prefix. The `app` group enables this: `teka app <name> ARGS…` runs `teka-app-<name> ARGS…` from `PATH`. Help and completion list these plugins under `app`, using the local name instead of listing `app-<name>` at the root. Built-in commands and `help` take precedence. Plugins parse their own arguments, including `--help`.
+
+## Check the build environment
+
+```sh
+teka build check
+teka build check --full
+```
+
+The quick check validates local prerequisites. `--full` also compiles a minimal AArch64 Linux program; add `--verbose` to see Nix logs.
 
 ## Shell completion
 
@@ -138,5 +140,7 @@ nix flake check
 nix develop
 cargo run -p teka-cli -- --help
 ```
+
+Build downloadable binaries for the current platform from the repository root with `nix build .#teka.dist`. The `result/` directory contains the executable and `SHA256SUMS`.
 
 Agent implementation requirements live in [specs/teka-cli.md](specs/teka-cli.md). See the [developer guide](../../docs/developer-guide.md) for app workflows.

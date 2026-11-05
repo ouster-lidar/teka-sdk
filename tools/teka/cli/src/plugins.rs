@@ -49,10 +49,17 @@ fn plugin_name_from_file(file_name: &str) -> Option<&str> {
     file_name.strip_prefix("teka-")
 }
 
-fn is_executable(path: &Path) -> bool {
+pub(crate) fn is_executable(path: &Path) -> bool {
     fs::metadata(path)
         .map(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
         .unwrap_or(false)
+}
+
+pub(crate) fn on_path(name: &str) -> Option<PathBuf> {
+    path_entries()
+        .into_iter()
+        .map(|directory| directory.join(name))
+        .find(|path| is_executable(path))
 }
 
 /// First `teka-<name>` on PATH wins per name when scanning PATH order.
@@ -99,14 +106,7 @@ pub fn find_plugin(name: &str) -> Option<PathBuf> {
     if is_builtin(name) {
         return None;
     }
-    let file_name = format!("teka-{name}");
-    for dir in path_entries() {
-        let path = dir.join(&file_name);
-        if is_executable(&path) {
-            return Some(path);
-        }
-    }
-    None
+    on_path(&format!("teka-{name}"))
 }
 
 pub(crate) fn augment_plugins(cmd: &mut Command, add: impl Fn(&mut Command, Vec<Command>)) {

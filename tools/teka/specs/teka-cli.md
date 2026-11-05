@@ -24,6 +24,8 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 | Command | Contract |
 |---------|----------|
+| `teka build init` | Initialize Nix and install the portable CLI |
+| `teka build check [--full [--verbose]]` | Check host prerequisites; optionally compile an AArch64 Linux test |
 | `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
 | `teka app deploy [--build] [-H URL]… APP…` | Deploy the same apps to every host from `./result`, building for the device architectures first with `--build`; then verify startup logs |
 | `teka package pack --manifest PATH --member NAME=FILE --private-key KEY --certificate CERT --output FILE [--zstd-level N]` | Finalize the Bao root and stored payload descriptors, sign the manifest, and atomically create a Bao-authenticated TPK package |
@@ -43,6 +45,37 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - Explicit `-H`/`--host` values override the single-host `TEKA_HOST` fallback. `deploy` fails with a usage error (exit 2) if neither is set; there is no default host. `system` commands accept one host.
 - `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system.
 - Apps-flake precedence is `--flake`, `TEKA_APPS_FLAKE_ROOT`, then `apps/flake.nix` at the root of the enclosing git checkout. An apps flake exports `teka.apps`, an attrset of per-app metadata keyed by app id; `teka app list` prints its names without forcing values. Builds reject apps missing from `teka.apps`, and unsupported targets fail at build time. Other teka flake data goes under `teka.<name>`. CLI-specific environment variables use `TEKA_*`.
+
+## Build environment
+
+### `teka build init`
+
+- Support Linux x86_64/AArch64 and macOS Apple Silicon.
+- Find Nix on `PATH`, then at `/nix/var/nix/profiles/default/bin/nix`. If missing, run the official Determinate installer interactively, preserving confirmation and sudo prompts.
+- Enable missing required Nix features through an additive user configuration entry, preserving other settings and honoring `NIX_USER_CONF_FILES`/`XDG_CONFIG_HOME`. Verify the result; stop with guidance for other broken installations or managed configuration. Do not repair the daemon or offer unattended installation.
+- Atomically install the running portable binary to `~/.local/bin` when on `PATH`, otherwise `/usr/local/bin`, confirming with `? Install Teka to PATH? [y/N]` before sudo. Use a `?` password prompt with `%p` and `(sudo)`, mentioning macOS only on macOS; request authentication only when sudo needs it. Skip an already installed binary.
+- Require portable installs to resolve to that binary on `PATH`; report shadowing with repair guidance.
+- Native Nix packages skip self-copying and check the running executable, including through `nix run` without `teka` on `PATH`.
+- Verify the installed `teka --version`, then report its version and path once.
+- Link to `teka completion --help`; show Nix shell setup only when needed. Leave compilation opt-in through `build check --full`.
+- Required failures and cancellations return exit 1 with a concrete failure result; declined installation reports `✗ Teka installation: declined`.
+
+### `teka build check`
+
+- Check executable `teka` resolution on `PATH`, Nix, enabled `nix-command` / flakes, and access to the configured store. The quick check does not fetch inputs, build or change configuration.
+- Probe functionality without overriding feature flags. Accept implementations where features are stable and absent from `experimental-features`.
+- Share Nix, feature and store checks with `build init`, passing the resolved Nix executable explicitly.
+- Report on stderr with repair guidance. Continue independent checks and skip dependent checks whose prerequisites failed; any failed check returns exit 1.
+- Share the Nix version/config/store reporting routine with init. Print `teka (PATH)`, `Nix config: valid (flakes)`, and `Nix store: reachable`; failed configuration checks recommend `teka build init`. Dependent skips explain the failed prerequisite.
+- Follow the common output conventions for success and failure; keep quick checks identical to `--full` except for the test build.
+
+#### `--full`
+
+- Compile a minimal C hello-world for `aarch64-linux` using pinned Nixpkgs' `writeCBin`, without configure phases, documentation or target execution. Work outside a checkout without channels or the flake registry.
+- Compile natively on AArch64 Linux, cross-compile on other Linux hosts, and use a configured AArch64 Linux builder on Darwin. Do not change builder settings or require emulation.
+- Give each test derivation a fresh nonce and disable substitution; dependencies may use caches. Keep the display name short and pass the nonce separately.
+- Verify an executable AArch64 Linux ELF without running it. Use a temporary out-link and leave the working directory untouched.
+- Hide successful Nix output by default; include captured failure diagnostics inline. `--verbose` / `-v` requires `--full` and streams Nix's `--print-build-logs` output on success and failure.
 
 ## System
 
@@ -82,13 +115,18 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - Mirror these groups under JSON `verification`: `signatures.manifest` and `signatures.native` each include `valid`; retain signer and component diagnostics under the corresponding signature group. `integrity` contains boolean `blake3`, `root_hash_binding`, and `dm_verity_tree` results. Do not duplicate trust flags or retain legacy verification keys.
 - Signature validity alone does not establish publisher trust. Without configured certificates, JSON `publisher_trust` is `{"status":"not_checked","reason":"no_trust_directory"}` and text shows exactly `· not checked (add --trust DIR to verify the publisher)`, with no separate trust hint. With trusted certificates, use `{"status":"trusted"}` and `✓ signing certificates match configured trust`.
 - A failed verification emits no success report or unchecked-trust result. `package verify` returns exit 3 for rejected package contents; input-file access, trust configuration, staging I/O and verifier process failures return exit 1. Keep these categories machine-readable without matching diagnostic text.
-- Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, 2 for usage errors, and 3 for rejected contents from `package verify`. Do not ask for confirmation.
+- Keep data on stdout and diagnostics on stderr. Exit codes are 0 for success (including `--help` and bare `teka`), 1 for operational errors, 2 for usage errors, and 3 for rejected contents from `package verify`. Only build initialization may ask for setup confirmation.
 
 ## Packaging and checks
 
 - The repository-root flake re-exports a non-static `teka` package, `apps.<system>.teka`, and `overlays.default` for `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin` for NixOS/Home Manager consumers. Consumers use the root flake, not `?dir=tools/teka`, and follow only `nixpkgs` on that input; the root flake forwards `crane` into `tools/teka`. The overlay reuses `packages.<system>.teka`; it does not rebuild with consumer nixpkgs, and there is no Home Manager module. Root `nix develop` puts `teka` on `PATH` without installation. The `apps/` flake's dev shell contains only `teka` (from `tools/teka`) and builds no app images.
 - The `tools/teka` flake owns Crane and exports native `teka`/`default` and `portable` packages, plus `apps.<system>.teka` and `overlays.default`, for those systems. Bootstrap uses `portable`, with static Linux outputs; the root flake and device tests consume `teka`.
-- `bootstrap.sh` supports `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`. Prefer Nix when available; otherwise use Cargo, and fail with a future binary-release note when neither is installed. Report the builder and install destination before building. Install to `~/.local/bin` only when that directory is on `PATH`; otherwise use `/usr/local/bin`, confirming before privileged installation.
-- The root `bootstrap.sh` is the only supported install entry point. Workflow docs use plain `teka` commands and link to the installation guide.
+- Portable outputs resolve UKI verifiers on `PATH`, with no embedded Nix-store paths. Linux binaries are static; Apple Silicon binaries statically link third-party libraries and retain macOS system linkage.
+- Both flakes expose `teka.dist` for the selected system: a directory containing `teka-<system>` and `SHA256SUMS` with relative filenames. The distribution must have no store references (`allowedReferences = [ ]`).
+- Set `meta.mainProgram = "teka"` and provide relative `bin/teka` and `bin/teka-<system>` links so `nix run` and `nix shell` can execute the distribution.
+- Read the package version from the CLI Cargo manifest. Distribution checks cover checksums, copied executable behavior, platform linkage and completions.
+- `bootstrap.sh` supports `x86_64-linux`, `aarch64-linux`, and `aarch64-darwin`. Resolve or interactively install Nix, check its features and store, build portable Teka, then invoke `build init`.
+- Keep bootstrap's portable output rooted under `${XDG_DATA_HOME:-$HOME/.local/share}/teka`.
+- Source checkouts install through root `bootstrap.sh`; downloaded portable executables install through `teka build init`. Workflow docs use plain `teka` commands and link to the installation guide.
 - Use Crane with cached Cargo dependencies; documentation changes must not invalidate Rust builds. Name branches in flake inputs and keep exact revisions in lockfiles.
 - `nix flake check` covers CLI dispatch and device protocol behavior. Validate `bootstrap.sh` on supported hosts.

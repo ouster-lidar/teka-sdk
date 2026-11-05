@@ -27,7 +27,7 @@ impl Shell {
         }
     }
 
-    fn detect() -> Option<Self> {
+    pub(crate) fn detect() -> Option<Self> {
         parent_shell().or_else(|| {
             std::env::var_os("SHELL").and_then(|shell| Self::from_path(Path::new(&shell)))
         })
@@ -37,7 +37,11 @@ impl Shell {
 fn parent_shell() -> Option<Shell> {
     let pid = unsafe { libc::getppid() };
     #[cfg(target_os = "linux")]
-    let path = std::fs::read_link(format!("/proc/{pid}/exe")).ok()?;
+    let path = {
+        // Under binfmt emulation, exe points at the interpreter rather than the shell.
+        let name = std::fs::read_to_string(format!("/proc/{pid}/comm")).ok()?;
+        std::path::PathBuf::from(name.trim_end())
+    };
     #[cfg(target_os = "macos")]
     let path = {
         use std::os::unix::ffi::OsStrExt;

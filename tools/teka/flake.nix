@@ -21,15 +21,22 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
       mkTeka =
-        pkgs:
+        pkgs: portable:
         pkgs.callPackage ./package.nix {
+          inherit portable;
+          nixpkgsRev = nixpkgs.rev;
           craneLib = crane.mkLib pkgs;
           advisoryDb = rustsecAdvisoryDb;
-          ukiVerifier =
-            if pkgs.stdenv.hostPlatform.isLinux then
-              nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sbsigntool
+          openssl =
+            if portable && pkgs.stdenv.hostPlatform.isDarwin then
+              pkgs.openssl.override { static = true; }
             else
-              pkgs.osslsigncode;
+              pkgs.openssl;
+          verifierEnv =
+            if pkgs.stdenv.hostPlatform.isLinux then
+              { TEKA_SBVERIFY = pkgs.lib.getExe' pkgs.sbsigntool "sbverify"; }
+            else
+              { TEKA_OSSLSIGNCODE = pkgs.lib.getExe pkgs.osslsigncode; };
         };
     in
     {
@@ -37,12 +44,29 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          teka = mkTeka pkgs;
+          teka = (mkTeka pkgs false).overrideAttrs (old: {
+            passthru = old.passthru // {
+              dist =
+                pkgs.runCommand "teka-dist-${portable.version}"
+                  {
+                    allowedReferences = [ ];
+                    meta.mainProgram = "teka";
+                  }
+                  ''
+                    install -Dm755 ${portable}/bin/teka "$out/teka-${system}"
+                    cd "$out"
+                    sha256sum teka-${system} > SHA256SUMS
+                    mkdir bin
+                    ln -s ../teka-${system} bin/teka
+                    ln -s teka bin/teka-${system}
+                  '';
+            };
+          });
+          portable = mkTeka (if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs) true;
         in
         {
-          inherit teka;
+          inherit teka portable;
           default = teka;
-          portable = if pkgs.stdenv.hostPlatform.isLinux then mkTeka pkgs.pkgsStatic else teka;
         }
       );
       apps = forAllSystems (system: {
@@ -58,11 +82,17 @@
       checks = forAllSystems (
         system:
         let
+          pkgs = nixpkgs.legacyPackages.${system};
           teka = self.packages.${system}.teka;
         in
         {
           inherit teka;
           inherit (teka.cargoChecks) clippy fmt audit;
+          teka-dist = pkgs.callPackage ./tests/dist.nix {
+            dist = teka.dist;
+            inherit system;
+            version = teka.version;
+          };
         }
       );
       devShells = forAllSystems (system: {
