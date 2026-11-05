@@ -1,6 +1,7 @@
 {
   description = "Composite teka CLI";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   inputs.crane.url = "github:ipetkov/crane/master";
   inputs.rustsecAdvisoryDb = {
     url = "github:RustSec/advisory-db";
@@ -10,6 +11,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-unstable,
       crane,
       rustsecAdvisoryDb,
     }:
@@ -25,6 +27,7 @@
         pkgs.callPackage ./package.nix {
           inherit portable;
           nixpkgsRev = nixpkgs.rev;
+          nixpkgsUnstableRev = nixpkgs-unstable.rev;
           craneLib = crane.mkLib pkgs;
           advisoryDb = rustsecAdvisoryDb;
           openssl =

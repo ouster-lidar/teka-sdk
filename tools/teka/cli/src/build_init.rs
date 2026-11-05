@@ -270,6 +270,28 @@ fn initialize() -> Result<()> {
         build_check::display_path(&destination),
         if native { "; managed by Nix" } else { "" }
     );
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    if crate::build_vm::needed(&nix)? {
+        let sibling = destination
+            .parent()
+            .context("missing install directory")?
+            .join("teka-build-vm");
+        let existing = crate::plugins::find_plugin("build-vm");
+        let plugin = if !native && existing.as_ref().is_none_or(|path| path == &sibling) {
+            install_teka(&destination, &sibling)?;
+            sibling
+        } else {
+            existing.unwrap_or(sibling)
+        };
+        let status = Command::new(plugin)
+            .arg("init")
+            .status()
+            .context("initialize Linux build VM")?;
+        ensure!(
+            status.success(),
+            build_check::BuildFailed("VM initialization failed")
+        );
+    }
     eprintln!();
     if !native {
         shell_setup();

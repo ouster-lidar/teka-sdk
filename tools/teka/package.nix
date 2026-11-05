@@ -13,6 +13,8 @@
   removeReferencesTo,
   portable ? false,
   nixpkgsRev ? (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked.rev,
+  nixpkgsUnstableRev ?
+    (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs-unstable.locked.rev,
   verifierEnv,
 }:
 let
@@ -21,7 +23,11 @@ let
     version = (builtins.fromTOML (builtins.readFile ./cli/Cargo.toml)).package.version;
     src = lib.cleanSourceWith {
       src = ./.;
-      filter = path: type: craneLib.filterCargoSources path type || lib.hasSuffix "/flake.lock" path;
+      filter =
+        path: type:
+        craneLib.filterCargoSources path type
+        || lib.hasSuffix "/src/build_vm.nix" path
+        || lib.hasSuffix "/flake.lock" path;
     };
     strictDeps = true;
     CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
@@ -30,6 +36,7 @@ let
     nativeBuildInputs = [ pkg-config ];
     buildInputs = [ openssl ];
     TEKA_VM_NIXPKGS_REV = nixpkgsRev;
+    TEKA_VM_NIXPKGS_UNSTABLE_REV = nixpkgsUnstableRev;
   }
   // lib.optionalAttrs (!portable) (
     verifierEnv
@@ -89,6 +96,9 @@ craneLib.buildPackage (
       ]
     );
     postInstall = ''
+      ${lib.optionalString (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64) ''
+        ln -s teka "$out/bin/teka-build-vm"
+      ''}
       printf 'eval "$(%s completion bash)"\n' "$out/bin/teka" > teka.bash
       printf '%s completion fish | source\n' "$out/bin/teka" > teka.fish
       printf '#compdef teka\neval "$(%s completion zsh)"\nif [[ $funcstack[1] == _teka ]]; then\n  _teka "$@"\nfi\n' "$out/bin/teka" > teka.zsh

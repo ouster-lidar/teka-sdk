@@ -16,7 +16,7 @@ For a temporary shell without installing Teka, run `nix develop` at the reposito
 
 Nix packages include the UKI verifier. Portable and Cargo installs require `sbverify` from `sbsigntool` on Linux, or `brew install osslsigncode` on Darwin.
 
-Supports Linux x86_64/AArch64 and macOS Apple Silicon.
+Supports Linux x86_64/AArch64 and macOS Apple Silicon. `teka build init` prepares a Linux build VM on macOS when needed.
 
 ### NixOS / Home Manager
 
@@ -70,7 +70,7 @@ Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP 
 
 ### Nested plugins
 
-Built-in command groups can opt into the same runtime plugin dispatch using their command path as the executable prefix. The `app` group enables this: `teka app <name> ARGS…` runs `teka-app-<name> ARGS…` from `PATH`. Help and completion list these plugins under `app`, using the local name instead of listing `app-<name>` at the root. Built-in commands and `help` take precedence. Plugins parse their own arguments, including `--help`.
+Built-in command groups can opt into the same runtime plugin dispatch using their command path as the executable prefix. The `app` and `build` groups enable this: `teka app <name> ARGS…` runs `teka-app-<name> ARGS…` from `PATH`; `teka build <name>` runs `teka-build-<name>`. Help and completion list plugins under their parent group using the local name. Built-in commands and `help` take precedence. Plugins parse their own arguments, including `--help`.
 
 ## Check the build environment
 
@@ -80,6 +80,47 @@ teka build check --full
 ```
 
 The quick check validates local prerequisites. `--full` also compiles a minimal AArch64 Linux program; add `--verbose` to see Nix logs.
+
+### macOS build VM
+
+On Apple silicon, `teka build init` installs the standalone `teka-build-vm` plugin when no Linux builder is configured. Existing Linux builders take precedence until you explicitly register this VM with `vm init`; `TEKA_BUILD_VM=always` or `never` overrides selection during init. Afterward, Nix configuration selects builders for app builds, build-and-deploy, full build checks, and ordinary `nix build` commands. The host daemon retrieves outputs into its store and creates normal result links without changes to trust or signature settings.
+
+```sh
+teka build vm init   # initialize, register the host builder (sudo), and enable the VM service
+teka build vm init --reset  # delete VM state and initialize defaults (sudo)
+teka build vm start  # wait for SSH using saved settings
+teka build vm stop         # disable the service; may interrupt active clients
+teka build vm start --cpus 12 --memory 8 --idle-timeout 300  # save settings after stopping
+teka build vm ssh          # open a guest shell (may boot the guest)
+teka build vm ssh top      # run an interactive guest command
+teka build vm btop         # open the bundled resource monitor
+teka build vm ssh -T uname -a
+teka build vm ssh -T journalctl -f -u nix-daemon  # stream guest Nix daemon logs
+teka build vm status       # service activity, guest state, and brief live usage
+teka build vm check        # prerequisites, host registration, and connectivity; may boot
+```
+
+The plugin uses Nixpkgs’ cached Linux guest and vzvm 1.1.0, with native NAT networking and no GUI. A separate `nixpkgs-unstable` input supplies only vzvm and its NixOS VM module; guest packages retain the main Nixpkgs pin. The module configures idle timeout, console logging, and SSH forwarding through Nix options. Rosetta must already be installed on the Mac (`softwareupdate --install-rosetta --agree-to-license`). Keys, the sparse 64 GiB data disk, and logs live in `${XDG_DATA_HOME:-~/.local/share}/teka-build-vm`. The `runtime` out-link retains the runtime as a Nix GC root. SSH listens on localhost port 31023. A unique host key stays in the private state directory; init/reset updates the CLI and system builder pins automatically.
+
+The user LaunchAgent at `~/Library/LaunchAgents/com.teka.build-vm.plist` runs the runtime in the foreground, starts after GUI login, and restarts it after a failure. `init` installs/enables it; `start` enables/loads it; `stop` disables/unloads it, including for future logins. Explicit stop can interrupt builds and SSH sessions. Idle shutdown releases guest resources while leaving the service listening for new connections. SSH, btop, checks, and Nix builder connections may wake an idle guest; they do not enable an explicitly stopped service.
+
+`start` always connects to the guest and waits for SSH readiness before succeeding, including when the service is already running. It reports connection time, including any cold boot. `--idle-timeout SECONDS` selects on-demand shutdown after 1–604800 seconds without forwarded connections; `0` keeps the guest on until stopped. On-demand guests boot again on the next connection.
+
+The first `init` or `start` saves defaults in `config.json`: host logical CPUs minus two (at least one), half the host RAM, and a 1800-second idle timeout. Later starts and ordinary `init` reuse these values; supplied `--cpus`, `--memory`, and `--idle-timeout` arguments replace only their own settings. Bare memory values mean GiB; integer MiB/GiB suffixes are also accepted. CPU/RAM allocations cannot exceed host capacity. Stop the service before changing settings or updating its runtime; repeated starts with unchanged settings do not restart it.
+
+Settings are validated before saving. If preparation or startup fails while stopped, valid requested settings remain saved for a plain `start` retry. Old `resources.json` and `launch.json` files are ignored.
+
+`vm init` registers a system builder in `/etc/nix/teka-build-vm.conf`, installs a root-only SSH identity, and restarts the daemon through sudo. It sets the host daemon's `build-poll-interval` to one second instead of Nix's five-second default so postponed remote builds retry promptly. Rerun `vm init` to update existing registrations. Initialization verifies that Nix loads the registration before reporting success. Existing builders are preserved; declaratively managed Nix configuration must use its system options.
+
+`vm init --reset` stops and disables the service, waits for its process to exit, and removes the entire VM state directory and old LaunchAgent. It then creates fresh SSH keys and a new disk, restores default CPU/RAM and the 1800s on-demand policy, updates the system builder credentials through sudo, and enables the service at login. This deletes the old VM's writable store, logs, and saved settings, including invalid configuration. Normal `init` preserves existing state. If runtime setup or registration fails after deletion, the service stays disabled; retry `vm init` to finish setup.
+
+Nix builds embed both resolved Nixpkgs input revisions in the CLI; direct Cargo builds use `tools/teka/flake.lock`. After updating the flake lock, rebuild or upgrade Teka, then stop the VM service. The next start or `vm init` updates the runtime and store image while preserving the writable disk. To debug startup, inspect `~/.local/share/teka-build-vm/vm.log` and `vm/console.log` under the same data directory.
+
+`vm ssh` forwards SSH options and commands and returns the SSH exit status. Its handshake timeout allows cold boot. It allocates a TTY when stdin and stdout are terminals; use `-T` to disable or `-t`/`-tt` to request one. `vm btop` opens the monitor bundled with the guest's Nixpkgs pin without runtime package downloads. The monitor is also on the guest PATH, so `vm ssh btop` and plain `btop` in the guest shell work.
+
+`status` reports login enablement and launchd service activity, then inspects the monitor's launchd PID domain for a running Virtualization helper. Waiting guests are left alone; active helpers trigger one SSH request for uptime, load, CPUs, RAM usage excluding reclaimable cache, and disk usage. The SSH handshake timeout is two seconds and the entire request is limited to five seconds. Missing or unrecognized process information is reported as unknown; failed guest requests show details as unavailable. Status never enables or reconfigures the service. Helper presence is a best-effort activity signal: a guest shutting down between inspection and SSH can wake again. Use `vm btop` or SSH for further guest diagnostics. `check` explicitly probes connectivity and may boot an on-demand VM; it verifies credentials, system builder registration, SSH, and the guest Nix daemon. Check results include inline failure reasons and SSH connection time; faults or a stopped service return failure.
+
+When live status metrics are unavailable, `status` shows saved CPU/RAM allocation, idle timeout, and disk capacity from local state. Missing or unreadable settings do not hide available disk capacity. Resource sizes use explicit binary units (`KiB`, `MiB`, `GiB`), scaled to at most one decimal place. Configured RAM and disk capacity can exceed the guest's usable totals.
 
 ## Shell completion
 

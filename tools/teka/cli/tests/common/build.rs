@@ -131,3 +131,43 @@ impl CommandExt for Command {
         self.output().unwrap().into()
     }
 }
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub fn ssh_timing(report: &str) {
+    let timing = report
+        .lines()
+        .find_map(|line| line.strip_prefix("✓ SSH: reachable ("))
+        .unwrap()
+        .strip_suffix("s)")
+        .unwrap();
+    assert!(timing.parse::<f64>().unwrap() >= 0.0);
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub fn runtime() -> String {
+    teka_cli::build_vm::runtime_expression(1800).unwrap()
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub fn vm_fixture(root: &Path, private: &str, public: &str) {
+    for (name, contents) in [
+        ("keys/builder_ed25519", private),
+        ("keys/builder_ed25519.pub", public),
+        ("keys/ssh_host_ed25519_key", "host private key"),
+        ("keys/ssh_host_ed25519_key.pub", "ssh-ed25519 AAAA fixture"),
+        (
+            "known_hosts",
+            "[127.0.0.1]:31023 ssh-ed25519 AAAA fixture\n",
+        ),
+        (
+            "runtime/share/teka-build-vm/btop",
+            "/nix/store/abc-btop/bin/btop\n",
+        ),
+        ("runtime.nix", &runtime()),
+    ] {
+        let path = root.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, contents).unwrap();
+    }
+    script(&root.join("runtime/bin/teka-build-vm-runner"), "exit 0");
+}

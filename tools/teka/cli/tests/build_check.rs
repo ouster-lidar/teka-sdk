@@ -32,7 +32,8 @@ case "$1" in
     exit "${MOCK_CONFIG_STATUS:-0}" ;;
   config)
     if [ -f "$MOCK_CALLS.registration" ]; then
-      /bin/cat "$MOCK_CALLS.registration"
+      IFS= read -r registration < "$MOCK_CALLS.registration"
+      printf '%s\n' "$registration"
     else
       printf '%s\n' "${MOCK_BUILDERS_JSON-}"
     fi
@@ -447,6 +448,85 @@ fn bootstrap_checks_nix_then_builds_portable_and_delegates_installation() {
             host.missing(&["init"]);
         }
     }
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn init_installs_a_standalone_vm_plugin_when_required() {
+    if option_env!("TEKA_NIX_PACKAGE").is_some() {
+        return;
+    }
+    let host = Host::new();
+    executable(
+        &host.path(".local/bin/launchctl"),
+        r#"#!/bin/sh
+case "$1" in
+  print) [ -f "$MOCK_CALLS.loaded" ] || exit 113; echo 'state = running' ;;
+  bootstrap) : > "$MOCK_CALLS.loaded" ;;
+  enable) exit 0 ;;
+  *) exit 99 ;;
+esac
+"#,
+    );
+    executable(
+        &host.path(".local/bin/sysctl"),
+        "#!/bin/sh\nprintf '8\\n17179869184\\n'\n",
+    );
+    let root = host.path("data/teka-build-vm");
+    support::vm_fixture(&root, "private key", "public key");
+    let diagnostic = host.init(
+        &[
+            ("TEKA_BUILD_VM", "auto"),
+            ("XDG_DATA_HOME", host.path("data").to_str().unwrap()),
+            ("MOCK_SUDO_NOOP", "1"),
+        ],
+        1,
+    );
+    assert!(diagnostic.contains("verify system builder registration"));
+    assert!(!diagnostic.contains("✓ System remote builder: configured"));
+    assert_eq!(diagnostic.matches('✗').count(), 1, "{diagnostic}");
+    for _ in 0..2 {
+        let stderr = host.init(
+            &[
+                ("TEKA_BUILD_VM", "auto"),
+                ("XDG_DATA_HOME", host.path("data").to_str().unwrap()),
+            ],
+            0,
+        );
+        assert!(stderr.contains("✓ Launchd service: running; enabled at login"));
+        assert!(!stderr.contains("VM initialization"));
+        assert!(!stderr.lines().any(|line| line == "Linux build VM"));
+        excludes(&stderr, "console.log");
+        assert_eq!(stderr.matches("→ Run `teka build check --full`").count(), 1);
+        let version = host
+            .binary(host.path(".local/bin/teka-build-vm"))
+            .arg("--version")
+            .checked(0);
+        assert_eq!(
+            version.stdout,
+            concat!("teka-build-vm ", env!("CARGO_PKG_VERSION"), "\n")
+        );
+    }
+    host.missing(&["data/teka-build-vm/manual", "data/teka-build-vm/vm.log"]);
+    assert!(root.join("known_hosts").is_file());
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn init_uses_configured_linux_builders_without_installing_vm() {
+    let host = Host::new();
+    host.init(
+        &[
+            ("TEKA_BUILD_VM", "auto"),
+            (
+                "MOCK_BUILDERS_JSON",
+                r#"{"builders":{"value":"ssh://remote aarch64-linux,x86_64-linux - 4"}}"#,
+            ),
+        ],
+        0,
+    );
+    host.missing(&[".local/bin/teka-build-vm"]);
+    assert!(host.read("calls").contains("config show --json"));
 }
 
 #[test]

@@ -178,13 +178,14 @@ EOF
     fi
     printf '%s\n' "$@" "$expr" >> calls
 elif [ "$2" = --raw ]; then
-    printf x86_64-linux
+    printf '%s' "${MOCK_SYSTEM:-x86_64-linux}"
 else
     printf '["app","hello-world"]'
 fi"#;
 
 fn cli(dir: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_teka"));
+    c.env("TEKA_BUILD_VM", "never");
     c.env_remove("TEKA_HOST")
         .env_remove("TEKA_PASSWORD")
         .env_remove("TEKA_APPS_FLAKE_ROOT")
@@ -1256,6 +1257,7 @@ fn plugins_dispatch_with_builtin_precedence() {
             &["build", "list", "deploy", "help"][..],
         ),
         (&["app"][..], "another-name", &[][..]),
+        (&["build"][..], "vm", &["init", "check", "help"][..]),
     ] {
         let plugin = [parents, &[name]].concat().join("-");
         plugin_bin(d.path(), &plugin, "printf '%s\\n' \"$@\"; exit 7");
@@ -1305,6 +1307,51 @@ fn plugins_dispatch_with_builtin_precedence() {
             assert_eq!(out.stderr, b"teka: error: unknown command 'nope'\n");
         }
     }
+}
+
+#[test]
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn vm_plugin_usage_matches_invocation() {
+    let d = TempDir::new().unwrap();
+    let bin = d.path().join("bin");
+    fs::create_dir(&bin).unwrap();
+    let plugin = bin.join("teka-build-vm");
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_teka"), &plugin).unwrap();
+    for (args, usage) in [
+        (vec!["--help"], "teka build vm <COMMAND>"),
+        (vec!["check", "--help"], "teka build vm check"),
+        (vec!["help", "check"], "teka build vm check"),
+    ] {
+        let out = cli(d.path())
+            .args(["build", "vm"])
+            .args(args)
+            .output()
+            .unwrap();
+        success(&out);
+        assert!(
+            String::from_utf8_lossy(&out.stdout).contains(&format!("Usage: {usage}\n")),
+            "{out:?}"
+        );
+    }
+    let out = cli(d.path())
+        .args(["build", "vm", "check", "--invalid"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("Usage: teka build vm check\n"),
+        "{out:?}"
+    );
+
+    let out = Command::new(&plugin)
+        .args(["check", "--help"])
+        .output()
+        .unwrap();
+    success(&out);
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("Usage: teka-build-vm check\n"),
+        "{out:?}"
+    );
 }
 
 #[test]
@@ -1739,4 +1786,57 @@ fn system_requires_host() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    plugin_bin(d.path(), "build-vm", "exit 99");
+    for target in ["aarch64", "x86_64"] {
+        let out = cli(d.path())
+            .env("TEKA_BUILD_VM", "always")
+            .env("MOCK_SYSTEM", "aarch64-darwin")
+            .args(["app", "build", "app", "--arch", target])
+            .output()
+            .unwrap();
+        success(&out);
+        let architecture = if target == "aarch64" {
+            r#"{"architecture":"aarch64"}"#
+        } else {
+            r#"{"architecture":"x86_64"}"#
+        };
+        let (url, server) = serve(vec![
+            ("200 OK", r#"{"auth_disabled":true}"#),
+            ("200 OK", architecture),
+            ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+            ("200 OK", "healthy"),
+        ]);
+        let out = cli(d.path())
+            .env("TEKA_BUILD_VM", "always")
+            .env("MOCK_SYSTEM", "aarch64-darwin")
+            .args(["app", "deploy", "--build", "app", "--host", &url])
+            .output()
+            .unwrap();
+        success(&out);
+        assert_eq!(
+            server.join().unwrap()[2].body,
+            fs::read(d.path().join(format!("packages/{target}-linux/app.tpk"))).unwrap()
+        );
+        let expression = fs::read_to_string(d.path().join("calls")).unwrap();
+        assert!(
+            expression.contains("legacyPackages.\"aarch64-darwin\""),
+            "{expression}"
+        );
+        assert!(
+            expression.contains(&format!("packages.\"{target}-linux\".\"app\"")),
+            "{expression}"
+        );
+        assert!(expression.contains("--out-link\nresult"), "{expression}");
+        assert!(
+            !expression.contains("--store") && !expression.contains("--builders"),
+            "{expression}"
+        );
+    }
 }

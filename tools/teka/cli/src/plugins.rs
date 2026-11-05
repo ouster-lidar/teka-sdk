@@ -176,6 +176,12 @@ pub fn run_external_in(parents: &[&str], args: Vec<std::ffi::OsString>) -> Resul
     let name = name.to_string_lossy();
     let plugin = [parents, &[name.as_ref()]].concat().join("-");
     let path = find_plugin(&plugin).ok_or_else(|| usage(format!("unknown command '{name}'")))?;
-    let err = ProcessCommand::new(&path).args(rest).exec();
+    let invocation = [&["teka"][..], parents, &[name.as_ref()]]
+        .concat()
+        .join(" ");
+    let err = ProcessCommand::new(&path)
+        .arg0(invocation)
+        .args(rest)
+        .exec();
     Err(anyhow::Error::from(err).context(format!("run {}", path.display())))
 }

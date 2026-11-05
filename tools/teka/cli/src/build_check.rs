@@ -7,6 +7,7 @@ use crate::{
 use anyhow::{ensure, Context, Result};
 use clap::Subcommand;
 use std::{
+    ffi::OsString,
     fs,
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -27,6 +28,8 @@ pub enum BuildCommand {
         #[arg(short, long, requires = "full")]
         verbose: bool,
     },
+    #[command(external_subcommand)]
+    External(Vec<OsString>),
 }
 
 #[derive(Debug)]
@@ -296,6 +299,7 @@ pub(crate) fn timed(
 
 pub fn run(command: BuildCommand) -> Result<()> {
     match command {
+        BuildCommand::External(args) => crate::plugins::run_external_in(&["build"], args),
         BuildCommand::Init => crate::build_init::run(),
         BuildCommand::Check { full, verbose } => checks(Path::new("nix"), full, verbose),
     }
