@@ -1300,7 +1300,9 @@ fn plugins_dispatch_with_builtin_precedence() {
         let out = cli(d.path()).env("PATH", &bin).args(args).output().unwrap();
         assert_eq!(out.status.code(), Some(2), "{out:?}");
         if args.contains(&"missing") {
-            assert!(String::from_utf8_lossy(&out.stderr).contains("no teka-app-missing on PATH"));
+            assert_eq!(out.stderr, b"teka: error: unknown command 'missing'\n");
+        } else if args == ["nope"] {
+            assert_eq!(out.stderr, b"teka: error: unknown command 'nope'\n");
         }
     }
 }
