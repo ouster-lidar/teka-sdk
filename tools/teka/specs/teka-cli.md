@@ -2,6 +2,18 @@
 
 Agent-facing requirements. Commit spec changes before implementing behavior changes. Human usage and development instructions live in [README.md](../README.md); implementation details live in code and tests.
 
+## CLI output conventions
+
+- Apply these conventions to `teka build`; other command groups retain their existing formats. Unknown-command errors omit internal plugin lookup details.
+- Preserve existing icons. Print flat results and prompts without headings, indentation, or redundant final summaries. Use lowercase states and self-contained labels; reserve `→` for guidance and skipped checks.
+- Every `⏳︎` step ends with a success or failure result and actual elapsed seconds to one decimal. Already-completed work needs no wait or timing.
+- Failures identify the problem and return non-zero. Separate recovery guidance with a blank line. Failed builds print a timed result, a blank line, then complete captured logs unchanged; verbose logs stream without duplication.
+- Display paths under the current user's home as `~/…`. Standalone copy-paste commands have blank lines around them and no backticks; inline command references may use backticks.
+- Share checks, output, timing, path formatting, and shell detection through small functions. Keep status data on stdout, diagnostics on stderr, and subprocess output intact.
+- `build init` enables missing `nix-command flakes` while preserving unrelated settings, then validates the configuration. `build check` remains read-only and recommends init for missing features; `--full` only adds the test build.
+- SSH and btop reuse guest-state detection: running guests connect silently without a readiness probe; sleeping guests show startup and timed SSH readiness; unknown state uses neutral connection progress. Preserve the session's exit status, including remote exit 3.
+- Shell guidance says “load the Nix environment” and shows only the detected shell's daemon profile command: Fish sources `nix-daemon.fish`; Bash/Zsh source `nix-daemon.sh`. Reuse invoking-shell detection with `SHELL` fallback; unknown shells get the new-shell suggestion.
+
 ## Structure
 
 - Host tooling lives in `tools/teka/`; app images live in `apps/`. `teka-cli` exports the shared library and `teka` binary.
