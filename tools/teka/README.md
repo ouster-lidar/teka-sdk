@@ -124,6 +124,8 @@ When live status metrics are unavailable, `status` shows saved CPU/RAM allocatio
 
 `check` reports available RAM, swap capacity, and kernel OOM kills since boot. OOM kills or unreadable counters return failure, even after memory recovers. Direct `systemd-oomd` kills are not counted. Inspect victims with `teka build vm ssh journalctl -k -b0 --no-pager -g 'Killed process'`.
 
+Normal builds should fit in RAM. A separate sparse 8 GiB disk at `vm/swap.img` provides swap so high-concurrency memory peaks can slow down instead of triggering OOM kills, without reducing build concurrency. It preserves store capacity and consumes host disk space as written. RAM plus swap remains finite. After rebuilding or upgrading Teka, stop/start the VM to activate it; no reset is needed. Rebooting clears OOM counts, not the underlying memory demand.
+
 ## Shell completion
 
 `teka completion [bash|fish|zsh]` prints completion code. Without an argument, it detects the invoking shell, then falls back to `$SHELL`. If neither identifies a supported shell, pass one explicitly.

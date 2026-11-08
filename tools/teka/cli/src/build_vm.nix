@@ -23,6 +23,11 @@ let
   vzvm = pkgs.writeShellScriptBin "vzvm" ''
     set -eu
     config="$1"
+    # Normal builds should fit in RAM; swap lets high-concurrency peaks slow down
+    # instead of triggering OOM kills. A separate disk preserves build space.
+    swap="$(${pkgs.coreutils}/bin/dirname "$config")/swap.img"
+    umask 077
+    ${pkgs.coreutils}/bin/truncate -s 8G "$swap"
     ${lib.getExe pkgs.jq} \
       --argjson cpus "$TEKA_VM_CPUS" \
       --argjson memory "$TEKA_VM_MEMORY_MIB" \
@@ -30,9 +35,12 @@ let
       --arg dhcp ${lib.escapeShellArg dhcp} \
       --arg keys ${lib.escapeShellArg keys} \
       --arg hostKey ${lib.escapeShellArg hostKey} \
-      '.cpuCount = $cpus
+      --arg swapDisk "$swap" \
+      'if (.disks | length) != 2 then error("expected store and data disks before /dev/vdc swap") else . end
+       | .cpuCount = $cpus
        | .memorySizeMiB = $memory
-       | .cmdline += " systemd.mask=sshd.service systemd.mask=getty@tty1.service systemd.mask=autovt@tty1.service systemd.mask=serial-getty@hvc0.service systemd.setenv=\"NIX_CONFIG=build-dir = /nix/.rw-store/builds\" systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock.socket:\($dropin | @base64) systemd.set_credential_binary=systemd.unit-dropin.dhcpcd.service:\($dhcp | @base64) systemd.set_credential_binary=systemd.unit-dropin.copy-builder-keys.service:\($keys | @base64) systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock@.service:\($hostKey | @base64)"' \
+       | .disks += [{path: $swapDisk, readOnly: false}]
+       | .cmdline += " systemd.swap-extra=/dev/vdc:x-systemd.makefs systemd.mask=sshd.service systemd.mask=getty@tty1.service systemd.mask=autovt@tty1.service systemd.mask=serial-getty@hvc0.service systemd.setenv=\"NIX_CONFIG=build-dir = /nix/.rw-store/builds\" systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock.socket:\($dropin | @base64) systemd.set_credential_binary=systemd.unit-dropin.dhcpcd.service:\($dhcp | @base64) systemd.set_credential_binary=systemd.unit-dropin.copy-builder-keys.service:\($keys | @base64) systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock@.service:\($hostKey | @base64)"' \
       "$config" > "$config.tmp"
     mv "$config.tmp" "$config"
     exec ${lib.getExe unstable.legacyPackages.aarch64-darwin.vzvm} "$config"
