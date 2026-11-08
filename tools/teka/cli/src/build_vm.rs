@@ -75,7 +75,7 @@ enum VmCommand {
     Btop,
     /// Show service status and brief usage for an active guest
     Status,
-    /// Check runtime, host registration, and connectivity (may boot the guest)
+    /// Check runtime, host registration, connectivity, and OOM kills (may boot the guest)
     Check,
 }
 

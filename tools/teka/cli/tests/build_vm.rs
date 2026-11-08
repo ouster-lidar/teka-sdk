@@ -91,6 +91,12 @@ printf 'ssh\n' >> "$MOCK_ROOT/ssh-calls"
 case "$*" in
   *'exit 3'*) exit 3 ;;
   *__teka_ssh_test__*|*'/bin/btop'*) /bin/cat; exit "${MOCK_SSH_EXIT:-0}" ;;
+  *'/proc/vmstat'*)
+    if [ "${MOCK_MEMORY_STATUS:-0}" != 0 ]; then
+      echo 'memory probe failed' >&2
+      exit "$MOCK_MEMORY_STATUS"
+    fi
+    exec /bin/cat "$MOCK_ROOT/memory" ;;
   *'/proc/uptime'*)
     if [ -n "${MOCK_METRICS_HANG:-}" ]; then exec /bin/sleep 30; fi
     if [ "${MOCK_METRICS_STATUS:-0}" != 0 ]; then
@@ -129,6 +135,10 @@ else
   fi
 fi
 "#,
+        );
+        host.write(
+            "memory",
+            r#"{"total":8589934592,"available":7516192768,"swap":0,"oom_kills":0}"#,
         );
         script(
             &host.path("bin/ssh-keygen"),
@@ -790,7 +800,10 @@ fn check_wakes_on_demand_guests_and_skips_unavailable_services() {
 ⏳︎ Starting VM...",
     );
     ssh_timing(&report);
-    assert!(host.read("ssh-args").contains("ConnectTimeout=180"));
+    contains(
+        &report,
+        "✓ Guest memory: 0 kernel OOM kills since boot; RAM: 7 GiB / 8 GiB available; swap: 0 B",
+    );
     let report = host.report(&["check"], 1, &[("MOCK_PROBE_STATUS", "1")]);
     contains(
         &report,
@@ -808,6 +821,29 @@ fn check_wakes_on_demand_guests_and_skips_unavailable_services() {
         assert_eq!(report.matches("teka build vm start").count(), 1);
         host.missing(&["ssh-args"]);
     }
+}
+
+#[test]
+fn check_detects_oom_even_after_memory_is_freed_and_reports_probe_failures() {
+    let host = Host::new();
+    host.run(&["start"]);
+    contains(&host.report(&["check"], 1, &[]), "✓ Guest memory:");
+    host.write(
+        "memory",
+        r#"{"total":8589934592,"available":7516192768,"swap":0,"oom_kills":6}"#,
+    );
+    let report = host.report(&["check"], 1, &[]);
+    contains(
+        &report,
+        "✗ Guest memory: 6 kernel OOM kills since boot; RAM: 7 GiB / 8 GiB available; swap: 0 B",
+    );
+    contains(&report, "journalctl -k -b0");
+    contains(&report, "OOM counts reset on guest reboot");
+    host.write("memory", "{}");
+    contains(&host.report(&["check"], 1, &[]), "✗ Guest memory:");
+    let report = host.report(&["check"], 1, &[("MOCK_MEMORY_STATUS", "7")]);
+    contains(&report, "memory probe failed");
+    excludes(&report, "Inspect OOM victims");
 }
 
 #[test]

@@ -79,6 +79,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ### `teka build vm`
 
+- Check available RAM, swap, and kernel OOM kills since boot. Any kills or unreadable counters fail the check, even after memory recovers.
 - Include core tools such as `btop` in the VM image using the same Nixpkgs pin as the guest. Use NixOS VM options to include their closures and reuse binary caches where available, keeping first-time setup buildable from Darwin.
 - Expose bundled tools on the guest PATH for interactive shells and SSH commands. Stage `/etc/profile.local` through the existing boot-time key service; keep the cached guest system unchanged and include the profile file through `virtualisation.additionalPaths`.
 - `btop` launches the packaged guest executable through a direct SSH session, without runtime Nix evaluation, downloads or Nix profile installation. Preserve terminal handling and exit status; allow a cold-boot handshake.

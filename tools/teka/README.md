@@ -97,7 +97,7 @@ teka build vm btop         # open the bundled resource monitor
 teka build vm ssh -T uname -a
 teka build vm ssh -T journalctl -f -u nix-daemon  # stream guest Nix daemon logs
 teka build vm status       # service activity, guest state, and brief live usage
-teka build vm check        # prerequisites, host registration, and connectivity; may boot
+teka build vm check        # prerequisites, connectivity, and OOM kills; may boot
 ```
 
 The plugin uses Nixpkgs’ cached Linux guest and vzvm 1.1.0, with native NAT networking and no GUI. A separate `nixpkgs-unstable` input supplies only vzvm and its NixOS VM module; guest packages retain the main Nixpkgs pin. The module configures idle timeout, console logging, and SSH forwarding through Nix options. Rosetta must already be installed on the Mac (`softwareupdate --install-rosetta --agree-to-license`). Keys, the sparse 64 GiB data disk, and logs live in `${XDG_DATA_HOME:-~/.local/share}/teka-build-vm`. The `runtime` out-link retains the runtime as a Nix GC root. SSH listens on localhost port 31023. A unique host key stays in the private state directory; init/reset updates the CLI and system builder pins automatically.
@@ -121,6 +121,8 @@ Nix builds embed both resolved Nixpkgs input revisions in the CLI; direct Cargo 
 `status` reports login enablement and launchd service activity, then inspects the monitor's launchd PID domain for a running Virtualization helper. Waiting guests are left alone; active helpers trigger one SSH request for uptime, load, CPUs, RAM usage excluding reclaimable cache, and disk usage. The SSH handshake timeout is two seconds and the entire request is limited to five seconds. Missing or unrecognized process information is reported as unknown; failed guest requests show details as unavailable. Status never enables or reconfigures the service. Helper presence is a best-effort activity signal: a guest shutting down between inspection and SSH can wake again. Use `vm btop` or SSH for further guest diagnostics. `check` explicitly probes connectivity and may boot an on-demand VM; it verifies credentials, system builder registration, SSH, and the guest Nix daemon. Check results include inline failure reasons and SSH connection time; faults or a stopped service return failure.
 
 When live status metrics are unavailable, `status` shows saved CPU/RAM allocation, idle timeout, and disk capacity from local state. Missing or unreadable settings do not hide available disk capacity. Resource sizes use explicit binary units (`KiB`, `MiB`, `GiB`), scaled to at most one decimal place. Configured RAM and disk capacity can exceed the guest's usable totals.
+
+`check` reports available RAM, swap capacity, and kernel OOM kills since boot. OOM kills or unreadable counters return failure, even after memory recovers. Direct `systemd-oomd` kills are not counted. Inspect victims with `teka build vm ssh journalctl -k -b0 --no-pager -g 'Killed process'`.
 
 ## Shell completion
 

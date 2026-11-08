@@ -4,7 +4,7 @@ use crate::{
     checked_output,
 };
 use anyhow::{bail, ensure, Context, Result};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use std::{
     fs,
     process::Stdio,
@@ -21,6 +21,45 @@ awk '/^MemTotal:/ {total=$2} /^MemAvailable:/ {available=$2} END {printf "\"memo
 disk=$(df -B1 --output=used,size /nix/.rw-store)
 printf '%s\n' "$disk" | awk 'NR == 2 {printf "\"disk\":[%s,%s]}\n", $1, $2}'
 "#;
+
+const MEMORY: &str = r#"set -eu
+export LC_ALL=C
+awk '
+  /^MemTotal:/ {total=$2}
+  /^MemAvailable:/ {available=$2; have_available=1}
+  /^SwapTotal:/ {swap=$2; have_swap=1}
+  /^oom_kill / {kills=$2; have_kills=1}
+  END {
+    if (!total || !have_available || !have_swap || !have_kills) exit 1
+    printf "{\"total\":%.0f,\"available\":%.0f,\"swap\":%.0f,\"oom_kills\":%.0f}\n", total*1024, available*1024, swap*1024, kills
+  }
+' /proc/meminfo /proc/vmstat
+"#;
+
+#[derive(Deserialize)]
+struct Memory {
+    total: u64,
+    available: u64,
+    swap: u64,
+    oom_kills: u64,
+}
+
+impl Memory {
+    fn summary(&self) -> String {
+        format!(
+            "{} kernel OOM kills since boot; RAM: {} / {} available; swap: {}",
+            self.oom_kills,
+            size(self.available),
+            size(self.total),
+            size(self.swap)
+        )
+    }
+
+    fn check(self) -> Result<Self> {
+        ensure!(self.oom_kills == 0, "{}", self.summary());
+        Ok(self)
+    }
+}
 
 #[derive(Deserialize)]
 struct Metrics {
@@ -200,17 +239,21 @@ impl Vm {
     }
 
     fn guest_metrics(&self) -> Result<Metrics> {
+        self.guest_probe(METRICS).context("read guest metrics")
+    }
+
+    fn guest_probe<T: DeserializeOwned>(&self, script: &str) -> Result<T> {
         let stdout = tempfile::NamedTempFile::new()?;
         let stderr = tempfile::NamedTempFile::new()?;
         let mut child = self
             .ssh_with_timeout(2)
             .args(["-o", "ConnectionAttempts=1", "-T"])
-            .arg(METRICS)
+            .arg(script)
             .stdin(Stdio::null())
             .stdout(stdout.reopen()?)
             .stderr(stderr.reopen()?)
             .spawn()
-            .context("start guest status probe")?;
+            .context("start guest probe")?;
         let deadline = Instant::now() + Duration::from_secs(5);
         let status = loop {
             match child.try_wait() {
@@ -221,17 +264,17 @@ impl Vm {
                 result => {
                     let _ = child.kill();
                     let _ = child.wait();
-                    let _ = result.context("wait for guest status probe")?;
-                    bail!("SSH status probe timed out after 5s");
+                    let _ = result.context("wait for guest probe")?;
+                    bail!("SSH guest probe timed out after 5s");
                 }
             }
         };
         ensure!(
             status.success(),
-            "SSH status probe failed ({status}): {}",
+            "SSH guest probe failed ({status}): {}",
             fs::read_to_string(stderr.path())?.trim()
         );
-        serde_json::from_reader(stdout.reopen()?).context("read guest metrics")
+        serde_json::from_reader(stdout.reopen()?).context("read guest probe response")
     }
 
     pub(super) fn guest_state(&self) -> Option<bool> {
@@ -302,6 +345,18 @@ impl Vm {
                     ),
                     |_| "available".into(),
                 );
+                let memory = self.guest_probe::<Memory>(MEMORY);
+                let exhausted = memory.as_ref().is_ok_and(|memory| memory.oom_kills > 0);
+                healthy &= report(
+                    "Guest memory",
+                    memory.and_then(Memory::check),
+                    Memory::summary,
+                );
+                if exhausted {
+                    eprintln!();
+                    note("Inspect OOM victims: `teka build vm ssh journalctl -k -b0 --no-pager -g 'Killed process'`");
+                    note("OOM counts reset on guest reboot; restarting does not fix insufficient memory");
+                }
             } else {
                 note("Guest checks: skipped");
             }
@@ -327,7 +382,51 @@ impl Vm {
 
 #[cfg(test)]
 mod tests {
-    use super::{guest_process, size, Metrics, METRICS};
+    use super::{guest_process, size, Memory, Metrics, MEMORY, METRICS};
+
+    #[test]
+    fn memory_probe_counts_oom_kills_without_journal_access() {
+        let directory = tempfile::tempdir().unwrap();
+        let meminfo = directory.path().join("meminfo");
+        let vmstat = directory.path().join("vmstat");
+        let script = MEMORY
+            .replace("/proc/meminfo", &format!("\"{}\"", meminfo.display()))
+            .replace("/proc/vmstat", &format!("\"{}\"", vmstat.display()));
+        std::fs::write(
+            &meminfo,
+            "MemTotal: 8388608 kB\nMemAvailable: 7340032 kB\nSwapTotal: 2097152 kB\n",
+        )
+        .unwrap();
+        for kills in [0, 6] {
+            std::fs::write(&vmstat, format!("pgfault 12345\noom_kill {kills}\n")).unwrap();
+            let output = std::process::Command::new("/bin/sh")
+                .args(["-c", &script])
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{output:?}");
+            let memory: Memory = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(memory.total, 8589934592);
+            assert_eq!(memory.available, 7516192768);
+            assert_eq!(memory.swap, 2147483648);
+            assert_eq!(memory.oom_kills, kills);
+            assert_eq!(memory.check().is_ok(), kills == 0);
+        }
+        for (memory, counters) in [
+            ("MemTotal: 8388608 kB\nSwapTotal: 0 kB\n", "oom_kill 0\n"),
+            (
+                "MemTotal: 8388608 kB\nMemAvailable: 0 kB\nSwapTotal: 0 kB\n",
+                "pgfault 12345\n",
+            ),
+        ] {
+            std::fs::write(&meminfo, memory).unwrap();
+            std::fs::write(&vmstat, counters).unwrap();
+            assert!(!std::process::Command::new("/bin/sh")
+                .args(["-c", &script])
+                .status()
+                .unwrap()
+                .success());
+        }
+    }
 
     #[test]
     fn resource_sizes_use_explicit_binary_units() {
