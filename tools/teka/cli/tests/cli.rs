@@ -21,8 +21,7 @@ use tempfile::TempDir;
 fn apps_flake(dir: &Path) {
     fs::create_dir(dir.join("bin")).unwrap();
     fs::create_dir(dir.join(".git")).unwrap();
-    fs::create_dir(dir.join("apps")).unwrap();
-    fs::write(dir.join("apps/flake.nix"), "{}").unwrap();
+    fs::write(dir.join("flake.nix"), "{}").unwrap();
     script(&dir.join("bin/nix"), NIX_MOCK);
     for (target, arch) in [
         ("x86_64-linux", Architecture::X86_64),
@@ -459,9 +458,10 @@ fn errors_without_password_and_rejects_login_redirect() {
 #[test]
 fn apps_flake_environment_and_flag_precedence() {
     let d = TempDir::new().unwrap();
+    fs::write(d.path().join("flake.nix"), "{}").unwrap();
     let bin = d.path().join("bin");
     fs::create_dir(&bin).unwrap();
-    for name in ["environment", "explicit"] {
+    for name in ["environment#?%", "explicit#?%"] {
         let dir = d.path().join(name);
         fs::create_dir(&dir).unwrap();
         fs::write(dir.join("flake.nix"), "{}").unwrap();
@@ -474,11 +474,11 @@ fn apps_flake_environment_and_flag_precedence() {
     for explicit in [false, true] {
         let mut command = cli(d.path());
         command
-            .env("TEKA_APPS_FLAKE_ROOT", d.path().join("environment"))
+            .env("TEKA_APPS_FLAKE_ROOT", d.path().join("environment#?%"))
             .env("TEKA_TEST_NIX_ARGS", &captured)
             .args(["app", "list"]);
         if explicit {
-            command.arg("--flake").arg(d.path().join("explicit"));
+            command.arg("--flake").arg(d.path().join("explicit#?%"));
         }
         let output = command.output().unwrap();
         success(&output);
@@ -487,39 +487,134 @@ fn apps_flake_environment_and_flag_precedence() {
         assert_eq!(
             fs::read_to_string(&captured).unwrap(),
             format!(
-                "{}#.teka.apps",
-                d.path().join(selected).canonicalize().unwrap().display()
+                "path:{}/{selected}%23%3F%25#.",
+                d.path().canonicalize().unwrap().display()
             )
         );
     }
 }
 
 #[test]
-fn apps_flake_is_found_at_git_root() {
+fn app_discovery_selects_the_nearest_registry() {
     let d = TempDir::new().unwrap();
-    fs::create_dir(d.path().join(".git")).unwrap();
-    let root = d.path().join("checkout");
-    fs::create_dir(&root).unwrap();
+    let root = d.path().canonicalize().unwrap();
     apps_flake(&root);
-    let sub = root.join("nested/dir");
-    fs::create_dir_all(&sub).unwrap();
-    let out = cli(&root)
-        .current_dir(&sub)
-        .args(["app", "list"])
-        .output()
-        .unwrap();
-    success(&out);
-    assert_eq!(out.stdout, b"app\nhello-world\n");
+    discovery_flake(&root, "[\"parent\"]");
+    let local = root.join("local");
+    let unrelated = local.join("unrelated");
+    discovery_flake(&unrelated, "null");
+    let nested = unrelated.join("nested");
+    fs::create_dir(&nested).unwrap();
+    for (names, expected, parent) in [
+        ("[\"local\"]", "local\n", false),
+        ("[]", "", false),
+        ("null", "parent\n", true),
+    ] {
+        discovery_flake(&local, names);
+        let (output, probes) = discover(&root, &nested, &[]);
+        success(&output);
+        assert_eq!(output.stdout, expected.as_bytes());
+        let mut expected_probes = format!("{}#.\n{}#.\n", unrelated.display(), local.display());
+        if parent {
+            expected_probes.push_str(&format!("{}#.\n", root.display()));
+        }
+        assert_eq!(probes, expected_probes);
+    }
+    discovery_flake(&local, "[\"local\"]");
+    let (output, probes) = discover(&root, &local, &[]);
+    success(&output);
+    assert_eq!(output.stdout, b"local\n");
+    assert_eq!(probes, format!("{}#.\n", local.display()));
+}
 
-    fs::remove_dir(root.join(".git")).unwrap();
-    let out = cli(&root)
-        .current_dir(&sub)
+#[test]
+fn app_discovery_stops_at_git_roots_without_searching_children() {
+    for worktree in [false, true] {
+        let d = TempDir::new().unwrap();
+        let root = d.path().canonicalize().unwrap();
+        apps_flake(&root);
+        discovery_flake(&root, "[\"outside\"]");
+        let repo = root.join("repo");
+        discovery_flake(&repo, "null");
+        discovery_flake(&repo.join("apps"), "[\"child\"]");
+        if worktree {
+            fs::write(repo.join(".git"), "gitdir: /unused\n").unwrap();
+        } else {
+            fs::create_dir(repo.join(".git")).unwrap();
+        }
+        let (output, probes) = discover(&root, &repo, &[]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("no flake exporting teka.apps"));
+        assert_eq!(probes, format!("{}#.\n", repo.display()));
+    }
+}
+
+#[test]
+fn app_discovery_reports_evaluation_errors_without_falling_back() {
+    let d = TempDir::new().unwrap();
+    let root = d.path().canonicalize().unwrap();
+    apps_flake(&root);
+    discovery_flake(&root, "[\"parent\"]");
+    let local = root.join("local");
+    discovery_flake(&local, "null");
+    fs::write(local.join("eval-error"), "broken local flake\n").unwrap();
+    let (output, probes) = discover(&root, &local, &[]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("broken local flake"));
+    assert_eq!(probes, format!("{}#.\n", local.display()));
+}
+
+#[test]
+fn explicit_flakes_must_export_the_app_registry() {
+    let d = TempDir::new().unwrap();
+    let root = d.path().canonicalize().unwrap();
+    apps_flake(&root);
+    discovery_flake(&root, "[\"parent\"]");
+    let local = root.join("local");
+    discovery_flake(&local, "null");
+    let (output, probes) = discover(&root, &local, &["--flake", "."]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("no teka.apps output"));
+    assert_eq!(probes, format!("{}#.\n", local.display()));
+}
+
+fn discovery_flake(directory: &Path, names: &str) {
+    fs::create_dir_all(directory).unwrap();
+    fs::write(directory.join("flake.nix"), "{}").unwrap();
+    fs::write(directory.join("app-names.json"), names).unwrap();
+}
+
+fn discover(root: &Path, cwd: &Path, args: &[&str]) -> (Output, String) {
+    let probes = root.join("probes");
+    fs::write(&probes, "").unwrap();
+    script(
+        &root.join("bin/nix"),
+        r#"flake=${2%#.}
+case "$flake" in
+    git+file://*)
+        dir=${flake##*\?dir=}
+        dir=$(printf '%s' "$dir" | sed 's/%2F/\//g')
+        flake=${flake#git+file://}
+        flake=${flake%\?dir=*}
+        if [ -n "$dir" ]; then flake=$flake/$dir; fi
+        ;;
+    path:*) flake=${flake#path:} ;;
+esac
+printf '%s#.\n' "$flake" >> "$TEKA_TEST_PROBES"
+if [ -f "$flake/eval-error" ]; then
+    cat "$flake/eval-error" >&2
+    exit 1
+fi
+cat "$flake/app-names.json""#,
+    );
+    let output = cli(root)
+        .current_dir(cwd)
+        .env("TEKA_TEST_PROBES", &probes)
         .args(["app", "list"])
+        .args(args)
         .output()
         .unwrap();
-    assert_eq!(out.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&out.stderr)
-        .contains(&format!("no apps/flake.nix in {}", d.path().display())));
+    (output, fs::read_to_string(probes).unwrap())
 }
 
 #[test]
@@ -546,7 +641,7 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
     assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world-cross-aarch64-linux\""));
     assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world\";"));
-    assert!(calls.contains("builtins.getFlake") && calls.contains("?dir=apps"));
+    assert!(calls.contains("builtins.getFlake") && calls.contains("?dir=\n"));
     assert!(calls.contains("--file"));
     assert!(calls.contains("--out-link"));
     assert!(!calls.contains("#packages"));

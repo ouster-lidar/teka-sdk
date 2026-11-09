@@ -38,7 +38,7 @@ environment.systemPackages = [ pkgs.teka ]; # Home Manager: home.packages
 
 ## Use
 
-From the repository root or `apps/`:
+For the SDK examples, work from `apps/`:
 
 ```sh
 teka app list
@@ -64,7 +64,7 @@ teka system update ./image.tpk --wait --host http://device.local
 
 Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
-App builds use `apps/flake.nix` at the root of the enclosing git checkout; it must export `teka.apps`. Outside the checkout, use `--flake /path/to/apps` or set `TEKA_APPS_FLAKE_ROOT` to that directory.
+App commands search upward for the nearest `flake.nix` exporting `teka.apps`, stopping at the Git root or a filesystem boundary. Flakes without that output are skipped; evaluation errors stop discovery. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select a directory explicitly.
 
 Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 

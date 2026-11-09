@@ -4,13 +4,14 @@ use clap::Args;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     io::{IsTerminal, Read, Write},
+    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildSource {
-    /// Apps flake directory (default: apps/ at checkout root)
+    /// Apps flake directory (default: discover from the current directory)
     #[arg(long, env = "TEKA_APPS_FLAKE_ROOT", value_hint = clap::ValueHint::DirPath)]
     pub flake: Option<PathBuf>,
 }
@@ -71,8 +72,7 @@ pub fn build_apps_for_targets(
         bail!("no device targets to build");
     }
     let multi_target = targets.len() > 1;
-    let flake = find_apps_flake(source.flake.as_deref())?;
-    let known = app_names(&flake)?;
+    let (flake, known) = find_apps(source.flake.as_deref())?;
     if let Some(app) = apps.iter().find(|app| !known.contains(app)) {
         bail!("unknown app '{app}'; see `teka app list`");
     }
@@ -112,33 +112,38 @@ pub fn package_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
         .collect()
 }
 
-fn app_names(flake: &Path) -> Result<Vec<String>> {
+fn app_names(flake: &Path) -> Result<Option<Vec<String>>> {
     let output = checked_output(Command::new("nix").args([
         "eval",
-        &format!("{}#.teka.apps", flake.display()),
+        &format!("{}#.", flake_reference(flake)?),
         "--json",
+        "--no-write-lock-file",
         "--apply",
-        "builtins.attrNames",
+        "flake: if flake ? teka.apps then builtins.attrNames flake.teka.apps else null",
     ]))
     .with_context(|| format!("read teka.apps from {}", flake.display()))?;
-    Ok(serde_json::from_str(&output)?)
+    serde_json::from_str(&output)
+        .with_context(|| format!("invalid app names from {}", flake.display()))
 }
 
 fn flake_reference(flake: &Path) -> Result<String> {
-    let Some(root) = flake.ancestors().find(|dir| dir.join(".git").exists()) else {
-        return Ok(flake.to_string_lossy().into_owned());
+    let root = flake.ancestors().find(|dir| dir.join(".git").exists());
+    let url = reqwest::Url::from_file_path(root.unwrap_or(flake))
+        .map_err(|_| anyhow::anyhow!("invalid flake path: {}", flake.display()))?;
+    let Some(root) = root else {
+        return Ok(format!("path:{}", url.path()));
     };
-    let url = reqwest::Url::from_file_path(root)
-        .map_err(|_| anyhow::anyhow!("invalid repository path: {}", root.display()))?;
     let mut url = reqwest::Url::parse(&format!("git+{url}"))?;
     url.query_pairs_mut()
         .append_pair("dir", &flake.strip_prefix(root)?.to_string_lossy());
+    // Nix decodes URL queries, not form data where '+' means a space.
+    let query = url.query().unwrap().replace('+', "%20");
+    url.set_query(Some(&query));
     Ok(url.into())
 }
 
 pub fn list(args: BuildSource) -> Result<()> {
-    let flake = find_apps_flake(args.flake.as_deref())?;
-    let mut names = app_names(&flake)?;
+    let (_, mut names) = find_apps(args.flake.as_deref())?;
     names.sort();
     for name in names {
         println!("{name}");
@@ -155,26 +160,35 @@ pub fn run(args: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-pub fn find_apps_flake(explicit: Option<&Path>) -> Result<PathBuf> {
+fn find_apps(explicit: Option<&Path>) -> Result<(PathBuf, Vec<String>)> {
     if let Some(path) = explicit {
         if !path.join("flake.nix").is_file() {
             bail!("no flake.nix in {}", path.display());
         }
-        return Ok(path.canonicalize()?);
+        let path = path.canonicalize()?;
+        let names = app_names(&path)?
+            .with_context(|| format!("no teka.apps output in {}", path.display()))?;
+        return Ok((path, names));
     }
     let cwd = std::env::current_dir()?;
-    // `.git` is a directory in clones and a file in worktrees and submodules.
-    let Some(root) = cwd.ancestors().find(|dir| dir.join(".git").exists()) else {
-        bail!("not in a git checkout; use --flake or TEKA_APPS_FLAKE_ROOT")
-    };
-    let apps = root.join("apps");
-    if !apps.join("flake.nix").is_file() {
-        bail!(
-            "no apps/flake.nix in {}; use --flake or TEKA_APPS_FLAKE_ROOT",
-            root.display()
-        );
+    let device = cwd.metadata()?.dev();
+    for directory in cwd.ancestors() {
+        if directory.metadata()?.dev() != device {
+            break;
+        }
+        if directory.join("flake.nix").is_file() {
+            if let Some(names) = app_names(directory)? {
+                return Ok((directory.to_owned(), names));
+            }
+        }
+        if directory.join(".git").exists() {
+            break;
+        }
     }
-    Ok(apps.canonicalize()?)
+    bail!(
+        "no flake exporting teka.apps found from {}; use --flake or TEKA_APPS_FLAKE_ROOT",
+        cwd.display()
+    )
 }
 
 pub fn target_package(builder: &str, app: &str, target: &str) -> (String, String) {
