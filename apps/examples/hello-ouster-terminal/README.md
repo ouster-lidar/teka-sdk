@@ -5,17 +5,15 @@
 **Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/runtime-process.md) for lidar/IMU traffic.
 The manifest uses `backend.mode = none`; the host must support resource-only activation.
 
-## Build
+## Build and deploy
 
-`nix build .#hello-ouster-terminal` (cross attr for aarch64 from x86_64).
+```sh
+teka app deploy --build
+```
 
 ## Host
 
 **`X-Teka-PortableGPU=wayland`**, **`/run/opengl-driver`**, **`seatd`**. x86 hosts may need the portable GL extension to bind Mesa **`libLLVM`** store roots (see comments in `default.nix`).
-
-## Deploy
-
-Point viz at a sensor hostname/IP after attach. `teka app deploy --build hello-ouster-terminal --host http://HOST/`
 
 ## In-kiosk docs
 
@@ -40,5 +38,5 @@ The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that she
 
 ## Verify
 
-Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk.
+Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk, pointing it at the sensor hostname/IP.
 Override these ports and the lease range in `default.nix`.

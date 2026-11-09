@@ -17,20 +17,13 @@ Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slide
 | `/api/v1/app/hello-slidev/guest-access` | App backend: public GET, PUT requires principal |
 | `/api/v1/app/hello-slidev/deck/…` | App backend: allow when guest access is on **or** request has `X-MC-Principal-Id` |
 
-## Build
+## Build and deploy
 
-```bash
-cd apps
-nix build .#hello-slidev
+```sh
+teka app deploy --build
 ```
 
 Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the app image ships the `dist/` tree under `usr/lib/hello-slidev/deck/`. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`hello-slidev-cross-aarch64-linux`) do not compile Node on the target architecture.
-
-## Deploy
-
-```bash
-teka app deploy --build hello-slidev --host http://HOST/
-```
 
 ## Verify
 

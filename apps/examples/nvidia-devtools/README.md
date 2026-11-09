@@ -20,9 +20,6 @@ sudo nsys profile --pid <PID> --duration 30
 
 ## Build and deploy
 
-From `apps/`:
-
-```bash
-nix build .#nvidia-devtools-cross-aarch64-linux
-teka app deploy --build nvidia-devtools --host http://HOST/
+```sh
+teka app deploy --build
 ```

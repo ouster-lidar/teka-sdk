@@ -4,12 +4,10 @@ Firefox on Wayland using Sway. The default page is [a Babylon.js 3D tiles demo](
 
 Requires a Teka device with GPU integration and `seatd`. The SDK supplies the compositor launch, browser profile, certificate trust, and service policy.
 
-## Build
+## Build and deploy
 
-`nix build .#hello-firefox` (cross attr for ZBM when building on x86_64).
-
-## Deploy
-
-`teka app deploy --build hello-firefox --host http://HOST/`
+```sh
+teka app deploy --build
+```
 
 Verify that the browser opens the configured page and that local keyboard and mouse input work.

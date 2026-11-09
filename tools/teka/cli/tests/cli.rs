@@ -618,6 +618,82 @@ cat "$flake/app-names.json""#,
 }
 
 #[test]
+fn build_defaults_to_the_only_declared_app() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    script(
+        &d.path().join("bin/nix"),
+        &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
+    );
+    let output = cli(d.path()).args(["app", "build"]).output().unwrap();
+    success(&output);
+    assert_eq!(output.stdout, b"result/hello-world\n");
+    assert!(d.path().join("result/hello-world/app.tpk").is_file());
+}
+
+#[test]
+fn build_and_deploy_reject_ambiguous_or_invalid_discovered_apps() {
+    for command in ["build", "deploy"] {
+        for (names, reason) in [
+            ("[]", "no apps declared in teka.apps"),
+            ("[\"bad.name\"]", "invalid app id 'bad.name'"),
+            ("[\"app\",\"hello-world\"]", "specify an app explicitly"),
+        ] {
+            let d = TempDir::new().unwrap();
+            apps_flake(d.path());
+            script(
+                &d.path().join("bin/nix"),
+                &NIX_MOCK.replace("[\"app\",\"hello-world\"]", names),
+            );
+            let mut process = cli(d.path());
+            process.args(["app", command]);
+            if command == "deploy" {
+                process.args(["--host", "http://127.0.0.1:1"]);
+            }
+            let output = process.output().unwrap();
+            assert_eq!(output.status.code(), Some(1));
+            let stderr = String::from_utf8(output.stderr).unwrap();
+            assert!(stderr.contains(reason), "{stderr}");
+            assert!(!d.path().join("calls").exists());
+            assert!(!d.path().join("result").exists());
+        }
+    }
+}
+
+#[test]
+fn deploy_defaults_to_the_only_declared_app() {
+    for build in [false, true] {
+        let d = TempDir::new().unwrap();
+        apps_flake(d.path());
+        script(
+            &d.path().join("bin/nix"),
+            &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
+        );
+        if !build {
+            prebuilt_app(d.path(), "hello-world", Architecture::X86_64);
+        }
+        let (url, server) = serve(vec![
+            ("200 OK", r#"{"auth_disabled":true}"#),
+            ("200 OK", r#"{"architecture":"amd64"}"#),
+            ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+            ("200 OK", "hello world"),
+        ]);
+        let mut process = cli(d.path());
+        process.args(["app", "deploy", "--host", &url]);
+        if build {
+            process.arg("--build");
+        }
+        success(&process.output().unwrap());
+        let requests = server.join().unwrap();
+        assert_eq!(
+            requests[2].body,
+            fs::read(d.path().join("result/hello-world/app.tpk")).unwrap()
+        );
+        assert_eq!(d.path().join("calls").exists(), build);
+    }
+}
+
+#[test]
 fn build_prints_paths_and_lists_apps_without_a_device() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
@@ -854,7 +930,6 @@ fn cli_rejects_invalid_usage() {
             "0",
             "app",
         ],
-        vec!["app", "build"],
         vec!["app", "build", "hello-world", "--arch", "unknown"],
         vec!["package", "inspect", "x.tpk", "--trust", "dir"],
     ] {

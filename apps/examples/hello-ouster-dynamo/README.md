@@ -4,32 +4,25 @@
 
 An optional advanced companion to `hello-ouster-world`, illustrating multiple capabilities of the Ouster SDK and Teka. Visualize and interact with LiDAR data sourced from an .osf file on disk, a live LiDAR sensor on the network, or through the separately installed Ouster Dynamo app to detect and track objects. This app utilizes the Ouster SDK's SimpleViz to visualize LiDAR point clouds. The app window is displayed on the device's local monitor (e.g., hdmi out), and accepts mouse and keyboard input to interact with the visuals. It also transmits a live feed of the app window to the app's web interface's remote display. The web interface also accepts mouse and keyboard inputs to control the app remotely.
 
-## Build for Teka (Ouster Box Jetson)
+## Build and deploy
 
-```bash
-nix build .#hello-ouster-dynamo .#hello-ouster-dynamo-cross-aarch64-linux
+```sh
+teka app deploy --build
 ```
 
 The Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).
 
 ## Run on the device
 
-### 1. Deploy to device
-
-```bash
-export TEKA_PASSWORD='…'   # when the device requires authentication
-teka app deploy --build hello-ouster-dynamo --host http://HOST/
-```
-
-### 2a. Running on local-file OSF
+### Local OSF files
 
 In the Display panel, pick **Local file**, choose an OSF on the device or a Studio catalog example (fetched from the web on **Apply**), or **Upload** your own `.osf`. **Download** is a plain `GET /osfs/{name}` — the browser saves the streamed file. Apply.
 
-### 2b. Running with ouster-dynamo (optional)
+### Ouster Dynamo (optional)
 
 Install **Ouster Dynamo** on the device (proprietary app, separate from this repo). Turn **via ouster-dynamo** on, **Apply**. SimpleViz reads `/run/ouster-dynamo/frameset.sock`. Off: hello-ouster-dynamo opens the OSF or sensor itself.
 
-### 2c. Running on a live sensor
+### Live sensor
 
 Set source to **connected sensor**, enter hostname/IP, Apply.
 

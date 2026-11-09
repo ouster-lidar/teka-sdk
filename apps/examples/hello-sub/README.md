@@ -177,13 +177,12 @@ Static panel under `/app/hello-sub`:
 - Feed filter checkboxes (All + per publisher); selection persisted in `localStorage`
 - **Refresh peer state** (`POST /peer-state` for all)
 
-## Build / deploy
+## Build and deploy
 
-```bash
-cd apps
-nix build .#hello-sub
+```sh
+teka app deploy --build
 ```
 
-Deploy with `teka app deploy --build hello-sub --host http://HOST/` (and `hello-pub`). Open `/app/hello-sub` while hello-pub is running.
+Open `/app/hello-sub` while hello-pub is running.
 
 Remote example: on the publisher UI, copy the Publisher URL (browser origin + `/api/v1/app/hello-pub`), paste into hello-sub on the other box, Add + Apply.

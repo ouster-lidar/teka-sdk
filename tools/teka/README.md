@@ -53,7 +53,7 @@ teka system status --host http://device.local
 teka system update ./image.tpk --wait --host http://device.local
 ```
 
-`build` links `./result/<app>` at the requested images and prints those paths. `deploy APP…` uploads named apps from `./result`; adding `--build` builds those apps for the device architecture first.
+Omitted app names require exactly one `teka.apps` entry. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
 
 - `package pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
 - `package verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.

@@ -21,8 +21,8 @@ pub const RESULT: &str = "result";
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildOptions {
-    /// App IDs to build
-    #[arg(value_name = "APP", required = true)]
+    /// App IDs to build (default: the project's only app)
+    #[arg(value_name = "APP")]
     pub apps: Vec<String>,
     /// Architecture to build for
     #[arg(long, default_value = "aarch64", value_parser = ["x86_64", "aarch64", "amd64", "arm64"])]
@@ -55,34 +55,46 @@ pub fn validate_apps(apps: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn build_apps(source: &BuildSource, apps: &[String], target: &str) -> Result<Vec<PathBuf>> {
-    build_apps_for_targets(source, apps, &[target.to_owned()])?
-        .remove(target)
-        .context("build did not produce requested target")
+pub(crate) fn resolve_apps(
+    source: &BuildSource,
+    apps: &[String],
+) -> Result<(PathBuf, Vec<String>)> {
+    validate_apps(apps)?;
+    let (flake, known) = find_apps(source.flake.as_deref())?;
+    let apps = if apps.is_empty() {
+        validate_apps(&known)?;
+        match known.len() {
+            0 => bail!("no apps declared in teka.apps; declare an app before building or deploying"),
+            1 => (),
+            _ => bail!("multiple apps declared in teka.apps; specify an app explicitly; see `teka app list`"),
+        }
+        known
+    } else {
+        if let Some(app) = apps.iter().find(|app| !known.contains(app)) {
+            bail!("unknown app '{app}'; see `teka app list`");
+        }
+        apps.to_vec()
+    };
+    Ok((flake, apps))
 }
 
-pub fn build_apps_for_targets(
-    source: &BuildSource,
+pub(crate) fn build_targets(
+    flake: &Path,
     apps: &[String],
     targets: &[String],
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    validate_apps(apps)?;
     let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
     if targets.is_empty() {
         bail!("no device targets to build");
     }
     let multi_target = targets.len() > 1;
-    let (flake, known) = find_apps(source.flake.as_deref())?;
-    if let Some(app) = apps.iter().find(|app| !known.contains(app)) {
-        bail!("unknown app '{app}'; see `teka app list`");
-    }
     let builder = builder_system()?;
     let use_nom = std::io::stderr().is_terminal() && nom_available();
     let mut command = Command::new(if use_nom { "nom" } else { "nix" });
     command
         .args(["build", "--file", "-", "-L", "--out-link", RESULT])
         .args(["--no-write-lock-file", "--argstr", "flake"])
-        .arg(flake_reference(&flake)?);
+        .arg(flake_reference(flake)?);
     let expr = if !multi_target {
         result_expr(&builder, targets.first().unwrap(), apps)
     } else {
@@ -153,8 +165,9 @@ pub fn list(args: BuildSource) -> Result<()> {
 
 pub fn run(args: BuildOptions) -> Result<()> {
     let arch = normalize_arch(&args.arch)?;
-    build_apps(&args.source, &args.apps, &format!("{arch}-linux"))?;
-    for app in &args.apps {
+    let (flake, apps) = resolve_apps(&args.source, &args.apps)?;
+    build_targets(&flake, &apps, &[format!("{arch}-linux")])?;
+    for app in apps {
         println!("{RESULT}/{app}");
     }
     Ok(())

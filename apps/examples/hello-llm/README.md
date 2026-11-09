@@ -52,17 +52,10 @@ The erofs image does **not** embed model weights. Space trims:
 - Ollama prebuilt: ship `cuda_jetpack6` only (drop `cuda_v12` / `cuda_v13` from the base tarball)
 - Open WebUI rootfs: remove baked `app/backend/data/cache` and `__pycache__` (RAG bypassed at runtime)
 
-## Build
+## Build and deploy
 
-```bash
-cd apps
-nix build .#hello-llm-cross-aarch64-linux   # from x86_64 → ZED Box Mini
-```
-
-## Deploy
-
-```bash
-teka app deploy --build hello-llm --host http://HOST/
+```sh
+teka app deploy --build
 ```
 
 ## App UI

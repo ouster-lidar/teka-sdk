@@ -125,11 +125,10 @@ Static panel under `/app/hello-pub`:
 - Toggle generator and set interval 1–10s (`POST /generator`)
 - Live event list via `WS /events/stream` (or refetch on snapshot)
 
-## Build / deploy
+## Build and deploy
 
-```bash
-cd apps
-nix build .#hello-pub
+```sh
+teka app deploy --build
 ```
 
-Deploy with `teka app deploy --build hello-pub --host http://HOST/`. Open `/app/hello-pub`. Pair with `hello-sub` for the subscriber demo.
+Open `/app/hello-pub`. Pair with `hello-sub` for the subscriber demo.

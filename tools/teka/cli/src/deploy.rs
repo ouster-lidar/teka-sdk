@@ -26,8 +26,8 @@ pub struct DeployOptions {
         required = true
     )]
     pub hosts: Vec<String>,
-    /// App IDs from ./result, or prebuilt .tpk files
-    #[arg(value_name = "INPUT", required = true, num_args = 1..)]
+    /// App IDs from ./result, or prebuilt .tpk files (default: the project's only app)
+    #[arg(value_name = "INPUT")]
     pub apps: Vec<String>,
     /// Build apps for the device before deploying
     #[arg(long)]
@@ -292,13 +292,20 @@ fn deploy_targets(
     }
 }
 
-pub fn run(args: DeployOptions) -> Result<()> {
+pub fn run(mut args: DeployOptions) -> Result<()> {
     let has_files = args.apps.iter().any(|input| is_file_input(input));
     if has_files && (args.build || args.remove) {
         return Err(crate::plugins::usage(
             "file inputs cannot be used with --build or --remove",
         ));
     }
+    let flake = if args.apps.is_empty() {
+        let (flake, apps) = build::resolve_apps(&args.source, &args.apps)?;
+        args.apps = apps;
+        Some(flake)
+    } else {
+        None
+    };
     let apps = args
         .apps
         .iter()
@@ -317,11 +324,12 @@ pub fn run(args: DeployOptions) -> Result<()> {
         .map(|target| target.target.clone())
         .collect::<BTreeSet<_>>();
     let files = if args.build {
-        build::build_apps_for_targets(
-            &args.source,
-            &apps,
-            &target_arches.iter().cloned().collect::<Vec<_>>(),
-        )?
+        let architectures = target_arches.iter().cloned().collect::<Vec<_>>();
+        let flake = match flake {
+            Some(flake) => flake,
+            None => build::resolve_apps(&args.source, &apps)?.0,
+        };
+        build::build_targets(&flake, &apps, &architectures)?
     } else if apps.is_empty() {
         target_arches
             .iter()

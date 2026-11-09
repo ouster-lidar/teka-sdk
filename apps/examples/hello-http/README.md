@@ -5,13 +5,11 @@
 **Python 3** HTTP server app on **0.0.0.0:8000** returning a small HTML page.
 Teka proxies directly to this fixed listener and manages its TCP 8000 lease through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/runtime-process.md).
 
-## Build
+## Build and deploy
 
-`nix build .#hello-http` from `apps/`.
-
-## Deploy
-
-`teka app deploy --build hello-http --host http://HOST/` from `apps/`.
+```sh
+teka app deploy --build
+```
 
 ## Verify
 
