@@ -83,6 +83,7 @@ craneLib.buildPackage (
       ]
       ++ lib.optional portable removeReferencesTo;
     nativeCheckInputs = [
+      buildPackages.gitMinimal
       bashInteractive
       fish
       zsh

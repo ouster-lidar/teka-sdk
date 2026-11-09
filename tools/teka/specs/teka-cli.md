@@ -53,7 +53,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 - Select an example with `--example NAME`, using the catalog's default when omitted; `DIR` defaults to `.`. Share catalog discovery with `app list --examples`, accept the `default` alias, and reject unknown names before creating files.
 - Leverage Nix flake templates for selection, copying, and conflict handling instead of maintaining a separate initializer. Preserve example files, app IDs, and input declarations; skip identical files and report conflicts without overwriting them.
-- Lock declared dependencies, honoring any supplied lockfile. Refuse an existing destination lockfile. Initialization does not build the app.
+- Pin the generated `teka-sdk` input to the example provider, using committed HEAD for local Git sources and letting Nix record its revision and content hash. Preserve other dependency pins, including those in a supplied lockfile. Refuse an existing destination lockfile. Initialization does not build the app.
 - Reuse or initialize a Git repository and stage new files, including partial copies needed for retries. Preserve unrelated files, index entries, and existing project guidance; never commit. Add shared `AGENTS.md` guidance only when absent, referring to the app README and locked inputs.
 - Report one timed app result and subprocess diagnostics on stderr. After success, print `⚒︎ Build: cd … && teka app build` and `✈︎ Deploy: cd … && teka app deploy --build` with shell-quoted paths and text-presentation icons.
 

@@ -38,11 +38,19 @@ environment.systemPackages = [ pkgs.teka ]; # Home Manager: home.packages
 
 ## Use
 
+List the available examples and create an app:
+
+```sh
+teka app list --examples
+teka app init my-app
+```
+
+Use `--example NAME` to choose an example; otherwise, initialization uses the catalog's default. The directory defaults to `.`. Initialization preserves the example's app ID and reports conflicting files without overwriting them. SDK examples use the SDK revision that supplied them.
+
 For the SDK examples, work from `apps/`:
 
 ```sh
 teka app list
-teka app list --examples
 teka app build hello-world
 teka app deploy --host http://device.local hello-world hello-pub
 teka app deploy --host http://device.local --build hello-world hello-pub
@@ -54,9 +62,7 @@ teka system status --host http://device.local
 teka system update ./image.tpk --wait --host http://device.local
 ```
 
-`app list --examples` lists the selected flake's SDK example catalog; from an SDK checkout, it lists that checkout's catalog. Outside a project, it uses the exact SDK revision recorded in the CLI build. Unpinned development builds need an explicit SDK source.
-
-Omitted app names require exactly one `teka.apps` entry. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
+App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
 
 - `package pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
 - `package verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.
@@ -67,7 +73,7 @@ Omitted app names require exactly one `teka.apps` entry. `build` links packages 
 
 Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
-App builds, deployments, and normal listings search upward for the nearest `flake.nix` exporting `teka.apps`, stopping at the Git root or a filesystem boundary. Flakes without that output are skipped; evaluation errors stop discovery. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select a directory explicitly.
+App builds, deployments, and listings use the nearest app project. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select another project.
 
 Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 

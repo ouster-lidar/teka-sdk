@@ -1,3 +1,4 @@
+pub mod app_init;
 pub mod build;
 pub mod build_check;
 pub mod build_init;
@@ -50,7 +51,7 @@ Reload after updating Teka or plugins."#)]
         #[arg(value_enum)]
         shell: Option<completion::Shell>,
     },
-    /// Build, list, and deploy apps
+    /// Initialize, build, list, and deploy apps
     App {
         #[command(subcommand)]
         command: AppCommand,
@@ -66,6 +67,8 @@ Reload after updating Teka or plugins."#)]
 
 #[derive(Debug, Subcommand)]
 pub enum AppCommand {
+    /// Create a new Teka app project
+    Init(app_init::InitOptions),
     /// Build app images
     Build(build::BuildOptions),
     /// List available apps
@@ -85,6 +88,7 @@ pub fn run(command: Command) -> Result<()> {
         Command::Package { command } => package::run(command),
         Command::Completion { shell } => completion::run(shell),
         Command::App { command } => match command {
+            AppCommand::Init(args) => app_init::run(args),
             AppCommand::Deploy(args) => deploy::run(args),
             AppCommand::Build(args) => build::run(args),
             AppCommand::List(args) => build::list(args),

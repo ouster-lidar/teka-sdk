@@ -128,7 +128,19 @@ fn corrupt_package(path: &Path, member: usize) {
     fs::write(path, bytes).unwrap();
 }
 
-const NIX_MOCK: &str = r#"if [ "$1" = build ]; then
+const NIX_MOCK: &str = r#"if [ "$1 $2" = "flake metadata" ]; then
+    printf '{"url":"github:ouster-lidar/teka-sdk/0123456789012345678901234567890123456789"}'
+    exit
+fi
+if [ "$1 $2" = "flake new" ]; then
+    cp -R -- "$TEKA_MOCK_EXAMPLE_SOURCE/." "$6"
+    exit
+fi
+if [ "$1 $2" = "flake lock" ]; then
+    printf '{"nodes":{"root":{"inputs":{}}},"root":"root","version":7}\n' > flake.lock
+    exit
+fi
+if [ "$1" = build ]; then
     expr=$(cat)
     out=result
     prev=
@@ -179,7 +191,10 @@ EOF
 elif [ "$2" = --raw ]; then
     printf '%s' "${MOCK_SYSTEM:-x86_64-linux}"
 else
-    printf '["app","hello-world"]'
+    case "$*" in
+        *provider.templates*) printf '[false,["default","hello-world"]]' ;;
+        *) printf '["app","hello-world"]' ;;
+    esac
 fi"#;
 
 fn cli(dir: &Path) -> Command {
@@ -191,6 +206,7 @@ fn cli(dir: &Path) -> Command {
         .env("TEKA_POST_DEPLOY_SEC", "0")
         .env("TEKA_LOG_SEC", "2")
         .env("TEKA_MOCK_PACKAGES", dir.join("packages"))
+        .env("TEKA_MOCK_EXAMPLE_SOURCE", dir.join("example-source"))
         .env(
             "PATH",
             std::env::join_paths([dir.join("bin")].into_iter().chain(std::env::split_paths(
@@ -618,17 +634,57 @@ cat "$flake/app-names.json""#,
 }
 
 #[test]
-fn build_defaults_to_the_only_declared_app() {
-    let d = TempDir::new().unwrap();
-    apps_flake(d.path());
-    script(
-        &d.path().join("bin/nix"),
-        &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
-    );
-    let output = cli(d.path()).args(["app", "build"]).output().unwrap();
-    success(&output);
-    assert_eq!(output.stdout, b"result/hello-world\n");
-    assert!(d.path().join("result/hello-world/app.tpk").is_file());
+fn initialized_apps_build_without_names_or_flake_flags() {
+    for enclosing_repository in [false, true] {
+        let d = TempDir::new().unwrap();
+        apps_flake(d.path());
+        fs::create_dir(d.path().join("example-source")).unwrap();
+        fs::write(d.path().join("example-source/default.nix"), "{}").unwrap();
+        fs::write(d.path().join("example-source/flake.nix"), "{}").unwrap();
+        script(
+            &d.path().join("bin/nix"),
+            &NIX_MOCK
+                .replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]")
+                .replace("[false,", "[true,"),
+        );
+        fs::write(d.path().join("flake.nix"), "{}").unwrap();
+        if enclosing_repository {
+            let output = Command::new("git")
+                .arg("-C")
+                .arg(d.path())
+                .arg("init")
+                .output()
+                .unwrap();
+            success(&output);
+        }
+        success(
+            &cli(d.path())
+                .args(["app", "init", "projects with space/hello-world"])
+                .output()
+                .unwrap(),
+        );
+        let app = d.path().join("projects with space/hello-world");
+        assert_eq!(app.join(".git").exists(), !enclosing_repository);
+        let nested = app.join("src/nested");
+        fs::create_dir_all(&nested).unwrap();
+        for cwd in [&app, &nested] {
+            let output = cli(d.path())
+                .current_dir(cwd)
+                .args(["app", "build"])
+                .output()
+                .unwrap();
+            success(&output);
+            assert_eq!(output.stdout, b"result/hello-world\n");
+            assert!(cwd.join("result/hello-world/app.tpk").is_file());
+            let calls = fs::read_to_string(cwd.join("calls")).unwrap();
+            let dir = if enclosing_repository {
+                "projects%20with%20space%2Fhello-world"
+            } else {
+                ""
+            };
+            assert!(calls.contains(&format!("?dir={dir}\n")), "{calls}");
+        }
+    }
 }
 
 #[test]
@@ -727,15 +783,15 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
 }
 
 #[test]
-fn list_examples_selects_the_sdk_catalog() {
-    for examples in ["[\"hello-world\"]", "[]"] {
+fn list_examples_hides_only_the_default_alias() {
+    for examples in ["[\"default\",\"hello-world\"]", "[\"default\"]", "[]"] {
         let d = TempDir::new().unwrap();
         apps_flake(d.path());
         script(
             &d.path().join("bin/nix"),
             &format!(
                 r#"case "$*" in
-    *provider.templates*) printf '%s' '{examples}' ;;
+    *provider.templates*) printf '%s' '[false,{examples}]' ;;
     *) printf '%s' '["app","hello-world"]' ;;
 esac"#
             ),
@@ -747,10 +803,10 @@ esac"#
         success(&output);
         assert_eq!(
             output.stdout,
-            if examples == "[]" {
-                &b""[..]
-            } else {
+            if examples.contains("hello-world") {
                 &b"hello-world\n"[..]
+            } else {
+                &b""[..]
             }
         );
         let output = cli(d.path()).args(["app", "list"]).output().unwrap();
