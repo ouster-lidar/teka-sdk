@@ -4,7 +4,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ## CLI output conventions
 
-- Apply these conventions to `teka build`; other command groups retain their existing formats. Unknown-command errors omit internal plugin lookup details.
+- Apply these conventions to `teka build` and `teka app init`; other commands retain their existing formats. Unknown-command errors omit internal plugin lookup details.
 - Preserve existing icons. Print flat results and prompts without headings, indentation, or redundant final summaries. Use lowercase states and self-contained labels; reserve `→` for guidance and skipped checks.
 - Every `⏳︎` step ends with a success or failure result and actual elapsed seconds to one decimal. Already-completed work needs no wait or timing.
 - Failures identify the problem and return non-zero. Separate recovery guidance with a blank line. Failed builds print a timed result, a blank line, then complete captured logs unchanged; verbose logs stream without duplication.
@@ -26,8 +26,9 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 |---------|----------|
 | `teka build init` | Initialize Nix and install the portable CLI |
 | `teka build check [--full [--verbose]]` | Check host prerequisites; optionally compile an AArch64 Linux test |
-| `teka app build APP…` / `teka app list` | Build artifacts and print paths, or list apps; no device connection |
-| `teka app deploy [--build] [-H URL]… APP…` | Deploy the same apps to every host from `./result`, building for the device architectures first with `--build`; then verify startup logs |
+| `teka app init [--example NAME] [DIR]` | Create and stage a standalone app from an example |
+| `teka app build [APP…]` / `teka app list [--examples]` | Build artifacts and print paths, or list apps; no device connection |
+| `teka app deploy [--build] [-H URL]… [APP…]` | Deploy the same apps to every host from `./result`, building for the device architectures first with `--build`; then verify startup logs |
 | `teka package pack --manifest PATH --member NAME=FILE --private-key KEY --certificate CERT --output FILE [--zstd-level N]` | Finalize the Bao root and stored payload descriptors, sign the manifest, and atomically create a Bao-authenticated TPK package |
 | `teka package verify FILE --trust DIR` | Require trusted manifest, image, verity and UKI verification; print the verification report as JSON |
 | `teka package stream FILE_OR_HTTP_URL --trust DIR --member NAME [--offset N --size N]` | Authenticate accessed groups on disk or complete sequential HTTP transport; emit only verified logical bytes |
@@ -43,8 +44,18 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 - App uploads use `/api/v1/manager/install`, and authentication uses `/api/v1/auth/*`. Support setup and login; reject unsuccessful HTTP responses and login redirects.
 - Accept HTTP(S) URLs with ports and base paths. Use HTTPS when given; read the password from `TEKA_PASSWORD`; keep session cookies in memory.
 - Explicit `-H`/`--host` values override the single-host `TEKA_HOST` fallback. `deploy` fails with a usage error (exit 2) if neither is set; there is no default host. `system` commands accept one host.
-- `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system.
-- Apps-flake precedence is `--flake`, `TEKA_APPS_FLAKE_ROOT`, then `apps/flake.nix` at the root of the enclosing git checkout. An apps flake exports `teka.apps`, an attrset of per-app metadata keyed by app id; `teka app list` prints its names without forcing values. Builds reject apps missing from `teka.apps`, and unsupported targets fail at build time. Other teka flake data goes under `teka.<name>`. CLI-specific environment variables use `TEKA_*`.
+- `teka app build` takes `--arch <x86_64|aarch64>` (default `aarch64`; `amd64` and `arm64` are accepted aliases) and appends `-linux` to form the Nix system. For both `teka app build` and `teka app deploy`, infer an omitted app name only when the selected flake's `teka.apps` contains exactly one entry. Fail with guidance to select an app when the registry is empty or has multiple entries. Explicit names select only those apps. App discovery does not select a device; deployment still requires `--host` or `TEKA_HOST`.
+- Apps-flake precedence is `--flake`, `TEKA_APPS_FLAKE_ROOT`, then upward discovery from the current directory. Inspect each directory's `flake.nix` through Nix and select the nearest one exporting `teka.apps`. Continue past flakes without that output; never search child directories. Follow Nix's path-reference boundaries: stop at the Git root, filesystem root, or a different filesystem device. Explicit overrides select only the specified directory.
+- An apps flake exports `teka.apps`, an attrset of app definitions keyed by app id. Inspect names without forcing metadata values or writing lock files. Evaluation failures and invalid outputs are errors; only a missing output permits continuing upward. `teka app list` prints the names, including an empty list for an empty registry. Builds reject apps missing from `teka.apps`, and unsupported targets fail at build time. Other teka flake data goes under `teka.<name>`. CLI-specific environment variables use `TEKA_*`.
+- `teka app list --examples` uses the same directory overrides and discovery boundaries, preferring the project's own catalog before its SDK input. Print sorted names without evaluating app builds, hiding the `default` alias. Outside a project, use the catalog recorded in the CLI build; unpinned builds require an explicit source.
+
+## App initialization
+
+- Select an example with `--example NAME`, using the catalog's default when omitted; `DIR` defaults to `.`. Share catalog discovery with `app list --examples`, accept the `default` alias, and reject unknown names before creating files.
+- Leverage Nix flake templates for selection, copying, and conflict handling instead of maintaining a separate initializer. Preserve example files, app IDs, and input declarations; skip identical files and report conflicts without overwriting them.
+- Lock declared dependencies, honoring any supplied lockfile. Refuse an existing destination lockfile. Initialization does not build the app.
+- Reuse or initialize a Git repository and stage new files, including partial copies needed for retries. Preserve unrelated files, index entries, and existing project guidance; never commit. Add shared `AGENTS.md` guidance only when absent, referring to the app README and locked inputs.
+- Report one timed app result and subprocess diagnostics on stderr. After success, print `⚒︎ Build: cd … && teka app build` and `✈︎ Deploy: cd … && teka app deploy --build` with shell-quoted paths and text-presentation icons.
 
 ## Build environment
 
