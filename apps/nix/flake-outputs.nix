@@ -22,7 +22,9 @@ let
   inherit (version) appArtifactRawName imageVersion buildId;
 
   waylandCompositorsOverlay = import ./overlays/wayland-compositors-overlay.nix;
-  appPkgsFor = system: nixpkgs.legacyPackages.${system}.extend waylandCompositorsOverlay;
+  appPkgsFor =
+    system:
+    nixpkgs.legacyPackages.${system}.appendOverlays (appOverlays ++ [ waylandCompositorsOverlay ]);
 
   allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
   heavyCrossServices = lib.filter (n: !(lib.elem n simpleCrossServices)) allServiceNames;

@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "app-nixpkgs": {
+      "locked": {
+        "lastModified": 1783148766,
+        "narHash": "sha256-uslt2pqShTIXDdAHRHv2QkYLsVdY8Oqwz0EA48/RSM8=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "a50de1b7d8a586adc18d2395c19de7d6058e6030",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1792350552,
@@ -48,10 +64,29 @@
         "type": "github"
       }
     },
+    "ouster-sdk": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786660945,
+        "narHash": "sha256-tiytOySeS/uOzGPyFK6UjnOq5XaXWy5LK3wuEsZ/WN8=",
+        "owner": "ouster-lidar",
+        "repo": "ouster-sdk",
+        "rev": "46b7bceee7995914e2f3f3facf4d78418335b2d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ouster-lidar",
+        "ref": "v1.0.1",
+        "repo": "ouster-sdk",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
+        "app-nixpkgs": "app-nixpkgs",
         "crane": "crane",
         "nixpkgs": "nixpkgs",
+        "ouster-sdk": "ouster-sdk",
         "rustsecAdvisoryDb": "rustsecAdvisoryDb",
         "teka": "teka"
       }

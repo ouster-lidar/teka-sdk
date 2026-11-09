@@ -56,7 +56,6 @@
         import nixpkgs {
           inherit system;
           config.allowUnfree = true;
-          overlays = appOverlays;
         };
       systems = [
         "x86_64-linux"

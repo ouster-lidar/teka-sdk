@@ -218,6 +218,8 @@ let
         imageBuilder
         // wayland
         // {
+          appRuntime = pkgs.callPackage ./app-runtime.nix { };
+          mkFirefoxApp = args: pkgs.callPackage ./firefox/firefox-wayland-app.nix (args // { ps = psBase; });
           inherit
             hostGpuChecks
             ousterSdk
@@ -249,7 +251,8 @@ let
         }
       );
     in
-    psBase // {
+    psBase
+    // {
       inherit appCrate;
       inherit (version) imageVersion;
     };

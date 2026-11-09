@@ -24,7 +24,7 @@ Add the repository-root flake as an input, following your nixpkgs:
 
 ```nix
 inputs.teka = {
-  url = "git+ssh://git@<host>/<path>/teka-sdk";
+  url = "github:ouster-lidar/teka-sdk";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```

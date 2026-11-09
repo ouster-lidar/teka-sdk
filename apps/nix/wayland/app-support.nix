@@ -167,10 +167,9 @@ let
       SyslogIdentifier=${name}
       Restart=always
       RestartSec=3
-      StandardOutput=journal
-      StandardError=journal
       ${lib.optionalString useTty ''
         StandardInput=tty
+        StandardOutput=journal
         TTYPath=/dev/tty1
         TTYReset=true
         TTYVHangup=true

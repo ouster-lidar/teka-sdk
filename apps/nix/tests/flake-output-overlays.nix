@@ -14,7 +14,7 @@ let
     "aarch64-linux"
     "aarch64-darwin"
   ];
-  markerOverlay = _: _: { appOverlayMarker = "applied"; };
+  markerOverlay = _: prev: { appOverlayMarker = (prev.appOverlayMarker or 0) + 1; };
   outputsFor =
     simpleCrossServices:
     appLib.flakeOutputs {
@@ -24,17 +24,9 @@ let
         version
         tekaFor
         simpleCrossServices
+        nixpkgs
         ;
       appOverlays = [ markerOverlay ];
-      nixpkgs = nixpkgs // {
-        legacyPackages = lib.genAttrs systems (
-          system:
-          import nixpkgs {
-            inherit system;
-            overlays = [ markerOverlay ];
-          }
-        );
-      };
       services.overlay-probe =
         { pkgs, ... }:
         pkgs.runCommand "overlay-probe"
@@ -50,7 +42,7 @@ let
     lib.all (
       system:
       lib.all (
-        name: !(lib.hasSuffix "-tpk" name) && outputs.packages.${system}.${name}.image.marker == "applied"
+        name: !(lib.hasSuffix "-tpk" name) && outputs.packages.${system}.${name}.image.marker == 1
       ) (lib.filter (name: name != "default") (lib.attrNames outputs.packages.${system}))
     ) systems;
 in
