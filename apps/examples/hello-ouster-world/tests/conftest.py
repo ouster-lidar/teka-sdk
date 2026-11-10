@@ -23,7 +23,7 @@ def pytest_addoption(parser):
         "--skip-import", action="store_true", help="Use cached Studio samples"
     )
     group.addoption(
-        "--apps-flake", type=Path, help="Directory containing apps/flake.nix"
+        "--apps-flake", type=Path, help="App flake directory (default: current directory)"
     )
 
 
@@ -61,20 +61,7 @@ def app(browser, pytestconfig):
                 "Stop the configured recording first"
             )
         if not pytestconfig.getoption("skip_deploy"):
-            checkout = pytestconfig.getoption("apps_flake")
-            if checkout is None:
-                checkout = next(
-                    (
-                        p
-                        for parent in (Path.cwd(), *Path.cwd().parents)
-                        for p in (parent / "apps", parent)
-                        if (p / "examples/default.nix").is_file()
-                    ),
-                    None,
-                )
-            assert checkout and (checkout / "flake.nix").is_file(), (
-                "Use --apps-flake PATH"
-            )
+            checkout = pytestconfig.getoption("apps_flake") or Path.cwd()
             env = {"TEKA_POST_DEPLOY_SEC": "0", "TEKA_LOG_SEC": "2"} | os.environ
             subprocess.run(
                 [

@@ -1,42 +1,26 @@
 # hello-ouster-world
 
-`hello-ouster-world` is the direct Ouster SDK viewer. It opens OSF files or a network sensor with SimpleViz, displays on HDMI and in the browser, and can record live sensor frames to OSF. The separate [`hello-ouster-dynamo`](../hello-ouster-dynamo/README.md) app keeps the advanced workflow with optional Ouster Dynamo FrameSet input and overlays.
+`hello-ouster-world` is the direct Ouster SDK viewer. It opens OSF files or a network sensor with SimpleViz, displays on HDMI and in the browser, and can record live sensor frames to OSF. The separate [`hello-ouster-dynamo`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/examples/hello-ouster-dynamo/README.md) app keeps the advanced workflow with optional Ouster Dynamo FrameSet input and overlays.
 
 ## Build and deploy
 
-From `apps/`, build the native and Jetson packages:
-
 ```sh
-nix build .#hello-ouster-world
-nix build .#hello-ouster-world-cross-aarch64-linux
+teka app deploy --build
 ```
 
-Both outputs are signed `.tpk` packages containing EROFS DDI images. To build and deploy to an existing TekaOS host, run:
-
-```sh
-teka app deploy --build hello-ouster-world --host http://HOST/
-```
-
-Open `http://HOST/app/hello-ouster-world` to control the display. The tested native and cross images were built from revision `2be1287c02f934b298ea3324af8ee6a5cc26e577`:
-
-| Target | Flake output | DDI size |
-| --- | --- | ---: |
-| `x86_64-linux` (native) | `.#hello-ouster-world` | 743,849,984 bytes (709.39 MiB) |
-| `aarch64-linux` (cross) | `.#hello-ouster-world-cross-aarch64-linux` | 639,840,256 bytes (610.20 MiB) |
-
-The measured Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi.md`](../../specs/erofs-ddi.md).
+Open `http://HOST/app/hello-ouster-world` to control the display. The measured Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).
 
 ## Device tests
 
-From the repository root, build, deploy and test on a Teka device:
+From the app flake directory, build, deploy and test on a Teka device:
 
 ```sh
-nix run ./apps/examples/hello-ouster-world/tests#test-hello-ouster-world -- --host "$HOST"
+nix run .#test -- --host "$HOST"
 ```
 
-The standalone [`tests/`](tests/) flake pins Python, pytest, Playwright and Chromium. Set `TEKA_PASSWORD` when the device requires login. The tests invoke `teka app deploy` against the checkout's `apps/flake.nix`; pass `--apps-flake PATH` to the pytest runner when running outside the checkout.
+The [`tests/`](tests/) runner uses the app's locked SDK for its CLI, Python, pytest, Playwright, and Chromium. Set `TEKA_PASSWORD` when the device requires login. From the SDK checkout root, run `nix run ./apps/examples/hello-ouster-world#test --override-input teka-sdk . -- --host "$HOST" --apps-flake ./apps`.
 
-Tests are grouped into four modules:
+Device tests cover:
 
 | Module | Coverage |
 |--------|----------|
@@ -50,10 +34,10 @@ Pass `--sensor SENSOR_HOST` to enable discovery, recording and live-sensor check
 
 Run against an idle viewer. Tests refuse to interrupt an active or configured recording, restore settings at session teardown and remove their own device files. Studio import can download several gigabytes; `--skip-import` uses cached samples and skips sample-dependent tests if none are available. `--skip-deploy` uses the installed image.
 
-Standard pytest options work, including `-k discovery`, `-k recording`, `-k visualization`, `-k ui`, `--collect-only`, `--junitxml FILE`, `--output DIR`, and `--tracing on`. Failure screenshots and traces default to ignored `tmp/test-hello-ouster-world/` and contain device URLs. For example:
+Standard pytest options work, including `-k discovery`, `-k recording`, `-k visualization`, `-k ui`, `--collect-only`, `--junitxml FILE`, `--output DIR`, and `--tracing on`. Failure screenshots and traces default to `tmp/test-hello-ouster-world/` and contain device URLs. For example:
 
 ```sh
-nix run ./apps/examples/hello-ouster-world/tests -- --host "$HOST" --sensor "$SENSOR_HOST" --skip-deploy -k recording
+nix run .#test -- --host "$HOST" --sensor "$SENSOR_HOST" --skip-deploy -k recording
 ```
 
 ## Sources
@@ -158,4 +142,4 @@ flowchart LR
     VIZ -->|optional recording| REC[/srv/recordings]
 ```
 
-The app builds against the public Ouster SDK pinned in `apps/nix/ouster/ouster-sdk.nix`. It uses SDK `open_source` directly for sensor and OSF input.
+The app builds against the public Ouster SDK supplied by the pinned Teka SDK. It uses SDK `open_source` directly for sensor and OSF input.

@@ -1,0 +1,42 @@
+[Unit]
+Description=hello-ouster-world display (Sway + SimpleViz)
+Documentation=file:///usr/lib/teka/mission-control/manifest.json
+X-Teka-PortableGPU=wayland
+After=hello-ouster-world.service seatd.service
+Requires=hello-ouster-world.service
+Wants=seatd.service
+Conflicts=getty@tty1.service display-manager.service
+
+[Service]
+Type=simple
+User=root
+@serviceFragment@
+Environment=HELLO_OUSTER_WORLD_VIZ=@runLoop@
+Environment=HELLO_OUSTER_WORLD_PATH=@clientPath@
+Environment=HELLO_OUSTER_WORLD_XDG_RUNTIME_DIR=/run/hello-ouster-world
+Environment=HELLO_OUSTER_WORLD_WAYLAND_DISPLAY=wayland-1
+Environment=HELLO_OUSTER_WORLD_SWAYMSG=@swaymsg@
+Environment=HELLO_OUSTER_WORLD_WTYPE=@wtype@
+Environment=HELLO_OUSTER_WORLD_CONSOLE_LOG=/run/hello-ouster-world/console.log
+Environment=MC_SENSORS_APP_ID=sensors
+Environment=STATE_DIRECTORY=/var/lib/hello-ouster-world
+Environment=APP_ID=hello-ouster-world
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+ExecStart=@runLoop@
+SyslogIdentifier=hello-ouster-world-display
+Restart=always
+RestartSec=3
+@hostEtcBindPaths@
+BindReadOnlyPaths=-/run/seatd.sock
+# Bind the parent so the app can create /srv/recordings.
+BindPaths=/srv
+RuntimeDirectory=hello-ouster-world
+RuntimeDirectoryMode=0700
+StateDirectory=hello-ouster-world
+StateDirectoryMode=0750
+SupplementaryGroups=tty seat
+KillMode=mixed
+TimeoutStopSec=15
+
+[Install]
+WantedBy=teka-apps.target

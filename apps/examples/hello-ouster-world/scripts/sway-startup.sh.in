@@ -1,0 +1,62 @@
+#!@runtimeShell@
+set -euo pipefail
+
+# Ensure a persistent HEADLESS output (browser/home canvas).
+for _ in $(seq 1 50); do
+  outputs="$(swaymsg -t get_outputs 2>/dev/null || true)"
+  if [[ "$outputs" == *HEADLESS* ]]; then
+    break
+  fi
+  swaymsg create_output >/dev/null 2>&1 || true
+  sleep 0.1
+done
+
+headless_name="$(
+  swaymsg -t get_outputs 2>/dev/null |
+    sed -n 's/.*"name": "\(HEADLESS[^"]*\)".*/\1/p' |
+    head -n1
+)"
+if [[ -n "$headless_name" ]]; then
+  swaymsg output "$headless_name" enable >/dev/null 2>&1 || true
+  swaymsg output "$headless_name" resolution 1920x1080 >/dev/null 2>&1 || true
+  echo "hello-ouster-world: headless home output=$headless_name" >&2
+else
+  echo "hello-ouster-world: WARNING no HEADLESS output after create_output" >&2
+fi
+
+for _ in $(seq 1 100); do
+  outputs="$(swaymsg -t get_outputs 2>/dev/null || true)"
+  if [[ "$outputs" == *HEADLESS* && "$outputs" == *'"active": true'* ]]; then
+    break
+  fi
+  sleep 0.2
+done
+
+phys_name="$(
+  swaymsg -t get_outputs 2>/dev/null | @pythonEnv@/bin/python3 -c '
+import json, sys
+try:
+    outs = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for o in outs:
+    n = o.get("name") or ""
+    if o.get("active") and not str(n).startswith("HEADLESS"):
+        print(n)
+        break
+' || true
+)"
+if [[ -n "$phys_name" ]]; then
+  swaymsg focus output "$phys_name" >/dev/null 2>&1 || true
+  echo "hello-ouster-world: focus physical output=$phys_name for SimpleViz" >&2
+else
+  swaymsg workspace 1 >/dev/null 2>&1 || true
+fi
+sleep 0.5
+
+echo "hello-ouster-world: launching SimpleViz (GLFW Wayland)" >&2
+while true; do
+  @vizCmd@ || true
+  echo "hello-ouster-world: display process exited; restarting in 2s" >&2
+  sleep 2
+done

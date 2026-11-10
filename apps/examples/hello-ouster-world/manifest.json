@@ -1,0 +1,66 @@
+{
+  "id": "hello-ouster-world",
+  "version": "@imageVersion@",
+  "display_name": "hello-ouster-world",
+  "nav": {
+    "label": "hello-ouster-world",
+    "path": "/app/hello-ouster-world",
+    "section": "apps",
+    "order": 20,
+    "panels": [
+      {
+        "label": "Display",
+        "panel": "display"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "hello-ouster-world",
+    "template": "display.html",
+    "styles": [
+      "display.css",
+      "xterm.css"
+    ],
+    "anonymous": true
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/status",
+    "card_stream_path": "/api/v1/cards/stream"
+  },
+  "registers": [
+    {
+      "alias": "hello-ouster-world",
+      "panel": "display"
+    }
+  ],
+  "app_cards": [
+    {
+      "card_id": "hello-ouster-world",
+      "title": "Hello Ouster World",
+      "description": "Direct Ouster sensor and OSF viewer",
+      "icon": "📡",
+      "link_alias": "hello-ouster-world"
+    }
+  ],
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  },
+  "ports": [
+    {
+      "port": 7502,
+      "proto": "udp"
+    },
+    {
+      "port": 7503,
+      "proto": "udp"
+    }
+  ],
+  "portable": {
+    "displayService": true,
+    "gpu": "wayland"
+  }
+}
