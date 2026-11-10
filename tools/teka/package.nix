@@ -27,6 +27,7 @@ let
         path: type:
         craneLib.filterCargoSources path type
         || lib.hasSuffix "/src/build_vm.nix" path
+        || lib.hasSuffix "/src/build_vm_network.swift" path
         || lib.hasSuffix "/flake.lock" path;
     };
     strictDeps = true;

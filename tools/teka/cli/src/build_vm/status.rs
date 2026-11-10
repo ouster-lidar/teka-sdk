@@ -394,7 +394,10 @@ impl Vm {
             false
         };
         if !internet {
-            note("A VPN may block the VM's NAT traffic or DNS; disconnect it and retry, or allow VM traffic in the VPN settings");
+            note(format!(
+                "Check host internet access and the VM log: {}",
+                display_path(&self.root.join("vm.log"))
+            ));
         }
         internet
     }

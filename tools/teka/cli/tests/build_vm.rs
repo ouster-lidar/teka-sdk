@@ -855,7 +855,7 @@ fn check_reports_guest_dns_and_https_failures_with_vpn_guidance() {
         &report,
         "✗ Guest DNS:
 → Guest internet (HTTPS): skipped (DNS failed)
-A VPN may block the VM's NAT traffic or DNS
+Check host internet access and the VM log
 ✓ Guest memory:",
     );
     assert_eq!(host.read("network-calls"), "dns\n");
@@ -878,7 +878,7 @@ A VPN may block the VM's NAT traffic or DNS
             &report,
             "✓ Guest DNS:
 ✗ Guest internet (HTTPS):
-A VPN may block the VM's NAT traffic or DNS
+Check host internet access and the VM log
 ✓ Guest memory:",
         );
         contains(&report, error);

@@ -34,8 +34,9 @@ pub fn runtime_expression(idle_timeout: u32) -> Result<String> {
         idle_timeout.to_string()
     };
     Ok(format!(
-        "({}) {{ nixpkgsRev = \"{revision}\"; nixpkgsUnstableRev = \"{unstable}\"; idleTimeout = {idle_timeout}; }}",
-        include_str!("build_vm.nix")
+        "({}) {{ nixpkgsRev = \"{revision}\"; nixpkgsUnstableRev = \"{unstable}\"; idleTimeout = {idle_timeout}; networkSource = ''\n{}\n''; }}",
+        include_str!("build_vm.nix"),
+        include_str!("build_vm_network.swift")
     ))
 }
 
