@@ -26,6 +26,7 @@
         pkgs: portable:
         pkgs.callPackage ./package.nix {
           inherit portable;
+          sdkRef = if self ? rev then "github:ouster-lidar/teka-sdk/${self.rev}" else null;
           nixpkgsRev = nixpkgs.rev;
           nixpkgsUnstableRev = nixpkgs-unstable.rev;
           craneLib = crane.mkLib pkgs;

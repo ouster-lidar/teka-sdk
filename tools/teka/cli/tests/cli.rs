@@ -727,6 +727,40 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
 }
 
 #[test]
+fn list_examples_selects_the_sdk_catalog() {
+    for examples in ["[\"hello-world\"]", "[]"] {
+        let d = TempDir::new().unwrap();
+        apps_flake(d.path());
+        script(
+            &d.path().join("bin/nix"),
+            &format!(
+                r#"case "$*" in
+    *provider.templates*) printf '%s' '{examples}' ;;
+    *) printf '%s' '["app","hello-world"]' ;;
+esac"#
+            ),
+        );
+        let output = cli(d.path())
+            .args(["app", "list", "--examples"])
+            .output()
+            .unwrap();
+        success(&output);
+        assert_eq!(
+            output.stdout,
+            if examples == "[]" {
+                &b""[..]
+            } else {
+                &b"hello-world\n"[..]
+            }
+        );
+        let output = cli(d.path()).args(["app", "list"]).output().unwrap();
+        success(&output);
+        assert_eq!(output.stdout, b"app\nhello-world\n");
+        assert!(!d.path().join("calls").exists());
+    }
+}
+
+#[test]
 fn build_rejects_apps_missing_from_teka_apps() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());

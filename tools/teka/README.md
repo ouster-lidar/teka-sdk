@@ -42,6 +42,7 @@ For the SDK examples, work from `apps/`:
 
 ```sh
 teka app list
+teka app list --examples
 teka app build hello-world
 teka app deploy --host http://device.local hello-world hello-pub
 teka app deploy --host http://device.local --build hello-world hello-pub
@@ -52,6 +53,8 @@ teka package stream hello-world.tpk --trust ./trust --member hello-world.raw > h
 teka system status --host http://device.local
 teka system update ./image.tpk --wait --host http://device.local
 ```
+
+`app list --examples` lists the selected flake's SDK example catalog; from an SDK checkout, it lists that checkout's catalog. Outside a project, it uses the exact SDK revision recorded in the CLI build. Unpinned development builds need an explicit SDK source.
 
 Omitted app names require exactly one `teka.apps` entry. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
 
@@ -64,7 +67,7 @@ Omitted app names require exactly one `teka.apps` entry. `build` links packages 
 
 Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
-App commands search upward for the nearest `flake.nix` exporting `teka.apps`, stopping at the Git root or a filesystem boundary. Flakes without that output are skipped; evaluation errors stop discovery. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select a directory explicitly.
+App builds, deployments, and normal listings search upward for the nearest `flake.nix` exporting `teka.apps`, stopping at the Git root or a filesystem boundary. Flakes without that output are skipped; evaluation errors stop discovery. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select a directory explicitly.
 
 Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 

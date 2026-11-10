@@ -12,6 +12,7 @@
   pkg-config,
   removeReferencesTo,
   portable ? false,
+  sdkRef ? null,
   nixpkgsRev ? (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked.rev,
   nixpkgsUnstableRev ?
     (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs-unstable.locked.rev,
@@ -74,6 +75,7 @@ craneLib.buildPackage (
   common
   // {
     inherit cargoArtifacts;
+    TEKA_SDK_REF = sdkRef;
     nativeBuildInputs =
       common.nativeBuildInputs
       ++ [

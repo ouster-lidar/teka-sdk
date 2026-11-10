@@ -11,9 +11,18 @@ use std::{
 
 #[derive(Clone, Debug, Args)]
 pub struct BuildSource {
-    /// Apps flake directory (default: discover from the current directory)
+    /// Flake directory (default: discover from the current directory)
     #[arg(long, env = "TEKA_APPS_FLAKE_ROOT", value_hint = clap::ValueHint::DirPath)]
     pub flake: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
+pub struct ListOptions {
+    /// List available examples
+    #[arg(long)]
+    pub examples: bool,
+    #[command(flatten)]
+    pub source: BuildSource,
 }
 
 /// Out-link for the linkFarm of requested apps.
@@ -55,12 +64,9 @@ pub fn validate_apps(apps: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn resolve_apps(
-    source: &BuildSource,
-    apps: &[String],
-) -> Result<(PathBuf, Vec<String>)> {
+pub(crate) fn resolve_apps(source: &BuildSource, apps: &[String]) -> Result<(String, Vec<String>)> {
     validate_apps(apps)?;
-    let (flake, known) = find_apps(source.flake.as_deref())?;
+    let (flake, known) = find_apps(source.flake.as_deref(), false)?;
     let apps = if apps.is_empty() {
         validate_apps(&known)?;
         match known.len() {
@@ -79,7 +85,7 @@ pub(crate) fn resolve_apps(
 }
 
 pub(crate) fn build_targets(
-    flake: &Path,
+    flake: &str,
     apps: &[String],
     targets: &[String],
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
@@ -94,7 +100,7 @@ pub(crate) fn build_targets(
     command
         .args(["build", "--file", "-", "-L", "--out-link", RESULT])
         .args(["--no-write-lock-file", "--argstr", "flake"])
-        .arg(flake_reference(flake)?);
+        .arg(flake);
     let expr = if !multi_target {
         result_expr(&builder, targets.first().unwrap(), apps)
     } else {
@@ -124,18 +130,32 @@ pub fn package_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
         .collect()
 }
 
-fn app_names(flake: &Path) -> Result<Option<Vec<String>>> {
-    let output = checked_output(Command::new("nix").args([
-        "eval",
-        &format!("{}#.", flake_reference(flake)?),
-        "--json",
-        "--no-write-lock-file",
-        "--apply",
-        "flake: if flake ? teka.apps then builtins.attrNames flake.teka.apps else null",
-    ]))
-    .with_context(|| format!("read teka.apps from {}", flake.display()))?;
-    serde_json::from_str(&output)
-        .with_context(|| format!("invalid app names from {}", flake.display()))
+fn app_names(reference: &str, examples: bool) -> Result<Option<Vec<String>>> {
+    let registry = if examples { "templates" } else { "teka.apps" };
+    let mut command = Command::new("nix");
+    command.arg("eval");
+    if examples {
+        // Nix strings also interpret interpolation, unlike JSON strings.
+        let reference = serde_json::to_string(reference)?.replace("${", "\\${");
+        command.args(["--impure", "--expr"]).arg(format!(
+            "let flake = builtins.getFlake {reference}; provider = if flake ? templates then flake else flake.inputs.teka-sdk or {{}}; in if provider ? templates then builtins.attrNames (builtins.removeAttrs provider.templates [ \"default\" ]) else null"
+        ));
+    } else {
+        command.arg(format!("{reference}#.")).args([
+            "--apply",
+            "flake: if flake ? teka.apps then builtins.attrNames flake.teka.apps else null",
+        ]);
+    }
+    command.args(["--json", "--no-write-lock-file"]);
+    let output = checked_output(&mut command)
+        .with_context(|| format!("read {registry} from {reference}"))?;
+    serde_json::from_str(&output).with_context(|| format!("invalid app names from {reference}"))
+}
+
+fn default_sdk_reference() -> Result<&'static str> {
+    option_env!("TEKA_SDK_REF")
+        .filter(|reference| !reference.is_empty())
+        .context("this build has no pinned SDK; use --flake or TEKA_APPS_FLAKE_ROOT with a tested SDK checkout")
 }
 
 fn flake_reference(flake: &Path) -> Result<String> {
@@ -154,9 +174,8 @@ fn flake_reference(flake: &Path) -> Result<String> {
     Ok(url.into())
 }
 
-pub fn list(args: BuildSource) -> Result<()> {
-    let (_, mut names) = find_apps(args.flake.as_deref())?;
-    names.sort();
+pub fn list(args: ListOptions) -> Result<()> {
+    let (_, names) = find_apps(args.source.flake.as_deref(), args.examples)?;
     for name in names {
         println!("{name}");
     }
@@ -173,15 +192,17 @@ pub fn run(args: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-fn find_apps(explicit: Option<&Path>) -> Result<(PathBuf, Vec<String>)> {
+fn find_apps(explicit: Option<&Path>, examples: bool) -> Result<(String, Vec<String>)> {
+    let registry = if examples { "templates" } else { "teka.apps" };
     if let Some(path) = explicit {
         if !path.join("flake.nix").is_file() {
             bail!("no flake.nix in {}", path.display());
         }
         let path = path.canonicalize()?;
-        let names = app_names(&path)?
-            .with_context(|| format!("no teka.apps output in {}", path.display()))?;
-        return Ok((path, names));
+        let reference = flake_reference(&path)?;
+        let names = app_names(&reference, examples)?
+            .with_context(|| format!("no {registry} output in {}", path.display()))?;
+        return Ok((reference, names));
     }
     let cwd = std::env::current_dir()?;
     let device = cwd.metadata()?.dev();
@@ -190,16 +211,22 @@ fn find_apps(explicit: Option<&Path>) -> Result<(PathBuf, Vec<String>)> {
             break;
         }
         if directory.join("flake.nix").is_file() {
-            if let Some(names) = app_names(directory)? {
-                return Ok((directory.to_owned(), names));
+            let reference = flake_reference(directory)?;
+            if let Some(names) = app_names(&reference, examples)? {
+                return Ok((reference, names));
             }
         }
         if directory.join(".git").exists() {
             break;
         }
     }
+    if examples {
+        let reference = default_sdk_reference()?;
+        let names = app_names(reference, true)?.context("SDK has no templates output")?;
+        return Ok((reference.to_owned(), names));
+    }
     bail!(
-        "no flake exporting teka.apps found from {}; use --flake or TEKA_APPS_FLAKE_ROOT",
+        "no flake exporting {registry} found from {}; use --flake or TEKA_APPS_FLAKE_ROOT",
         cwd.display()
     )
 }
