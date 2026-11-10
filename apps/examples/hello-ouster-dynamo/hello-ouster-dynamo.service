@@ -1,0 +1,46 @@
+[Unit]
+Description=hello-ouster-dynamo (MC Console/Display API)
+Documentation=file:///usr/lib/teka/mission-control/manifest.json
+# Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
+# Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.
+X-Teka-PortableGPU=cuda
+After=mission-control.service systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
+Wants=network-online.target time-sync.target seatd.service
+@appBackendUnitLines@
+
+[Service]
+@appNotifyServiceLines@
+User=root
+@serviceFragment@
+Environment=HELLO_OUSTER_DYNAMO_VIZ=@runLoop@
+Environment=HELLO_OUSTER_DYNAMO_SHELL=@bash@/bin/bash
+Environment=HELLO_OUSTER_DYNAMO_CWD=/var/lib/hello-ouster-dynamo
+Environment=HELLO_OUSTER_DYNAMO_PATH=@clientPath@
+Environment=HELLO_OUSTER_DYNAMO_XDG_RUNTIME_DIR=/run/hello-ouster-dynamo
+Environment=HELLO_OUSTER_DYNAMO_WAYLAND_DISPLAY=wayland-1
+Environment=HELLO_OUSTER_DYNAMO_SWAYMSG=@sway@/bin/swaymsg
+Environment=HELLO_OUSTER_DYNAMO_WTYPE=@wtype@
+Environment=HELLO_OUSTER_DYNAMO_CONSOLE_LOG=/run/hello-ouster-dynamo/console.log
+Environment=STATE_DIRECTORY=/var/lib/hello-ouster-dynamo
+Environment=APP_ID=hello-ouster-dynamo
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+Environment=RUST_LOG=info
+ExecStart=@dynamoApiCmd@
+SyslogIdentifier=hello-ouster-dynamo
+Restart=always
+RestartSec=3
+PrivateDevices=no
+SupplementaryGroups=tty seat video render
+@hostEtcBindPaths@
+BindReadOnlyPaths=-/run/seatd.sock
+BindPaths=-/run/ouster-dynamo
+# Bind the parent so the app can create /srv/recordings.
+BindPaths=/srv
+RuntimeDirectory=hello-ouster-dynamo
+RuntimeDirectoryMode=0700
+StateDirectory=hello-ouster-dynamo
+StateDirectoryMode=0750
+@appBackendServiceLines@
+
+[Install]
+WantedBy=teka-apps.target

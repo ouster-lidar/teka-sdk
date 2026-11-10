@@ -1,0 +1,30 @@
+{
+  "id": "hello-http",
+  "version": "@imageVersion@",
+  "display_name": "Hello HTTP",
+  "nav": {
+    "label": "Hello HTTP",
+    "path": "/app/hello-http",
+    "section": "apps",
+    "order": 10,
+    "panels": [
+      {
+        "label": "Hello HTTP",
+        "panel": "hello-http"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello HTTP",
+    "template": "hello-http.html"
+  },
+  "backend": {
+    "mode": "proxy",
+    "upstream": "http://127.0.0.1:@port@"
+  },
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

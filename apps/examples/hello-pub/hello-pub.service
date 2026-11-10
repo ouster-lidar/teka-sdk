@@ -1,0 +1,22 @@
+[Unit]
+Description=hello-pub (Teka hello pub-sub publisher demo)
+Documentation=file:///usr/lib/teka/mission-control/manifest.json
+After=mission-control.service network.target
+@appBackendUnitLines@
+Wants=network.target
+
+[Service]
+@appNotifyServiceLines@
+ProtectSystem=no
+ProtectHome=no
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+Environment=APP_ID=hello-pub
+Environment=PATH=@binPath@
+@appBackendServiceLines@
+@serviceFragment@
+ExecStart=@program@
+SyslogIdentifier=hello-pub
+Restart=on-failure
+
+[Install]
+WantedBy=teka-apps.target

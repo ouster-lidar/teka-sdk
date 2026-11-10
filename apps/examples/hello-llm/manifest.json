@@ -1,0 +1,32 @@
+{
+  "id": "hello-llm",
+  "version": "@imageVersion@",
+  "display_name": "Hello LLM",
+  "nav": {
+    "label": "Hello LLM",
+    "path": "/app/hello-llm",
+    "section": "apps",
+    "order": 17,
+    "panels": [
+      {
+        "label": "Guide",
+        "panel": "hello-llm"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello LLM",
+    "template": "hello-llm.html",
+    "styles": [
+      "hello-llm.css"
+    ]
+  },
+  "backend": {
+    "mode": "none"
+  },
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

@@ -1,0 +1,32 @@
+[Unit]
+Description=NVIDIA DevTools app (sshd :@sshPort@)
+X-Teka-PortableGPU=cuda
+After=network.target mission-control.service
+Wants=network.target
+@appBackendUnitLines@
+
+[Service]
+@appNotifyServiceLines@
+PrivateNetwork=no
+ProtectSystem=no
+ProtectHome=no
+PrivateDevices=no
+NoNewPrivileges=no
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_CHROOT CAP_NET_RAW CAP_NET_ADMIN CAP_SETUID CAP_SETGID CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_KILL CAP_SYS_PTRACE
+StateDirectory=nvidia-devtools
+StateDirectoryMode=0750
+Environment=APP_ID=nvidia-devtools
+Environment=PATH=@devBinPath@
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+@appBackendServiceLines@
+@serviceFragment@
+SupplementaryGroups=video render
+BindReadOnlyPaths=-/run/systemd/resolve:/run/systemd/resolve
+ExecStart=@program@
+SyslogIdentifier=nvidia-devtools
+Restart=on-failure
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=teka-apps.target

@@ -1,0 +1,5 @@
+# shellcheck source=/dev/null
+. /etc/profile.d/zz-nvidia-devtools-binpath.sh
+. /usr/lib/nvidia-devtools/dev-env.sh
+case $- in *i*) ;; *) return ;; esac
+[[ -f /etc/bash.bashrc ]] && . /etc/bash.bashrc

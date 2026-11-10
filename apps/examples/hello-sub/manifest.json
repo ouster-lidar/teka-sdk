@@ -1,0 +1,50 @@
+{
+  "id": "hello-sub",
+  "version": "@imageVersion@",
+  "display_name": "Hello Subscriber",
+  "nav": {
+    "label": "Hello Sub",
+    "path": "/app/hello-sub",
+    "section": "apps",
+    "order": 41,
+    "panels": [
+      {
+        "label": "Subscriber",
+        "panel": "hello-sub"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello Subscriber",
+    "template": "index.html",
+    "styles": [
+      "hello-sub.css"
+    ]
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/status",
+    "card_stream_path": "/api/v1/cards/stream"
+  },
+  "registers": [
+    {
+      "alias": "hello-sub",
+      "panel": "hello-sub"
+    }
+  ],
+  "app_cards": [
+    {
+      "card_id": "hello-sub",
+      "title": "Hello Sub",
+      "description": "Demo event subscriber",
+      "icon": "📥",
+      "link_alias": "hello-sub"
+    }
+  ],
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

@@ -122,7 +122,7 @@
     appOutputs
     // {
       packages = infraPackages;
-      teka.apps = nixpkgs.lib.mapAttrs (_: _: { }) services;
+      teka.apps = exampleApps.apps;
       devShells = nixpkgs.lib.genAttrs systems (system: {
         default = nixpkgs.legacyPackages.${system}.mkShell {
           packages = [ teka.packages.${system}.teka ];

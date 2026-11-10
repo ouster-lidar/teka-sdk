@@ -2,7 +2,7 @@
 
 ## Goal
 
-**Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](../../lib/app-runtime/runtime-process.md) for lidar/IMU traffic.
+**Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/runtime-process.md) for lidar/IMU traffic.
 The manifest uses `backend.mode = none`; the host must support resource-only activation.
 
 ## Build
@@ -41,4 +41,4 @@ The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that she
 ## Verify
 
 Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk.
-Override these ports and the lease range in the local `ouster-app-common.nix` import.
+Override these ports and the lease range in `default.nix`.

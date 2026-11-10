@@ -49,6 +49,7 @@
         default = packages.teka;
       }) teka.packages;
       inherit (teka) apps checks overlays;
+      templates = (import ./apps/examples { lib = app-nixpkgs.lib; }).templates;
       devShells = nixpkgs.lib.genAttrs (builtins.attrNames teka.packages) (
         system:
         let

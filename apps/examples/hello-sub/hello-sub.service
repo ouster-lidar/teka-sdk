@@ -1,0 +1,25 @@
+[Unit]
+Description=hello-sub (Teka hello pub-sub subscriber demo)
+Documentation=file:///usr/lib/teka/mission-control/manifest.json
+After=mission-control.service network.target
+@appBackendUnitLines@
+Wants=network.target
+
+[Service]
+@appNotifyServiceLines@
+ProtectSystem=no
+ProtectHome=no
+StateDirectory=hello-sub
+StateDirectoryMode=0750
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+Environment=APP_ID=hello-sub
+Environment=MC_HELLO_PUB_APP_ID=hello-pub
+Environment=PATH=@binPath@
+@appBackendServiceLines@
+@serviceFragment@
+ExecStart=@program@
+SyslogIdentifier=hello-sub
+Restart=on-failure
+
+[Install]
+WantedBy=teka-apps.target

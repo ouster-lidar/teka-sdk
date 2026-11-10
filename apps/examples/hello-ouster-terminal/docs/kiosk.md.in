@@ -1,0 +1,31 @@
+# hello-ouster-terminal
+
+Sway + foot kiosk demo with lidar viz via ouster-cli.
+
+## Network
+
+- UDP @ousterUdpFirewallRange@ leased from Teka for the kiosk lifetime.
+- Point the sensor at this host (ports +100 vs appliance defaults 7502–7504):
+  - Lidar @ousterLidarDataPort@/udp
+  - IMU @ousterImuDataPort@/udp
+
+## Docs
+
+More in ~/docs (bat -p FILE), e.g.:
+
+- `bat -p sway.md`
+- `bat -p viz.md`
+
+Common shell utilities (ls, cat, grep, cp, …) are busybox on PATH.
+
+## Debug shell
+
+From the host as root, attach to the service mount namespace and run bash.
+/bin in the DDI has bash and busybox applets (ls, …):
+
+    systemd-run -tp JoinsNamespaceOf=hello-ouster-terminal.service bash
+
+## Sway key bindings
+
+- Super+Shift+Enter — new terminal
+- Super+F — fullscreen

@@ -1,0 +1,57 @@
+#!@runtimeShell@
+set -euo pipefail
+mkdir=@coreutils@/bin/mkdir
+chmod=@coreutils@/bin/chmod
+chown=@coreutils@/bin/chown
+cp=@coreutils@/bin/cp
+mount=@utilLinuxMount@/bin/mount
+dev_root="${STATE_DIRECTORY:-/var/lib/nvidia-devtools}"
+etc_dir="$dev_root/etc"
+dev_shell=/bin/bash
+"$mkdir" -p "$dev_root"/{sshd-home,ssh,etc}
+"$chmod" 0755 "$dev_root"
+"$chmod" 0700 "$dev_root/sshd-home" 2>/dev/null || true
+
+# Empty until a public key is pasted in the app UI. Do not seed a
+# bundled pubkey — that would be a shared login on every deploy.
+init_empty_keys() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    : >"$file"
+    "$chmod" 600 "$file"
+  fi
+}
+
+auth_root="$dev_root/ssh/authorized_keys.root"
+auth_js="$dev_root/ssh/authorized_keys.js"
+init_empty_keys "$auth_root"
+init_empty_keys "$auth_js"
+
+if [[ ! -f "$dev_root/ssh/ssh_host_ed25519_key" ]]; then
+  @openssh@/bin/ssh-keygen -t ed25519 -f "$dev_root/ssh/ssh_host_ed25519_key" -N ""
+fi
+
+printf '%s\n' \
+  "root:x:0:0:root:/root:$dev_shell" \
+  'sshd:x:999:999:SSH privsep:/var/empty:/bin/sh' \
+  "js:x:1000:100:js:/home/js:$dev_shell" \
+  >"$etc_dir/passwd"
+printf '%s\n' 'root:x:0:' 'sshd:x:999:' 'js:x:100:' >"$etc_dir/group"
+
+resolv="$etc_dir/resolv.conf"
+if [[ -r /run/systemd/resolve/stub-resolv.conf ]]; then
+  "$cp" -L /run/systemd/resolve/stub-resolv.conf "$resolv"
+elif [[ -r /etc/resolv.conf ]]; then
+  "$cp" -L /etc/resolv.conf "$resolv"
+else
+  echo "nvidia-devtools: no host resolver (stub-resolv.conf or /etc/resolv.conf)" >&2
+  exit 1
+fi
+
+for f in passwd group resolv.conf; do
+  [[ -f "$etc_dir/$f" ]] || {
+    echo "nvidia-devtools: missing $etc_dir/$f (StateDirectory not mounted?)" >&2
+    exit 1
+  }
+  "$mount" --bind "$etc_dir/$f" "/etc/$f"
+done

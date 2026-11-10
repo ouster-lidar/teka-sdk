@@ -1,0 +1,50 @@
+{
+  "id": "hello-pub",
+  "version": "@imageVersion@",
+  "display_name": "Hello Publisher",
+  "nav": {
+    "label": "Hello Pub",
+    "path": "/app/hello-pub",
+    "section": "apps",
+    "order": 40,
+    "panels": [
+      {
+        "label": "Publisher",
+        "panel": "hello-pub"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello Publisher",
+    "template": "index.html",
+    "styles": [
+      "hello-pub.css"
+    ]
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/state",
+    "card_stream_path": "/api/v1/cards/stream"
+  },
+  "registers": [
+    {
+      "alias": "hello-pub",
+      "panel": "hello-pub"
+    }
+  ],
+  "app_cards": [
+    {
+      "card_id": "hello-pub",
+      "title": "Hello Pub",
+      "description": "Demo event publisher",
+      "icon": "📤",
+      "link_alias": "hello-pub"
+    }
+  ],
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

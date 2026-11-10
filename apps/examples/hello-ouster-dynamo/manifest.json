@@ -1,0 +1,65 @@
+{
+  "id": "hello-ouster-dynamo",
+  "version": "@imageVersion@",
+  "display_name": "hello-ouster-dynamo",
+  "nav": {
+    "label": "hello-ouster-dynamo",
+    "path": "/app/hello-ouster-dynamo",
+    "section": "apps",
+    "order": 20,
+    "panels": [
+      {
+        "label": "Display",
+        "panel": "display"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "hello-ouster-dynamo",
+    "template": "display.html",
+    "styles": [
+      "display.css",
+      "xterm.css"
+    ]
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/status",
+    "card_stream_path": "/api/v1/cards/stream"
+  },
+  "registers": [
+    {
+      "alias": "hello-ouster-dynamo",
+      "panel": "display"
+    }
+  ],
+  "app_cards": [
+    {
+      "card_id": "hello-ouster-dynamo",
+      "title": "Hello Ouster Dynamo",
+      "description": "Example visualizer app with Ouster Dynamo integration",
+      "icon": "📡",
+      "link_alias": "hello-ouster-dynamo"
+    }
+  ],
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  },
+  "ports": [
+    {
+      "port": 7502,
+      "proto": "udp"
+    },
+    {
+      "port": 7503,
+      "proto": "udp"
+    }
+  ],
+  "portable": {
+    "displayService": true,
+    "gpu": "wayland"
+  }
+}

@@ -1,0 +1,24 @@
+[Unit]
+Description=hello-slidev (Slidev presentation demo)
+Documentation=file:///usr/lib/teka/mission-control/manifest.json
+After=mission-control.service network.target
+@appBackendUnitLines@
+Wants=network.target
+
+[Service]
+@appNotifyServiceLines@
+ProtectSystem=no
+ProtectHome=no
+Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+Environment=DECK_ROOT=/usr/lib/hello-slidev/deck
+Environment=PATH=@binPath@
+@appBackendServiceLines@
+StateDirectory=hello-slidev
+StateDirectoryMode=0750
+@serviceFragment@
+ExecStart=@program@
+SyslogIdentifier=hello-slidev
+Restart=on-failure
+
+[Install]
+WantedBy=teka-apps.target

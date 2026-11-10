@@ -1,0 +1,19 @@
+{
+  "id": "hello-ouster-terminal",
+  "version": "@imageVersion@",
+  "display_name": "Hello Ouster Terminal",
+  "nav": {
+    "label": "Hello Ouster Terminal",
+    "path": "/app/hello-ouster-terminal"
+  },
+  "ui": {
+    "mode": "external"
+  },
+  "backend": {
+    "mode": "none"
+  },
+  "portable": {
+    "displayService": true,
+    "gpu": "wayland"
+  }
+}

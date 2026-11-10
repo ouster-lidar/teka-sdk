@@ -1,0 +1,35 @@
+{
+  "id": "hello-slidev",
+  "version": "@imageVersion@",
+  "display_name": "Hello Slidev",
+  "nav": {
+    "label": "Hello Slidev",
+    "path": "/app/hello-slidev",
+    "section": "apps",
+    "order": 16,
+    "panels": [
+      {
+        "label": "Slides",
+        "panel": "slides"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello Slidev",
+    "template": "slides.html",
+    "styles": [
+      "hello-slidev.css"
+    ],
+    "anonymous": true
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/guest-access"
+  },
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

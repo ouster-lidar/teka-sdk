@@ -1,0 +1,26 @@
+[Unit]
+Description=hello-llm (Open WebUI + Ollama/@modelTag@)
+@gpuUnit@
+After=mission-control.service network-online.target
+Wants=mission-control.service network-online.target
+
+[Service]
+Type=notify
+PrivateNetwork=no
+ProtectSystem=no
+ProtectHome=no
+StateDirectory=hello-llm
+StateDirectoryMode=0750
+@serviceFragment@
+PrivateDevices=no
+SupplementaryGroups=video render
+ExecStart=@appRuntime@/bin/app-runtime-process hello-llm tcp @webPort@ /usr/lib/hello-llm/start.sh
+SyslogIdentifier=hello-llm
+BindReadOnlyPaths=-/etc/resolv.conf
+@gpuBind@
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=teka-apps.target

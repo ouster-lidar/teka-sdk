@@ -1,0 +1,12 @@
+#!@runtimeShell@
+set -eu
+user="$1"
+case "$user" in
+root) auth="/var/lib/nvidia-devtools/ssh/authorized_keys.root" ;;
+js) auth="/var/lib/nvidia-devtools/ssh/authorized_keys.js" ;;
+*) exit 0 ;;
+esac
+if [[ ! -r "$auth" ]]; then
+  exit 0
+fi
+exec @coreutils@/bin/cat "$auth"

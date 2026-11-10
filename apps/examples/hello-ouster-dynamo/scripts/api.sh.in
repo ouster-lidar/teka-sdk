@@ -1,0 +1,22 @@
+#!@runtimeShell@
+set -euo pipefail
+# Nix GST (appsrc/appsink). Keep generator GST_PLUGIN_PATH
+# (l4t-gstreamer: nvvidconv / nvjpegenc). Do not unset it.
+export GST_PLUGIN_SYSTEM_PATH="@gstPluginSystemPath@"
+unset GST_PLUGIN_SYSTEM_PATH_1_0 2>/dev/null || true
+# Generator LD_LIBRARY_PATH lists Mesa libgbm before nvidia-l4t-gbm; Mesa
+# then looks for dri_gbm.so. Prefer L4T GBM backends.
+IFS=':' read -r -a _ldpath <<<"${LD_LIBRARY_PATH:-}"
+for _d in "${_ldpath[@]}"; do
+  if [[ "$_d" == *nvidia-l4t-gbm* ]]; then
+    export LD_LIBRARY_PATH="$_d${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [[ -d "$_d/gbm" ]]; then
+      export GBM_BACKENDS_PATH="$_d/gbm"
+    fi
+    break
+  fi
+done
+# L4T nvvidconv/nvjpegenc may shell out to `lsmod | grep`. PortableGPU PATH
+# has neither busybox applets nor kmod; keep /bin as fallback.
+export PATH="@binPath@:/bin:/usr/bin${PATH:+:$PATH}"
+exec @program@ "$@"

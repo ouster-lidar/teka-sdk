@@ -10,16 +10,7 @@ An optional advanced companion to `hello-ouster-world`, illustrating multiple ca
 nix build .#hello-ouster-dynamo .#hello-ouster-dynamo-cross-aarch64-linux
 ```
 
-Output: `result/` (erofs DDI image)
-
-The measured images below were built from revision `2be1287c02f934b298ea3324af8ee6a5cc26e577`:
-
-| Target | Flake output | DDI size |
-| --- | --- | ---: |
-| `x86_64-linux` (native) | `.#hello-ouster-dynamo` | 743,624,704 bytes (709.18 MiB) |
-| `aarch64-linux` (cross) | `.#hello-ouster-dynamo-cross-aarch64-linux` | 639,549,440 bytes (609.92 MiB) |
-
-The Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi.md`](../../specs/erofs-ddi.md).
+The Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).
 
 ## Run on the device
 
@@ -29,8 +20,6 @@ The Ouster viewer image sizes are also listed in [`apps/specs/erofs-ddi.md`](../
 export TEKA_PASSWORD='…'   # when the device requires authentication
 teka app deploy --build hello-ouster-dynamo --host http://HOST/
 ```
-
-See the [Developer Guide](../../../docs/developer-guide.md) for the normal build and deploy workflow.
 
 ### 2a. Running on local-file OSF
 
@@ -58,11 +47,11 @@ Set source to **connected sensor**, enter hostname/IP, Apply.
 | **connected sensor**   | hostname / IP                                                                              | off: hello-ouster-dynamo owns UDP lidar; on: Dynamo owns lidar, hello-ouster-dynamo reads the FrameSet socket |
 
 
-Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and exposed at `GET/POST /api/v1/app/hello-ouster-dynamo/source-config` (Teka app proxy). **Lidar** is OSF vs sensor. **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo** is proprietary Ouster software, installed separately (not built from this repo). Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet sockets: see [apps/specs/frameset-socket.md](../../specs/frameset-socket.md).
+Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and exposed at `GET/POST /api/v1/app/hello-ouster-dynamo/source-config` (Teka app proxy). **Lidar** is OSF vs sensor. **via ouster-dynamo** is a separate toggle (not a third source). **Ouster Dynamo** is proprietary Ouster software, installed separately (not built from this repo). Changing source rewrites ``source-config.json``; SimpleViz reloads via ``execv`` (Sway stays up). **Stop** sets ``source_enabled: false`` (idle until Apply). App FrameSet sockets: see [apps/specs/frameset-socket.md](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/frameset-socket.md).
 
 ## Ouster SDK
 
-Uses `apps/nix/ouster/ouster-sdk.nix` (`ps.ousterSdk`) to build Ouster SDK from source (cross compiling if necessary) for Python 3.12.  This app utilizes the SDK to view and interact with LiDAR point clouds and object visualization using SimpleViz.
+Uses the pinned Teka SDK’s `ps.ousterSdk` for Python 3.12 and SimpleViz.
 
 Runtime: `GLFW_PLATFORM=wayland`, Sway built without Xwayland. SimpleViz is a native Wayland GLFW client.
 

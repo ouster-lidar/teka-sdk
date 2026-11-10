@@ -1,0 +1,11 @@
+# Kiosk: one client, no titlebars/split chrome.
+font pango:monospace 1
+default_border none
+default_floating_border none
+hide_edge_borders both
+output * bg #000000 solid_color
+# Do not pin Ouster Viz to HEADLESS here — Display places it on HDMI or
+# HEADLESS based on the HDMI toggle. A for_window move would fight that.
+for_window [app_id="hello-ouster-dynamo"] border none, fullscreen enable
+for_window [title="Ouster Viz"] border none, fullscreen enable
+exec @swayStartup@

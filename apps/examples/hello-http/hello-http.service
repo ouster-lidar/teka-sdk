@@ -1,0 +1,15 @@
+[Unit]
+Description=hello-http (python http.server)
+After=mission-control.service
+Wants=mission-control.service
+
+[Service]
+Type=notify
+@serviceFragment@
+ExecStart=@appRuntime@/bin/app-runtime-process hello-http tcp @port@ @python3Minimal@/bin/python3 /usr/lib/hello-http/server.py
+SyslogIdentifier=hello-http
+Restart=on-failure
+TimeoutStartSec=90
+
+[Install]
+WantedBy=teka-apps.target

@@ -27,7 +27,7 @@ Bump `modelStamp` in `default.nix` to force a re-pull after changing the default
 
 ## Web search
 
-Configured in `hello-llm/default.nix`. Option reference:
+Configured in `scripts/start.sh.in`. Option reference:
 [Environment Variable Configuration](https://docs.openwebui.com/reference/env-configuration/),
 [DDGS provider](https://docs.openwebui.com/features/chat-conversations/web-search/providers/ddgs/).
 
@@ -68,7 +68,7 @@ teka app deploy --build hello-llm --host http://HOST/
 ## App UI
 
 Guide panel at `/app/hello-llm` in Teka (how it works, first-boot tips).
-Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](../../lib/app-runtime/runtime-process.md)).
+Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/runtime-process.md)).
 Ollama stays on loopback 11434 without a public lease; Teka must use a different port from Open WebUI.
 Open WebUI's sandbox receives a read-only snapshot of the service's resolver configuration at launch so host file replacement cannot break startup.
 

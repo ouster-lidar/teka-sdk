@@ -1,6 +1,6 @@
 # hello-sub
 
-Demo subscriber app: connects to one or more [hello-pub](../hello-pub/README.md) publishers through Teka’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
+Demo subscriber app: connects to one or more [hello-pub](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/examples/hello-pub/README.md) publishers through Teka’s feature gateway, merges received events into a local feed (tagged by source), and exposes its own GET/WS for the subscriber UI.
 
 Supports **remote** publishers by pointing at other hosts’ Teka feature URLs (`/api/v1/app/hello-pub`). This demo does **not** perform remote Teka password login; use open-mode / unauthenticated peers for now (password auth may return later).
 
@@ -11,7 +11,6 @@ Supports **remote** publishers by pointing at other hosts’ Teka feature URLs (
 | Portable image / unit / state | `hello-sub` |
 | Manifest id / devres / `APP_ID` | `hello-sub` |
 | Rust package / binary | `hello-sub` |
-| Source dir | `apps/examples/hello-sub/` |
 
 ## Teka integration
 

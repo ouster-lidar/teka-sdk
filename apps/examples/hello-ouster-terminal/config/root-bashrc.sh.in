@@ -1,0 +1,5 @@
+@ddiBinPathExport@
+case $- in *i*)
+  [[ -f /etc/bash.bashrc ]] && . /etc/bash.bashrc
+  ;;
+esac

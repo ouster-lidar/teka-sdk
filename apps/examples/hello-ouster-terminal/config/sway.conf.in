@@ -1,0 +1,5 @@
+# Stock Sway/i3 style (this config does not include the full default keymap).
+bindsym Mod4+f fullscreen
+bindsym Mod4+Shift+Return exec @footExe@ --config=@footIni@ @bash@/bin/bash -i
+
+exec @swayAutostart@

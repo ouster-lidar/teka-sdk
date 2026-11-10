@@ -1,0 +1,34 @@
+{
+  "id": "nvidia-devtools",
+  "version": "@imageVersion@",
+  "display_name": "NVIDIA DevTools",
+  "nav": {
+    "label": "NVIDIA DevTools",
+    "path": "/app/nvidia-devtools",
+    "section": "apps",
+    "order": 26,
+    "panels": [
+      {
+        "label": "NVIDIA DevTools",
+        "panel": "nvidia-devtools"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "NVIDIA DevTools",
+    "template": "nvidia-devtools.html",
+    "styles": [
+      "nvidia-devtools.css"
+    ]
+  },
+  "backend": {
+    "mode": "proxy",
+    "runtime_listen": true,
+    "health_path": "/api/v1/status"
+  },
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}

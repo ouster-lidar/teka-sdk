@@ -2,7 +2,7 @@
 
 Demo publisher app: owns an in-process event ring buffer and current aggregate state. Peers and browsers publish, query, and subscribe at `/api/v1/app/hello-pub/…`.
 
-Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Teka), not a shared platform bus.
+Companion consumer: [hello-sub](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/examples/hello-sub/README.md). Together they demonstrate **owner-app topics** (publisher owns state + stream; subscribers reach it via Teka), not a shared platform bus.
 
 ## Naming
 
@@ -11,7 +11,6 @@ Companion consumer: [hello-sub](../hello-sub/README.md). Together they demonstra
 | Portable image / unit / state | `hello-pub` |
 | Manifest id / devres / `APP_ID` | `hello-pub` |
 | Rust package / binary | `hello-pub` |
-| Source dir | `apps/examples/hello-pub/` |
 
 ## Teka integration
 

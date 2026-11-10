@@ -1,0 +1,21 @@
+# Ouster viz (ouster-cli)
+
+Ouster SDK Autorun foot: discover → pick sensor → ouster-cli source … viz (Wayland/GLFW).
+
+## Sensor picker
+
+- 10s to enter a list number; else auto-pick first RUNNING in discover JSON.
+- Among those, auto-pick uses highest semver parsed from image/build rev (tie: list order).
+- If no RUNNING field in JSON, falls back to all discovered.
+- Ctrl-C at prompt re-runs discover.
+
+## Ports
+
+- Lidar @ousterLidarDataPort@/udp
+- IMU @ousterImuDataPort@/udp
+
+Point sensor UDP at this host on those ports (see README.md).
+
+## After exit
+
+Viz exits → short delay → picker again. Logs: journalctl, unit hello-ouster-terminal.

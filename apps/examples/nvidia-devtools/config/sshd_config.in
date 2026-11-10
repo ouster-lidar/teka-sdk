@@ -1,0 +1,16 @@
+Port @sshPort@
+ListenAddress 0.0.0.0
+HostKey /var/lib/nvidia-devtools/ssh/ssh_host_ed25519_key
+AuthorizedKeysFile none
+AuthorizedKeysCommand /usr/lib/nvidia-devtools/authorized-keys %u
+AuthorizedKeysCommandUser root
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+UsePAM no
+StrictModes no
+LogLevel VERBOSE
+Subsystem sftp @openssh@/libexec/sftp-server
+@devEnvSshdSetEnv@
+SetEnv PATH=@devBinPath@
+SetEnv LD_PRELOAD=

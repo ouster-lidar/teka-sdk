@@ -1,0 +1,25 @@
+#!@runtimeShell@
+set +e
+layout_ready="$HOME/layout-ready"
+rm -f "$layout_ready"
+swaymsg() { command @sway@/bin/swaymsg "$@" >/dev/null || true; }
+
+# Left column: general shell; viz loop foot spawns beside it.
+@footExe@ --config=@footIni@ -T Terminal @directionsLaunch@ &
+sleep 0.45
+swaymsg split vertical
+
+(
+  while true; do
+    @footExe@ --config=@footIni@ -T "Ouster SDK Autorun" @ousterVizLoop@ || true
+    sleep 1
+  done
+) &
+sleep 0.55
+
+# Wrap the stacked feet in a horizontal split and focus the empty right pane for GLFW.
+swaymsg focus parent
+swaymsg focus parent
+swaymsg splith
+swaymsg focus right
+: >"$layout_ready"
