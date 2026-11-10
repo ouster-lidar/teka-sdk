@@ -1,0 +1,10 @@
+[Unit]
+Description=Hello WebUI
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=yes
+
+[Install]
+WantedBy=teka-apps.target

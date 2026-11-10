@@ -1,15 +1,11 @@
 # hello-webui
 
-Static web UI demo: animated hero, counters, and a Snake game panel. No backend.
+A small dashboard with simulated traffic, latency, and CPU load. Plain HTML, CSS, and JavaScript; no backend or frontend build tools.
 
-## Build
+## Build and deploy
 
-`nix build .#hello-webui` from `apps/`.
+```sh
+teka app deploy --build
+```
 
-## Deploy
-
-`teka app deploy --build hello-webui --host http://HOST/`
-
-## Verify
-
-Open `/app/hello-webui` (Demo and Snake panels). Journal: `hello-webui: static web UI demo ready`.
+Open `/app/hello-webui` and select **Refresh samples** to update the readings and graphs. All data is simulated.

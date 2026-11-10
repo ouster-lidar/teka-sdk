@@ -1,0 +1,12 @@
+.hw-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.hw-header h2 { margin: 0; }
+.hw-header p, .hw-dashboard small { color: #94a3b8; }
+.hw-badge { color: #7dd3fc; }
+.hw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.hw-grid .stat-card { margin: 0 0 1rem; padding: 1.25rem; }
+.hw-grid h3 { margin: 0 0 0.75rem; font-size: 0.85rem; color: #94a3b8; font-weight: 500; }
+.hw-grid output { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hw-grid svg { display: block; width: 100%; margin-top: 1rem; color: #38bdf8; }
+.hw-grid article:nth-child(2) svg { color: #a78bfa; }
+.hw-grid article:nth-child(3) svg { color: #2dd4bf; }
+.hw-grid polyline { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

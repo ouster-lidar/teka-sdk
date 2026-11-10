@@ -1,24 +1,33 @@
-<main>
-    <section class="hw-hero">
-        <canvas id="hw-particles" class="hw-particles" aria-hidden="true"></canvas>
-        <div class="hw-hero-content">
-            <p class="hw-kicker">Teka · static web UI</p>
-            <h2 class="hw-title">Hello WebUI</h2>
-            <p class="hw-lead">Embedded panels and app-scoped assets — no backend required.</p>
+<div id="hw-dashboard" class="hw-dashboard">
+    <header class="hw-header">
+        <div>
+            <h2>Device overview</h2>
+            <p>Sample telemetry · <span class="hw-badge">Simulated data</span></p>
         </div>
+        <button type="button" class="btn btn-primary">↻ Refresh samples</button>
+    </header>
+    <section class="hw-grid" aria-label="Simulated device metrics">
+        <article class="stat-card" data-base="640" data-spread="80" data-decimals="0" data-unit=" pkt/s">
+            <h3>Traffic</h3>
+            <output aria-label="Traffic">—</output>
+            <svg viewBox="0 0 240 72" role="img" aria-label="Simulated traffic trend">
+                <polyline />
+            </svg>
+        </article>
+        <article class="stat-card" data-base="12" data-spread="2" data-decimals="1" data-unit=" ms">
+            <h3>Latency</h3>
+            <output aria-label="Latency">—</output>
+            <svg viewBox="0 0 240 72" role="img" aria-label="Simulated latency trend">
+                <polyline />
+            </svg>
+        </article>
+        <article class="stat-card" data-base="42" data-spread="6" data-decimals="0" data-unit="%" data-max="100">
+            <h3>CPU load</h3>
+            <output aria-label="CPU load">—</output>
+            <svg viewBox="0 0 240 72" role="img" aria-label="Simulated CPU load trend">
+                <polyline />
+            </svg>
+        </article>
     </section>
-
-    <div class="stat-card">
-        <div class="section-title">Live counters</div>
-        <div class="hw-stat-grid">
-            <div class="hw-stat-card">
-                <div class="hw-stat-value" data-target="12847">0</div>
-                <div class="hw-stat-label">Packets routed</div>
-            </div>
-            <div class="hw-stat-card">
-                <div class="hw-stat-value" data-target="99.7" data-decimals="1" data-suffix="%">0</div>
-                <div class="hw-stat-label">Uptime score</div>
-            </div>
-        </div>
-    </div>
-</main>
+    <small data-updated></small>
+</div>

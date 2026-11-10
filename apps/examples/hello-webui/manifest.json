@@ -1,0 +1,32 @@
+{
+  "id": "hello-webui",
+  "version": "@imageVersion@",
+  "display_name": "Hello WebUI",
+  "nav": {
+    "label": "Hello WebUI",
+    "path": "/app/hello-webui",
+    "section": "apps",
+    "order": 15,
+    "panels": [
+      {
+        "label": "Demo",
+        "panel": "demo"
+      }
+    ]
+  },
+  "ui": {
+    "mode": "static",
+    "title": "Hello WebUI",
+    "template": "demo.html",
+    "styles": [
+      "demo.css"
+    ]
+  },
+  "backend": {
+    "mode": "none"
+  },
+  "auth": {
+    "scheme": "ojs-proxy-identity",
+    "version": "0.1.0"
+  }
+}
