@@ -44,12 +44,20 @@
           tekaFor = system: self.packages.${system}.teka;
         };
       };
+
       packages = builtins.mapAttrs (_: packages: {
         inherit (packages) teka;
         default = packages.teka;
       }) teka.packages;
-      inherit (teka) apps checks overlays;
-      templates = (import ./apps/examples { lib = app-nixpkgs.lib; }).templates;
+
+      inherit (teka) apps overlays;
+
+      templates = (import ./apps/examples { lib = app-nixpkgs.lib; }).templates // {
+        default = self.templates.hello-world;
+      };
+
+      checks = nixpkgs.lib.recursiveUpdate teka.checks (import ./apps/nix/tests { sdk = self; });
+
       devShells = nixpkgs.lib.genAttrs (builtins.attrNames teka.packages) (
         system:
         let

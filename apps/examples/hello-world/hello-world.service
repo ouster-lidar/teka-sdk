@@ -1,0 +1,10 @@
+[Unit]
+Description=Hello world app
+
+[Service]
+Type=oneshot
+ExecStart=@program@
+RemainAfterExit=yes
+
+[Install]
+WantedBy=teka-apps.target

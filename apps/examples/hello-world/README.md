@@ -1,17 +1,11 @@
 # hello-world
 
-## Goal
+A minimal Rust app that prints `hello world`. `default.nix` builds the program and app image; `hello-world.service` starts it.
 
-Minimal app smoke test: a **oneshot** unit that logs `hello world` to the journal. No GPU, no network listeners.
+## Build and deploy
 
-## Build
+```sh
+teka app deploy --build
+```
 
-`nix build .#hello-world` from `apps/`.
-
-## Deploy
-
-Attach like any other app image (`portablectl`, or `teka app deploy --build hello-world --host http://HOST/`).
-
-## Verify
-
-`systemctl status hello-world.service` — active/exited with `RemainAfterExit=yes`; `journalctl -u hello-world.service` shows the message.
+Verify that `journalctl -u hello-world.service` contains `hello world`.

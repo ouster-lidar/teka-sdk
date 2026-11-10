@@ -1,33 +1,25 @@
 {
   image =
-    { ps, writeText }:
-
+    { ps, pkgs }:
     let
-      name = "hello-world";
-      jp = ps.hostUnitDefaults {
-        hostGpuChecksCfg = {
-          enable = false;
-        };
-      };
+      package =
+        pkgs.runCommand "hello-world"
+          {
+            nativeBuildInputs = [
+              pkgs.rustc
+              pkgs.stdenv.cc
+            ];
+            meta.mainProgram = "hello-world";
+          }
+          ''
+            mkdir -p "$out/bin"
+            rustc --crate-name hello_world --target ${pkgs.stdenv.hostPlatform.rust.rustcTarget} \
+              -C linker=${pkgs.stdenv.cc.targetPrefix}cc -O ${./hello-world.rs} -o "$out/bin/hello-world"
+          '';
     in
-
     ps.makeAppImage {
-      inherit name;
-      unit = writeText "${name}.service" ''
-        [Unit]
-        Description=hello-world app
-
-        [Service]
-        Type=oneshot
-        ${jp.serviceFragment}
-        ExecStart=/bin/sh -c 'echo hello world'
-        SyslogIdentifier=${name}
-        StandardOutput=journal
-        StandardError=journal
-        RemainAfterExit=yes
-
-        [Install]
-        WantedBy=teka-apps.target
-      '';
+      name = "hello-world";
+      unit = pkgs.replaceVars ./hello-world.service { program = pkgs.lib.getExe package; };
+      runtimeClosures = [ package ];
     };
 }
