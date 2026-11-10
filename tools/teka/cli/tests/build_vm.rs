@@ -91,6 +91,17 @@ printf 'ssh\n' >> "$MOCK_ROOT/ssh-calls"
 case "$*" in
   *'exit 3'*) exit 3 ;;
   *__teka_ssh_test__*|*'/bin/btop'*) /bin/cat; exit "${MOCK_SSH_EXIT:-0}" ;;
+  *'getent ahosts cache.nixos.org'*)
+    printf 'dns\n' >> "$MOCK_ROOT/network-calls"
+    exit "${MOCK_DNS_STATUS:-0}" ;;
+  *'https://cache.nixos.org/nix-cache-info'*)
+    printf 'https\n' >> "$MOCK_ROOT/network-calls"
+    printf '%s\n' "$@" > "$MOCK_ROOT/internet-args"
+    if [ -n "${MOCK_INTERNET_HANG:-}" ]; then exec /bin/sleep 30; fi
+    if [ "${MOCK_INTERNET_STATUS:-0}" != 0 ]; then
+      echo "$MOCK_INTERNET_ERROR" >&2
+      exit "$MOCK_INTERNET_STATUS"
+    fi ;;
   *'/proc/vmstat'*)
     if [ "${MOCK_MEMORY_STATUS:-0}" != 0 ]; then
       echo 'memory probe failed' >&2
@@ -804,11 +815,23 @@ fn check_wakes_on_demand_guests_and_skips_unavailable_services() {
         &report,
         "✓ Guest memory: 0 kernel OOM kills since boot; RAM: 7 GiB / 8 GiB available; swap: 0 B",
     );
+    contains(
+        &report,
+        "✓ Guest DNS: cache.nixos.org resolves
+✓ Guest internet (HTTPS): cache.nixos.org reachable",
+    );
+    assert_eq!(host.read("network-calls"), "dns\nhttps\n");
+    contains(
+        &host.read("internet-args"),
+        "curl --disable --fail --silent --show-error --location --connect-timeout 5 --max-time 10 --output /dev/null https://cache.nixos.org/nix-cache-info",
+    );
+    host.remove("network-calls");
     let report = host.report(&["check"], 1, &[("MOCK_PROBE_STATUS", "1")]);
     contains(
         &report,
         "✗ SSH:\nconnection timed out\n→ Guest checks: skipped",
     );
+    host.missing(&["network-calls"]);
     for stopped in [false, true] {
         if stopped {
             host.run(&["stop"]);
@@ -819,8 +842,63 @@ fn check_wakes_on_demand_guests_and_skips_unavailable_services() {
             .contains("✗ Launchd service: stopped\n→ Live checks: skipped (VM service stopped)\n"));
         assert_eq!(report.matches("stopped").count(), 2);
         assert_eq!(report.matches("teka build vm start").count(), 1);
-        host.missing(&["ssh-args"]);
+        host.missing(&["ssh-args", "network-calls"]);
     }
+}
+
+#[test]
+fn check_reports_guest_dns_and_https_failures_with_vpn_guidance() {
+    let host = Host::new();
+    host.run(&["start"]);
+    let report = host.report(&["check"], 1, &[("MOCK_DNS_STATUS", "2")]);
+    contains(
+        &report,
+        "✗ Guest DNS:
+→ Guest internet (HTTPS): skipped (DNS failed)
+A VPN may block the VM's NAT traffic or DNS
+✓ Guest memory:",
+    );
+    assert_eq!(host.read("network-calls"), "dns\n");
+    for (status, error) in [
+        ("7", "curl: (7) Failed to connect to cache.nixos.org"),
+        ("28", "curl: (28) Connection timed out"),
+        ("60", "curl: (60) SSL certificate problem"),
+        ("22", "curl: (22) The requested URL returned error: 503"),
+    ] {
+        host.remove("network-calls");
+        let report = host.report(
+            &["check"],
+            1,
+            &[
+                ("MOCK_INTERNET_STATUS", status),
+                ("MOCK_INTERNET_ERROR", error),
+            ],
+        );
+        contains(
+            &report,
+            "✓ Guest DNS:
+✗ Guest internet (HTTPS):
+A VPN may block the VM's NAT traffic or DNS
+✓ Guest memory:",
+        );
+        contains(&report, error);
+        excludes(&report, "✓ Guest internet (HTTPS):");
+        assert_eq!(host.read("network-calls"), "dns\nhttps\n");
+    }
+}
+
+#[test]
+fn check_internet_probe_has_a_deadline() {
+    let host = Host::new();
+    host.run(&["start"]);
+    let started = Instant::now();
+    let report = host.report(&["check"], 1, &[("MOCK_INTERNET_HANG", "1")]);
+    contains(
+        &report,
+        "✗ Guest internet (HTTPS): SSH guest probe timed out after 15s
+✓ Guest memory:",
+    );
+    assert!(started.elapsed() < Duration::from_secs(20), "{report}");
 }
 
 #[test]

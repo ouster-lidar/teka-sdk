@@ -97,7 +97,7 @@ teka build vm btop         # open the bundled resource monitor
 teka build vm ssh -T uname -a
 teka build vm ssh -T journalctl -f -u nix-daemon  # stream guest Nix daemon logs
 teka build vm status       # service activity, guest state, and brief live usage
-teka build vm check        # prerequisites, connectivity, and OOM kills; may boot
+teka build vm check        # prerequisites, SSH, internet access, and OOM kills; may boot
 ```
 
 The plugin uses Nixpkgs’ cached Linux guest and vzvm 1.1.0, with native NAT networking and no GUI. A separate `nixpkgs-unstable` input supplies only vzvm and its NixOS VM module; guest packages retain the main Nixpkgs pin. The module configures idle timeout, console logging, and SSH forwarding through Nix options. Rosetta must already be installed on the Mac (`softwareupdate --install-rosetta --agree-to-license`). Keys, the sparse 64 GiB data disk, and logs live in `${XDG_DATA_HOME:-~/.local/share}/teka-build-vm`. The `runtime` out-link retains the runtime as a Nix GC root. SSH listens on localhost port 31023. A unique host key stays in the private state directory; init/reset updates the CLI and system builder pins automatically.
@@ -123,6 +123,8 @@ Nix builds embed both resolved Nixpkgs input revisions in the CLI; direct Cargo 
 When live status metrics are unavailable, `status` shows saved CPU/RAM allocation, idle timeout, and disk capacity from local state. Missing or unreadable settings do not hide available disk capacity. Resource sizes use explicit binary units (`KiB`, `MiB`, `GiB`), scaled to at most one decimal place. Configured RAM and disk capacity can exceed the guest's usable totals.
 
 `check` reports available RAM, swap capacity, and kernel OOM kills since boot. OOM kills or unreadable counters return failure, even after memory recovers. Direct `systemd-oomd` kills are not counted. Inspect victims with `teka build vm ssh journalctl -k -b0 --no-pager -g 'Killed process'`.
+
+`check` also verifies DNS resolution and HTTPS access to `https://cache.nixos.org/nix-cache-info` from inside the guest, including certificate validation. DNS has a five-second deadline; HTTPS has a ten-second transfer limit and a fifteen-second SSH deadline. Failures return a nonzero exit status and show a VPN troubleshooting hint. If SSH works but these checks fail, disconnect your VPN and retry, or configure the VPN to allow the VM's NAT traffic and DNS. A cache outage or certificate problem can also fail the HTTPS check; inspect the reported error.
 
 Normal builds should fit in RAM. A separate sparse 8 GiB disk at `vm/swap.img` provides swap so high-concurrency memory peaks can slow down instead of triggering OOM kills, without reducing build concurrency. It preserves store capacity and consumes host disk space as written. RAM plus swap remains finite. After rebuilding or upgrading Teka, stop/start the VM to activate it; no reset is needed. Rebooting clears OOM counts, not the underlying memory demand.
 

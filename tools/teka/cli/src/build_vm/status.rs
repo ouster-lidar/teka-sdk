@@ -243,6 +243,10 @@ impl Vm {
     }
 
     fn guest_probe<T: DeserializeOwned>(&self, script: &str) -> Result<T> {
+        serde_json::from_str(&self.guest_output(script, 5)?).context("read guest probe response")
+    }
+
+    fn guest_output(&self, script: &str, timeout: u64) -> Result<String> {
         let stdout = tempfile::NamedTempFile::new()?;
         let stderr = tempfile::NamedTempFile::new()?;
         let mut child = self
@@ -254,7 +258,7 @@ impl Vm {
             .stderr(stderr.reopen()?)
             .spawn()
             .context("start guest probe")?;
-        let deadline = Instant::now() + Duration::from_secs(5);
+        let deadline = Instant::now() + Duration::from_secs(timeout);
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break status,
@@ -265,7 +269,7 @@ impl Vm {
                     let _ = child.kill();
                     let _ = child.wait();
                     let _ = result.context("wait for guest probe")?;
-                    bail!("SSH guest probe timed out after 5s");
+                    bail!("SSH guest probe timed out after {timeout}s");
                 }
             }
         };
@@ -274,7 +278,7 @@ impl Vm {
             "SSH guest probe failed ({status}): {}",
             fs::read_to_string(stderr.path())?.trim()
         );
-        serde_json::from_reader(stdout.reopen()?).context("read guest probe response")
+        fs::read_to_string(stdout.path()).context("read guest probe response")
     }
 
     pub(super) fn guest_state(&self) -> Option<bool> {
@@ -345,6 +349,7 @@ impl Vm {
                     ),
                     |_| "available".into(),
                 );
+                healthy &= self.check_internet();
                 let memory = self.guest_probe::<Memory>(MEMORY);
                 let exhausted = memory.as_ref().is_ok_and(|memory| memory.oom_kills > 0);
                 healthy &= report(
@@ -366,6 +371,32 @@ impl Vm {
             note("Run `teka build vm start` and retry");
         }
         Ok(if healthy { 0 } else { 1 })
+    }
+
+    fn check_internet(&self) -> bool {
+        let dns = report(
+            "Guest DNS",
+            self.guest_output("getent ahosts cache.nixos.org", 5)
+                .context("cannot resolve cache.nixos.org"),
+            |_| "cache.nixos.org resolves".into(),
+        );
+        let internet = if dns {
+            report(
+                "Guest internet (HTTPS)",
+                self.guest_output(
+                    "curl --disable --fail --silent --show-error --location --connect-timeout 5 --max-time 10 --output /dev/null https://cache.nixos.org/nix-cache-info",
+                    15,
+                ),
+                |_| "cache.nixos.org reachable".into(),
+            )
+        } else {
+            note("Guest internet (HTTPS): skipped (DNS failed)");
+            false
+        };
+        if !internet {
+            note("A VPN may block the VM's NAT traffic or DNS; disconnect it and retry, or allow VM traffic in the VPN settings");
+        }
+        internet
     }
 
     pub(super) fn initialized(&self) -> Result<()> {

@@ -79,6 +79,7 @@ Agent-facing requirements. Commit spec changes before implementing behavior chan
 
 ### `teka build vm`
 
+- Check guest DNS resolution and certificate-validated HTTPS access to `cache.nixos.org/nix-cache-info` after SSH succeeds. Bound DNS to five seconds and HTTPS to a ten-second transfer limit with a fifteen-second SSH deadline. Fail the command on either error, skip HTTPS when DNS fails, show the underlying error and a VPN/NAT/DNS troubleshooting hint, and continue independent guest checks.
 - Check available RAM, swap, and kernel OOM kills since boot. Any kills or unreadable counters fail the check, even after memory recovers.
 - Keep normal builds in RAM; provide a separate sparse 8 GiB swap disk so high-concurrency memory peaks can slow down instead of causing OOM kills. Preserve build concurrency and the cached guest image.
 - Include core tools such as `btop` in the VM image using the same Nixpkgs pin as the guest. Use NixOS VM options to include their closures and reuse binary caches where available, keeping first-time setup buildable from Darwin.
