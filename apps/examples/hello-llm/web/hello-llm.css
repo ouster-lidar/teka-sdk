@@ -1,6 +1,6 @@
 /* hello-llm guide panel — content-sized, no stretched cards */
 
-main.hllm {
+.hllm {
     display: flex;
     flex-direction: column;
     gap: 0.85rem;

@@ -91,7 +91,6 @@
             var open = !!expandedEvents[key];
             return '<div class="stream-item hello-feed-event' + (open ? ' hello-feed-event--expanded' : '') +
                 '" data-event-key="' + escapeHtml(key) + '">' +
-                '<div class="hello-feed-event-row">' +
                 '<div class="hello-feed-event-text">' +
                 '<span class="stream-meta">' +
                 '<span class="hello-event-kind">' + escapeHtml(ev.kind) + '</span>' +
@@ -101,7 +100,7 @@
                 '</div>' +
                 '<button type="button" class="btn btn-secondary btn-small hello-feed-expand" aria-expanded="' +
                 (open ? 'true' : 'false') + '">' + (open ? 'Collapse' : 'Expand') + '</button>' +
-                '</div></div>';
+                '</div>';
         }).join('');
         el.querySelectorAll('.hello-feed-event').forEach(function (row) {
             var btn = row.querySelector('.hello-feed-expand');

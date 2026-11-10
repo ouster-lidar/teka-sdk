@@ -5,27 +5,23 @@
     <div class="stat-card how-display-card">
         <div class="service-header">
             <div class="service-header-title">Display</div>
-            <div class="service-header-actions how-display-toolbar">
-                <div id="display-controls" class="how-display-controls">
-                    <label class="mc-switch service-auto-enable" id="hdmi-toggle-wrap" title="On-device HDMI panel">
-                        <input type="checkbox" class="mc-switch-cb" id="hdmi-toggle" checked>
-                        <span class="mc-switch-track" aria-hidden="true"></span>
-                        <span id="hdmi-label">Show on HDMI</span>
-                    </label>
-                    <label class="mc-switch service-auto-enable" title="Browser Display stream">
-                        <input type="checkbox" class="mc-switch-cb" id="stream-toggle" checked>
-                        <span class="mc-switch-track" aria-hidden="true"></span>
-                        <span id="stream-label">Show in Browser</span>
-                    </label>
-                    <span id="control-status" class="how-control-status" aria-live="polite">Watching&nbsp;&nbsp;&nbsp;</span>
-                </div>
+            <div class="service-header-actions">
+                <label class="mc-switch service-auto-enable" id="hdmi-toggle-wrap" title="On-device HDMI panel">
+                    <input type="checkbox" class="mc-switch-cb" id="hdmi-toggle" checked>
+                    <span class="mc-switch-track" aria-hidden="true"></span>
+                    <span id="hdmi-label">Show on HDMI</span>
+                </label>
+                <label class="mc-switch service-auto-enable" title="Browser Display stream">
+                    <input type="checkbox" class="mc-switch-cb" id="stream-toggle" checked>
+                    <span class="mc-switch-track" aria-hidden="true"></span>
+                    <span id="stream-label">Show in Browser</span>
+                </label>
+                <span id="control-status" class="how-control-status" aria-live="polite">Watching&nbsp;&nbsp;&nbsp;</span>
             </div>
         </div>
         <div id="display-error" class="mc-alert" style="display: none;"></div>
         <div class="iface-block how-source-block">
-            <div class="how-source-heading">
-                <div class="how-source-title">Source</div>
-            </div>
+            <div class="how-source-title">Source</div>
             <div class="iface-block-header how-source-header">
                 <div class="iface-block-row-left">
                     <span class="how-source-mode-segmented" role="group" title="OSF recording or live sensor">
