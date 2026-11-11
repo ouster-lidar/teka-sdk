@@ -20,6 +20,14 @@
 
 - Order unordered collections alphabetically unless order carries meaning.
 
+## Rust
+
+- Forbid unsafe code in all repository Rust projects whenever possible, including examples, tests, build scripts, and standalone Rust files.
+- Use `[lints.rust] unsafe_code = "forbid"` for Cargo packages so every target is covered, or `#![forbid(unsafe_code)]` at each crate root when package lints are unavailable.
+- Prefer safe standard-library APIs or maintained safe dependency interfaces over local unsafe blocks and implementations.
+- If unsafe code cannot reasonably be removed, document the constraint and narrow exception in a local spec; keep safe targets protected.
+- Build all affected targets and test changed behavior before committing safety changes; dependency internals are outside this restriction.
+
 ## Commits
 
 - Use LKML-style commit messages.
