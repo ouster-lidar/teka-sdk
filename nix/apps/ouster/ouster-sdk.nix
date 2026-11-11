@@ -16,7 +16,7 @@ let
   pkgs = python312Packages.pkgs;
   # SDK python/src/cpp/nb_func.cpp is a fork of nanobind 2.9.2 (setup.py pin).
   # nixpkgs nanobind 2.12 breaks that patched source.
-  nanobindCompat = python312Packages.nanobind.overridePythonAttrs (old: rec {
+  nanobindCompat = python312Packages.nanobind.overridePythonAttrs (_: rec {
     version = "2.9.2";
     src = pkgs.fetchPypi {
       pname = "nanobind";
@@ -103,7 +103,9 @@ python312Packages.buildPythonPackage rec {
     export VCPKG_MANIFEST_MODE=OFF
     export USE_OPENMP=OFF
     export BUILD_ML_INFERENCE=OFF
-    export OUSTER_SDK_CMAKE_ARGS="-DBUILD_PERCEPTION=OFF -DBUILD_ML_INFERENCE=OFF -DSKIP_NB_STUBGEN=${if stdenv.buildPlatform == stdenv.hostPlatform then "OFF" else "ON"} -DFLATBUFFERS_FLATC_EXECUTABLE=${lib.getExe pkgs.buildPackages.flatbuffers}"
+    export OUSTER_SDK_CMAKE_ARGS="-DBUILD_PERCEPTION=OFF -DBUILD_ML_INFERENCE=OFF -DSKIP_NB_STUBGEN=${
+      if stdenv.buildPlatform == stdenv.hostPlatform then "OFF" else "ON"
+    } -DFLATBUFFERS_FLATC_EXECUTABLE=${lib.getExe pkgs.buildPackages.flatbuffers}"
   '';
 
   propagatedBuildInputs = with python312Packages; [

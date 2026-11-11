@@ -9,36 +9,36 @@
   fish,
   zsh,
   openssl,
+  osslsigncode,
   pkg-config,
+  sbsigntool,
   removeReferencesTo,
   portable ? false,
   sdkRef ? null,
-  nixpkgsRev ? (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs.locked.rev,
-  nixpkgsUnstableRev ?
-    (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.nixpkgs-unstable.locked.rev,
-  verifierEnv,
+  nixpkgsRev ? (builtins.fromJSON (builtins.readFile ../../flake.lock)).nodes.nixpkgs.locked.rev,
+  verifierEnv ?
+    if stdenv.hostPlatform.isLinux then
+      { TEKA_SBVERIFY = lib.getExe' sbsigntool "sbverify"; }
+    else
+      { TEKA_OSSLSIGNCODE = lib.getExe osslsigncode; },
 }:
 let
+  opensslPackage =
+    if portable && stdenv.hostPlatform.isDarwin then openssl.override { static = true; } else openssl;
   common = {
     pname = "teka-cli";
-    version = (builtins.fromTOML (builtins.readFile ./cli/Cargo.toml)).package.version;
-    src = lib.cleanSourceWith {
-      src = ./.;
-      filter =
-        path: type:
-        craneLib.filterCargoSources path type
-        || lib.hasSuffix "/src/build_vm.nix" path
-        || lib.hasSuffix "/src/build_vm_network.swift" path
-        || lib.hasSuffix "/flake.lock" path;
+    version = (builtins.fromTOML (builtins.readFile ../../Cargo.toml)).workspace.package.version;
+    src = import ./source.nix {
+      inherit lib craneLib;
+      cli = true;
     };
     strictDeps = true;
     CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
-    cargoExtraArgs = "--locked --workspace";
+    cargoExtraArgs = "--locked -p teka-cli";
     doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
     nativeBuildInputs = [ pkg-config ];
-    buildInputs = [ openssl ];
+    buildInputs = [ opensslPackage ];
     TEKA_VM_NIXPKGS_REV = nixpkgsRev;
-    TEKA_VM_NIXPKGS_UNSTABLE_REV = nixpkgsUnstableRev;
   }
   // lib.optionalAttrs (!portable) (
     verifierEnv
@@ -87,18 +87,13 @@ craneLib.buildPackage (
       bashInteractive
       fish
       zsh
+      opensslPackage
+      buildPackages.osslsigncode
     ]
-    ++ (
-      with buildPackages;
-      [
-        openssl
-        osslsigncode
-      ]
-      ++ lib.optionals stdenv.hostPlatform.isLinux [
-        cryptsetup
-        sbsigntool
-      ]
-    );
+    ++ lib.optionals stdenv.hostPlatform.isLinux [
+      buildPackages.cryptsetup
+      buildPackages.sbsigntool
+    ];
     postInstall = ''
       ${lib.optionalString (stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64) ''
         ln -s teka "$out/bin/teka-build-vm"
@@ -110,7 +105,7 @@ craneLib.buildPackage (
     '';
     postFixup = lib.optionalString portable ''
       # Package signing uses explicit certificates and OpenSSL's built-in provider.
-      remove-references-to -t ${lib.getOutput "etc" openssl} "$out/bin/teka"
+      remove-references-to -t ${lib.getOutput "etc" opensslPackage} "$out/bin/teka"
     '';
     passthru = {
       inherit cargoChecks;

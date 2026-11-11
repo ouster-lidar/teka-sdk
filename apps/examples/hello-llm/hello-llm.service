@@ -14,7 +14,7 @@ StateDirectoryMode=0750
 @serviceFragment@
 PrivateDevices=no
 SupplementaryGroups=video render
-ExecStart=@appRuntime@/bin/teka-runner hello-llm tcp @webPort@ /usr/lib/hello-llm/start.sh
+ExecStart=@tekaRunner@/bin/teka-runner hello-llm tcp @webPort@ /usr/lib/hello-llm/start.sh
 SyslogIdentifier=hello-llm
 BindReadOnlyPaths=-/etc/resolv.conf
 @gpuBind@

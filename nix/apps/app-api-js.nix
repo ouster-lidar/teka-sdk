@@ -3,5 +3,5 @@
 
 runCommand "app-api-js" { } ''
   mkdir -p $out
-  cp ${../web/app-api.js} $out/app-api.js
+  cp ${./web/app-api.js} $out/app-api.js
 ''

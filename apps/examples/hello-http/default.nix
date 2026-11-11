@@ -9,7 +9,7 @@
     let
       app = ps.appCrate;
 
-      inherit (ps) appRuntime;
+      inherit (ps) tekaRunner;
 
       name = "hello-http";
       port = 8000;
@@ -46,7 +46,7 @@
       inherit name;
       unit = replaceVars ./hello-http.service {
         serviceFragment = jp.serviceFragment;
-        inherit appRuntime;
+        inherit tekaRunner;
         port = toString port;
         inherit python3Minimal;
       };
@@ -62,7 +62,7 @@
         ];
       runtimeClosures = [
         python3Minimal
-        appRuntime
+        tekaRunner
       ];
     };
 }

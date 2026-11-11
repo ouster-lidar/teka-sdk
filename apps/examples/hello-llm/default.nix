@@ -16,7 +16,7 @@
     let
       app = ps.appCrate;
 
-      inherit (ps) appRuntime;
+      inherit (ps) tekaRunner;
 
       name = "hello-llm";
       webPort = 8080;
@@ -111,7 +111,7 @@
       runtimeClosures = [
         ollamaBackend
         openWebUi
-        appRuntime
+        tekaRunner
         curl
         coreutils
         gnugrep
@@ -126,7 +126,7 @@
         inherit modelTag;
         gpuUnit = lib.optionalString isAarch64 "X-Teka-PortableGPU=cuda";
         serviceFragment = jp.serviceFragment;
-        inherit appRuntime;
+        inherit tekaRunner;
         webPort = toString webPort;
         gpuBind = lib.optionalString isAarch64 ''
           # DDI stub for bind target (read-only erofs cannot mkdir at runtime).

@@ -2,29 +2,20 @@
   description = "Teka app image examples (erofs DDI)";
 
   inputs = {
-    # Self-contained nixpkgs pin for this flake (toolchain + Python + GLFW).
-    nixpkgs.url = "github:NixOS/nixpkgs/a50de1b7d8a586adc18d2395c19de7d6058e6030";
-    crane.url = "github:ipetkov/crane/master";
-    rustsecAdvisoryDb = {
-      url = "github:RustSec/advisory-db";
-      flake = false;
-    };
-    # Public Ouster SDK (github.com/ouster-lidar/ouster-sdk). Built via
-    # apps/nix/ouster/ouster-sdk.nix against nixpkgs GLFW.
-    ouster-sdk = {
-      url = "github:ouster-lidar/ouster-sdk/v1.0.1";
-      flake = false;
-    };
+    nixpkgs.follows = "teka/nixpkgs";
+
+    crane.follows = "teka/crane";
+
     jetpack = {
       url = "github:anduril/jetpack-nixos";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    teka = {
-      url = "path:../tools/teka";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.crane.follows = "crane";
-      inputs.rustsecAdvisoryDb.follows = "rustsecAdvisoryDb";
-    };
+
+    ouster-sdk.follows = "teka/ouster-sdk";
+
+    rustsecAdvisoryDb.follows = "teka/rustsecAdvisoryDb";
+
+    teka.url = "path:..";
   };
 
   outputs =
@@ -32,19 +23,17 @@
       self,
       nixpkgs,
       crane,
-      rustsecAdvisoryDb,
-      ouster-sdk,
       jetpack,
+      ouster-sdk,
+      rustsecAdvisoryDb,
       teka,
       ...
     }:
     let
-      jp7Overlay =
-        final: prev:
-        {
-          nvidia-jetpack = final.nvidia-jetpack7;
-          cudaPackages = prev.cudaPackages_13_2;
-        };
+      jp7Overlay = final: prev: {
+        nvidia-jetpack = final.nvidia-jetpack7;
+        cudaPackages = prev.cudaPackages_13_2;
+      };
 
       appOverlays = [
         jetpack.overlays.default
@@ -79,7 +68,7 @@
         "nvidia-devtools"
       ];
 
-      appLib = import ./nix/app-lib.nix;
+      appLib = import ../nix/apps/app-lib.nix;
 
       version = appLib.mkVersion {
         inherit self;
@@ -92,9 +81,11 @@
           pkgs = nixpkgsPkgs.legacyPackages.${system};
         in
         {
-          app-runtime = pkgs.callPackage ./nix/app-runtime.nix { };
-          app-api-js = pkgs.callPackage ./nix/app-api-js.nix { };
-          app-runtime-src = pkgs.callPackage ./nix/app-runtime-src.nix { };
+          teka-runner = pkgs.callPackage ../nix/packages/teka-runner.nix {
+            craneLib = crane.mkLib pkgs;
+          };
+          app-api-js = pkgs.callPackage ../nix/apps/app-api-js.nix { };
+          teka-src = pkgs.callPackage ../nix/packages/teka-src.nix { };
         };
 
       appOutputs = appLib.flakeOutputs {
@@ -115,8 +106,7 @@
     in
     let
       infraPackages = nixpkgs.lib.mapAttrs (
-        system: attrs:
-        attrs // infraPkgsFor system
+        system: attrs: attrs // infraPkgsFor system
       ) appOutputs.packages;
     in
     appOutputs
@@ -132,13 +122,13 @@
         system:
         let
           pkgs = nixpkgsPkgs.legacyPackages.${system};
-          runtime = (infraPkgsFor system).app-runtime;
+          runner = (infraPkgsFor system).teka-runner;
         in
         appOutputs.checks.${system}
-        // nixpkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          app-runtime = runtime;
-          signed-images = pkgs.callPackage ./nix/tests/signed-images.nix { inherit version; };
-          flake-output-overlays = pkgs.callPackage ./nix/tests/flake-output-overlays.nix {
+        // nixpkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          teka-runner = runner;
+          signed-images = pkgs.callPackage ./tests/signed-images.nix { inherit version; };
+          flake-output-overlays = pkgs.callPackage ./tests/flake-output-overlays.nix {
             tekaFor = system: teka.packages.${system}.teka;
             inherit
               appLib
@@ -148,8 +138,8 @@
               ;
           };
           hello-llm-runtime = pkgs.runCommand "hello-llm-runtime-check" { } ''
-            TEKA_RUNNER=${runtime}/bin/teka-runner \
-              ${pkgs.python3}/bin/python3 ${./.}/examples/hello-llm/tests/runtime.py
+            TEKA_RUNNER=${runner}/bin/teka-runner \
+              ${pkgs.python3}/bin/python3 ${../.}/apps/examples/hello-llm/tests/runtime.py
             touch "$out"
           '';
           hello-ouster-world-startup = pkgs.runCommand "hello-ouster-world-startup-check" { } ''
@@ -159,7 +149,12 @@
         }
       );
       lib = appLib // {
-        inherit (version) appArtifactRawName imageVersion buildId compose;
+        inherit (version)
+          appArtifactRawName
+          imageVersion
+          buildId
+          compose
+          ;
       };
       apps = nixpkgs.lib.genAttrs systems (
         system:

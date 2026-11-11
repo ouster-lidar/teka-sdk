@@ -33,7 +33,7 @@
     let
       name = "hello-ouster-terminal";
 
-      inherit (ps) appRuntime;
+      inherit (ps) tekaRunner;
 
       ousterUdpFirewallRange = "7000-8000";
       ousterLidarDataPort = 7602;
@@ -244,7 +244,7 @@
       unit = ps.mkGpuWaylandUnit {
         inherit name jp;
         description = "hello-ouster-terminal (Sway Wayland kiosk + foot; native GLFW Wayland viz; systemd-run /bin)";
-        execStart = "${appRuntime}/bin/teka-runner ${name} udp ${ousterUdpFirewallRange} ${runLoop}";
+        execStart = "${tekaRunner}/bin/teka-runner ${name} udp ${ousterUdpFirewallRange} ${runLoop}";
         serviceType = "notify";
         runtimeDirectory = name;
         useTty = true;
@@ -262,7 +262,7 @@
       };
       runtimeClosures = [
         runLoopPack
-        appRuntime
+        tekaRunner
         ouster-sdk
         rootInteractiveBin
       ]

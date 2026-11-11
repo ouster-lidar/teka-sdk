@@ -1,5 +1,5 @@
 # App images are Wayland-only compositors (Sway, Cage); do not pull Xwayland into closures.
-final: prev:
+_final: prev:
 let
   disableX = {
     enableXWayland = false;

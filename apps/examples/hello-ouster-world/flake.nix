@@ -17,7 +17,7 @@
         system: packages:
         packages
         // {
-          test = teka-sdk.inputs.app-nixpkgs.legacyPackages.${system}.callPackage ./tests {
+          test = teka-sdk.inputs.nixpkgs.legacyPackages.${system}.callPackage ./tests {
             teka = teka-sdk.packages.${system}.teka;
           };
         }

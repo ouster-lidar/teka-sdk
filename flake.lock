@@ -1,21 +1,5 @@
 {
   "nodes": {
-    "app-nixpkgs": {
-      "locked": {
-        "lastModified": 1783148766,
-        "narHash": "sha256-uslt2pqShTIXDdAHRHv2QkYLsVdY8Oqwz0EA48/RSM8=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "a50de1b7d8a586adc18d2395c19de7d6058e6030",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "crane": {
       "locked": {
         "lastModified": 1792350552,
@@ -33,22 +17,6 @@
       }
     },
     "nixpkgs": {
-      "locked": {
-        "lastModified": 1793225069,
-        "narHash": "sha256-sx1f99WGrDfJ83KKuQrqGPmot0rnDgmpLJDzpU2oHQQ=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "e62746b0b472753ef019baceab6f1e2e52014980",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-unstable": {
       "locked": {
         "lastModified": 1793826729,
         "narHash": "sha256-D5H7H+qMoTGI/jJtxKP4u7BdjkFnUyhOovTrf3pTOr0=",
@@ -83,12 +51,10 @@
     },
     "root": {
       "inputs": {
-        "app-nixpkgs": "app-nixpkgs",
         "crane": "crane",
         "nixpkgs": "nixpkgs",
         "ouster-sdk": "ouster-sdk",
-        "rustsecAdvisoryDb": "rustsecAdvisoryDb",
-        "teka": "teka"
+        "rustsecAdvisoryDb": "rustsecAdvisoryDb"
       }
     },
     "rustsecAdvisoryDb": {
@@ -106,29 +72,6 @@
         "repo": "advisory-db",
         "type": "github"
       }
-    },
-    "teka": {
-      "inputs": {
-        "crane": [
-          "crane"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "nixpkgs-unstable": "nixpkgs-unstable",
-        "rustsecAdvisoryDb": [
-          "rustsecAdvisoryDb"
-        ]
-      },
-      "locked": {
-        "path": "./tools/teka",
-        "type": "path"
-      },
-      "original": {
-        "path": "./tools/teka",
-        "type": "path"
-      },
-      "parent": []
     }
   },
   "root": "root",

@@ -1,7 +1,7 @@
 { pkgs, version }:
 
 let
-  builder = pkgs.callPackage ../image-builder.nix { inherit version; };
+  builder = pkgs.callPackage ../../nix/apps/image-builder.nix { inherit version; };
   image = builder.makeAppImage {
     name = "verity-check";
     unit = pkgs.writeText "verity-check.service" "[Service]\nExecStart=/bin/true\n";
@@ -34,7 +34,7 @@ pkgs.runCommand "signed-app-images-check"
       test "$(cat rootHash)" = "$(cat "$1"/*.roothash)"
       jq -r .signature signature.json | base64 --decode >signature.der
       openssl cms -verify -inform DER -in signature.der -content rootHash \
-        -certfile ${../dev-keys/apps.pem} -nointern -noverify -binary -out /dev/null
+        -certfile ${../../nix/apps/dev-keys/apps.pem} -nointern -noverify -binary -out /dev/null
       veritysetup verify part-2 part-0 "$(cat rootHash)"
     }
     mkdir a b

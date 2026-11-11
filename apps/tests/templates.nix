@@ -1,7 +1,7 @@
 { sdk, system }:
 
 let
-  pkgs = sdk.inputs.app-nixpkgs.legacyPackages.${system};
+  pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
   inherit (pkgs) lib;
   templates = builtins.removeAttrs sdk.templates [ "default" ];
   template = pkgs.writeTextDir "flake.nix" ''

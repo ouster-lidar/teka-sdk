@@ -47,7 +47,7 @@ features=$("$nix" eval --json --expr 'builtins ? getFlake') || fail 'Nix evaluat
 status 'Building portable Teka with Nix'
 runtime_root="${XDG_DATA_HOME:-$HOME/.local/share}/teka"
 mkdir -p "$(dirname "$runtime_root")" || fail 'cannot create Teka runtime directory'
-store_path=$("$nix" build --out-link "$runtime_root" --print-out-paths ./tools/teka#portable) || fail 'Nix build failed'
+store_path=$("$nix" build --out-link "$runtime_root" --print-out-paths .#portable) || fail 'Nix build failed'
 binary="$store_path/bin/teka"
 [ -x "$binary" ] || fail "build did not produce an executable: $binary"
 exec "$binary" build init

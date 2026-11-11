@@ -1,37 +1,35 @@
-# Standalone nix build of the shared app runtime crate (for flake consumers).
 {
-  rustPlatform,
   lib,
-  python3,
   stdenv,
+  craneLib,
+  python3,
 }:
-
-rustPlatform.buildRustPackage rec {
-  pname = "teka-app";
-  version = "0.1.0";
-  src = lib.cleanSource ../lib/app-runtime;
-
-  cargoLock = {
-    lockFile = ../lib/app-runtime/Cargo.lock;
-    outputHashes = { };
+let
+  common = {
+    pname = "teka-runner";
+    version = (builtins.fromTOML (builtins.readFile ../../Cargo.toml)).workspace.package.version;
+    src = import ./source.nix { inherit lib craneLib; };
+    cargoExtraArgs = "--locked -p teka --no-default-features --features app";
+    cargoBuildExtraArgs = "--bin teka-runner";
+    CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
+    strictDeps = true;
+    doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    RUSTFLAGS = "-Dwarnings";
   };
-
-  RUSTFLAGS = "-Dwarnings";
-
-  postCheck = lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
-    TEKA_RUNNER="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/teka-runner" \
-      ${python3}/bin/python3 tests/resource_process.py
-  '';
-
-  postInstall = ''
-    mkdir -p $out/lib
-    rlib=$(
-      find "''${CARGO_TARGET_DIR:-target}" -path '*/release/deps/libteka_app-*.rlib' -print -quit
-    )
-    if [ -z "$rlib" ]; then
-      echo "postInstall: libteka_app rlib not found" >&2
-      exit 1
-    fi
-    cp "$rlib" $out/lib/libteka_app.rlib
-  '';
-}
+  cargoArtifacts = craneLib.buildDepsOnly common;
+in
+craneLib.buildPackage (
+  common
+  // {
+    inherit cargoArtifacts;
+    postCheck = lib.optionalString (common.doCheck && stdenv.hostPlatform.isLinux) ''
+      TEKA_RUNNER="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/teka-runner" \
+        ${python3}/bin/python3 crates/teka/tests/resource_process.py
+    '';
+    meta = {
+      description = "Run an app with Teka registration, resource leases, and lifecycle management";
+      mainProgram = "teka-runner";
+      platforms = lib.platforms.unix;
+    };
+  }
+)

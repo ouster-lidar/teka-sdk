@@ -78,6 +78,19 @@ let
           prev.openblas.override { dynamicArch = false; }
         else
           prev.openblas;
+      # FIXME: Remove when the pin includes https://github.com/NixOS/nixpkgs/pull/577654.
+      # Legacy GCC 16 omits the existing libgomp UID buffer fix and fails with -Werror=format-truncation.
+      gfortran =
+        if prev.stdenv.hostPlatform.system != prev.stdenv.buildPlatform.system then
+          prev.wrapCC (
+            prev.gfortran.cc.overrideAttrs (old: {
+              patches = old.patches ++ [
+                (nixpkgs + "/pkgs/development/compilers/gcc/ng/16/libgomp/uid-buffer-size.patch")
+              ];
+            })
+          )
+        else
+          prev.gfortran;
     };
 
   mkCross =
@@ -122,7 +135,7 @@ let
           --arg root_hash "$(cat ${lib.escapeShellArg "${image}/${basename}.roothash"})" \
           '{format:1,arch:$arch,components:[{type:"app",id:$id,version:$version,root_hash:$root_hash,image:{path:($id+".raw")}}]}' >manifest.json
         mkdir -p "$out"
-        teka package pack --manifest manifest.json \
+        teka tpk pack --manifest manifest.json \
           --member ${lib.escapeShellArg "${id}.raw"}="$raw" \
           --private-key ${./dev-keys/apps.key} --certificate ${./dev-keys/apps.pem} \
           --output "$out/${basename}.tpk"

@@ -323,7 +323,7 @@ fn result_expr(builder: &str, target: &str, apps: &[String]) -> String {
         r#"{{ flake }}:
 let
   apps = builtins.getFlake flake;
-  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.app-nixpkgs).legacyPackages."{builder}";
+  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.nixpkgs).legacyPackages."{builder}";
 in
 pkgs.linkFarm "teka-{target}" [
 {entries}
@@ -348,7 +348,7 @@ fn multi_result_expr(builder: &str, targets: &BTreeSet<String>, apps: &[String])
         r#"{{ flake }}:
 let
   apps = builtins.getFlake flake;
-  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.app-nixpkgs).legacyPackages."{builder}";
+  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.nixpkgs).legacyPackages."{builder}";
 {farms}
 in
 pkgs.linkFarm "teka-multi" [

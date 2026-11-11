@@ -5,7 +5,7 @@
 }:
 
 let
-  pkgs = sdk.inputs.app-nixpkgs.legacyPackages.${system};
+  pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
   program = pkgs.callPackage (import example.source).image {
     ps.makeAppImage = image: builtins.head image.runtimeClosures;
   };

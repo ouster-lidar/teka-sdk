@@ -1,7 +1,7 @@
 { sdk, system }:
 
 let
-  pkgs = sdk.inputs.app-nixpkgs.legacyPackages.${system};
+  pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
 in
 assert
   (sdk.lib.mkAppOutputs {

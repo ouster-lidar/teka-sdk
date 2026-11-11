@@ -1,12 +1,12 @@
 { sdk }:
 
 let
-  inherit (sdk.inputs.app-nixpkgs) lib;
+  inherit (sdk.inputs.nixpkgs) lib;
   examples = lib.mapAttrs (name: _: import ./example.nix { inherit sdk name; }) (
     builtins.removeAttrs sdk.templates [ "default" ]
   );
 in
-lib.genAttrs (lib.attrNames sdk.inputs.teka.checks) (
+lib.genAttrs (lib.attrNames sdk.packages) (
   system:
   lib.optionalAttrs (lib.hasSuffix "-linux" system) (
     {
@@ -20,7 +20,7 @@ lib.genAttrs (lib.attrNames sdk.inputs.teka.checks) (
     // lib.concatMapAttrs (
       name: example:
       let
-        pkgs = sdk.inputs.app-nixpkgs.legacyPackages.${system};
+        pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
         packages = example.outputs.packages.${system};
         crossPackages = lib.filterAttrs (
           packageName: _: lib.hasPrefix "${name}-cross-" packageName

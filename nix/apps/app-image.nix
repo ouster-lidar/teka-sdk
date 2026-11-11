@@ -218,7 +218,7 @@ let
         imageBuilder
         // wayland
         // {
-          appRuntime = pkgs.callPackage ./app-runtime.nix { };
+          tekaRunner = pkgs.callPackage ../packages/teka-runner.nix { inherit craneLib; };
           mkFirefoxApp = args: pkgs.callPackage ./firefox/firefox-wayland-app.nix (args // { ps = psBase; });
           inherit
             hostGpuChecks
@@ -247,7 +247,7 @@ let
         }
         // lib.optionalAttrs (exampleAppsPkgs != null) {
           appApiJs = exampleAppsPkgs.app-api-js;
-          appRuntimeSrc = exampleAppsPkgs.app-runtime-src;
+          tekaSrc = exampleAppsPkgs.teka-src;
         }
       );
     in
@@ -259,7 +259,7 @@ let
 
   mkImageBuilder = import ./image-builder.nix;
 
-  flakeOutputs = import ./flake-outputs.nix { inherit mkApp; };
+  flakeOutputs = import ./default.nix { inherit mkApp; };
 in
 {
   inherit mkApp mkImageBuilder flakeOutputs;

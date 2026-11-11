@@ -1,15 +1,19 @@
 {
   appLib,
-  app-nixpkgs,
+  nixpkgs,
   crane,
   ouster-sdk,
   tekaFor,
 }:
 
+let
+  defaultNixpkgs = nixpkgs;
+in
+
 {
   self,
   apps ? { },
-  nixpkgs ? app-nixpkgs,
+  nixpkgs ? defaultNixpkgs,
   systems ? [
     "x86_64-linux"
     "aarch64-linux"
