@@ -5,7 +5,7 @@ A small dashboard with simulated traffic, latency, and CPU load. Plain HTML, CSS
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy --build hello-webui
 ```
 
 Open `/app/hello-webui` and select **Refresh samples** to update the readings and graphs. All data is simulated.

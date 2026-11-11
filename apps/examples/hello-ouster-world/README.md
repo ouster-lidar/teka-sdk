@@ -5,7 +5,7 @@
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy --build hello-ouster-world
 ```
 
 Open `http://HOST/app/hello-ouster-world` to control the display. The measured Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).
@@ -18,7 +18,7 @@ From the app flake directory, build, deploy and test on a Teka device:
 nix run .#test -- --host "$HOST"
 ```
 
-The [`tests/`](tests/) runner uses the app's locked SDK for its CLI, Python, pytest, Playwright, and Chromium. Set `TEKA_PASSWORD` when the device requires login. From the SDK checkout root, run `nix run ./apps/examples/hello-ouster-world#test --override-input teka-sdk . -- --host "$HOST" --apps-flake ./apps`.
+The [`tests/`](tests/) runner uses the app's locked SDK for its CLI, Python, pytest, Playwright, and Chromium. Set `TEKA_PASSWORD` when the device requires login. From the SDK checkout root, run `nix run ./apps/examples/hello-ouster-world#test --override-input teka-sdk . -- --host "$HOST" --apps-flake .`.
 
 Device tests cover:
 

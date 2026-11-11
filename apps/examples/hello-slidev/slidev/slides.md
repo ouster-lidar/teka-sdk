@@ -192,8 +192,8 @@ layout: default
 # Build & Deploy
 
 ```bash
-cd apps
-nix build .#hello-slidev
+cd teka-sdk
+teka app build hello-slidev
 ```
 
 ```bash

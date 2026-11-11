@@ -61,7 +61,7 @@ teka app deploy --build
 ## App UI
 
 Guide panel at `/app/hello-llm` in Teka (how it works, first-boot tips).
-Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/teka-runner.md)).
+Chat UI: `http://<host>:8080/` (TCP 8080 leased through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/crates/teka/teka-runner.md)).
 Ollama stays on loopback 11434 without a public lease; Teka must use a different port from Open WebUI.
 Open WebUI's sandbox receives a read-only snapshot of the service's resolver configuration at launch so host file replacement cannot break startup.
 

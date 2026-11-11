@@ -21,21 +21,40 @@ $ nix run nixpkgs#hello
 Hello, world!
 ```
 
-From `apps/` (repository path `teka-sdk/apps`), read `flake.nix` and list the example apps that can be built:
+From the repository root (`teka-sdk/`), list the example apps:
 
 ```bash
-$ nix flake show
+$ teka app list
 ```
 
 ## Flake outputs and naming
 
-All build commands run from `apps/` (flake: `apps/flake.nix`).
+The root Cargo workspace contains `teka` and `teka-cli`. Rust examples remain independent Cargo packages with their own lockfiles.
+
+| Entry point | Responsibility |
+|-------------|----------------|
+| Root `flake.nix` | Dependency pins, SDK and CLI packages, app registry, templates and checks |
+| `nix/default.nix` | Workspace packages, development shells and CLI checks |
+| `apps/default.nix` | Example collection, Jetpack overlays and collection checks |
+| Example `flake.nix` | Standalone downstream SDK consumer |
+
+Workspace package definitions live under `nix/packages/`, reusable app builders under `nix/apps/`, and CLI checks under `nix/tests/`. App definitions live under `apps/examples/`, with collection checks under `apps/tests/`. Both the collection and standalone templates use `teka-sdk.lib.mkAppOutputs`. See the [app build library](../apps/specs/app-lib.md) for composition and Cargo source preparation.
+
+App artifacts live at `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>`. Root `packages` contains SDK and CLI outputs; app builds use the registry directly. Run the following commands from the repository root.
 
 **Cross-build** (x86_64-linux host → aarch64-linux device):
 
 ```bash
-$ nix build .#hello-world-cross-aarch64-linux
+$ teka app build --arch aarch64 hello-world
 ```
+
+The equivalent explicit Nix build is:
+
+```bash
+$ nix build .#teka.apps.hello-world.packages.x86_64-linux.aarch64-linux
+```
+
+On macOS, `teka app build` selects a Linux build system and uses a configured Linux builder.
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 # Developer Guide
 
-Task-oriented workflow for building app images from `apps/` and deploying them to a Teka device.
+Build the examples in `apps/` from the repository root and deploy them to a Teka device.
 
 ## Workflows
 
@@ -15,8 +15,8 @@ flowchart TD
     end
 
     subgraph manual [2. Manual build + web UI install]
-        D[nix build .#hello-ouster-terminal-cross-aarch64-linux]
-        E[result/*.tpk]
+        D[teka app build hello-ouster-terminal]
+        E[result/hello-ouster-terminal/*.tpk]
         F[Upload in Teka web UI]
         G[Open app and verify]
         D --> E --> F --> G
@@ -39,11 +39,11 @@ The first workflow is required once. Choose either manual web UI installation or
 
 1. Complete the [Linux host setup](linux.md) and [Nix configuration](nix.md).
 2. Clone this repository.
-3. [Install the Teka CLI](../tools/teka/README.md#install) from the repository root.
-4. Change to `apps/`, the directory containing `flake.nix`:
+3. [Install the Teka CLI](../crates/teka-cli/README.md#install) from the repository root.
+4. Run commands from the repository root, which contains `flake.nix`:
 
    ```bash
-   cd teka-sdk/apps
+   cd teka-sdk
    ```
 
 5. List available app ids:
@@ -54,13 +54,13 @@ The first workflow is required once. Choose either manual web UI installation or
 
 ## Workflow 2: Manual build + web UI install
 
-1. From `apps/`, build the app package targeting Jetson `aarch64-linux`:
+1. From the repository root, build the app package targeting Jetson `aarch64-linux`:
 
    ```bash
-   nix build .#hello-ouster-terminal-cross-aarch64-linux
+   teka app build --arch aarch64 hello-ouster-terminal
    ```
 
-2. In the web UI, upload the `.tpk` package from `result/`.
+2. In the web UI, upload the `.tpk` package from `result/hello-ouster-terminal/`.
 3. Open the app in the web UI and verify it.
 
 Replace `hello-ouster-terminal` with another app id as needed.
@@ -69,7 +69,7 @@ Replace `hello-ouster-terminal` with another app id as needed.
 
 1. Open the Teka device web interface in a browser and confirm it loads.
 2. Note the Teka administrator password set during initial setup.
-3. From `apps/`, run:
+3. From the repository root, run:
 
    ```bash
    export TEKA_PASSWORD='…'
@@ -82,7 +82,7 @@ After deploy:
 
 - Open the device app UI or manager for the installed app.
 - Read app-specific behavior and checks in the README in that app's directory under `apps/examples/`.
-- Rerun the same `teka app deploy` command from `apps/` to rebuild and replace an existing install.
+- Rerun the same `teka app deploy` command from the repository root to rebuild and replace an existing install.
 
 ## Troubleshooting
 

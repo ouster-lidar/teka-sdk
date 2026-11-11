@@ -1,6 +1,6 @@
 # App image erofs DDI format
 
-App `.tpk` packages contain signed GPT **DDI** images with erofs and dm-verity per [teka-package.md](../../tools/teka/specs/teka-package.md).
+App `.tpk` packages contain signed GPT **DDI** images with erofs and dm-verity per [TPK specification](../../specs/teka-tpk.md).
 `makeAppImage` uses `systemd-repart` with the mkfs tuning below.
 Bind `roothash` into the package manifest.
 
@@ -22,7 +22,7 @@ mkfs.erofs --all-root -T0 -zlz4hc,level=9 -Efragments -C 16384 <output> <tree>
 fsck.erofs <output>
 ```
 
-**Build wiring (apps flake only):** Importing `nix/erofs-mkfs.nix` with `{ lib, erofs-utils }` returns shared `args` and a `mkfs` function accepting `{ output, sourceDir, extraArgs ? [ ] }`. `nix/image-builder.nix` → `makeAppImage` passes `args` to repart and remains the only erofs entry point. App packages must not call `mkfs.erofs` directly.
+**Build wiring:** Importing `nix/apps/erofs-mkfs.nix` with `{ lib, erofs-utils }` returns shared `args` and a `mkfs` function accepting `{ output, sourceDir, extraArgs ? [ ] }`. `nix/apps/image-builder.nix` → `makeAppImage` passes `args` to repart and remains the only erofs entry point. App packages must not call `mkfs.erofs` directly.
 
 ## Extension DDI sizes (`x86_64-linux` `*.raw`)
 
@@ -41,12 +41,12 @@ Measured 2026-06-25: **before** = plain `-zlz4hc,level=9` (commit `53e9c36f`); *
 
 Measured 2026-09-29 from source revision `2be1287c02f934b298ea3324af8ee6a5cc26e577`. Sizes are exact `.raw` bytes and MiB (1 MiB = 1,048,576 bytes).
 
-| App | Target | Flake output | DDI size |
-|-----|--------|--------------|---------:|
-| `hello-ouster-world` | `x86_64-linux` (native) | `.#hello-ouster-world` | 743,849,984 bytes (709.39 MiB) |
-| `hello-ouster-world` | `aarch64-linux` (cross) | `.#hello-ouster-world-cross-aarch64-linux` | 639,840,256 bytes (610.20 MiB) |
-| `hello-ouster-dynamo` | `x86_64-linux` (native) | `.#hello-ouster-dynamo` | 743,624,704 bytes (709.18 MiB) |
-| `hello-ouster-dynamo` | `aarch64-linux` (cross) | `.#hello-ouster-dynamo-cross-aarch64-linux` | 639,549,440 bytes (609.92 MiB) |
+| App | Target | DDI size |
+|-----|--------|---------:|
+| `hello-ouster-world` | `x86_64-linux` (native) | 743,849,984 bytes (709.39 MiB) |
+| `hello-ouster-world` | `aarch64-linux` (cross) | 639,840,256 bytes (610.20 MiB) |
+| `hello-ouster-dynamo` | `x86_64-linux` (native) | 743,624,704 bytes (709.18 MiB) |
+| `hello-ouster-dynamo` | `aarch64-linux` (cross) | 639,549,440 bytes (609.92 MiB) |
 
 ## Coverage
 
@@ -59,10 +59,8 @@ All erofs app images use `ps.makeAppImage`:
 ## Verify
 
 ```bash
-# Single mkfs entry point in apps
-rg 'mkfs\.erofs' apps/ --glob '!README.md'   # → nix/erofs-mkfs.nix only
-
-cd apps
-nix build .#hello-world
-nix build .#checks.x86_64-linux.default
+# Run from the repository root.
+rg 'mkfs\.erofs' nix/apps/ --glob '*.nix'
+teka app build hello-world
+nix build .#checks.x86_64-linux.signed-images
 ```

@@ -1,47 +1,44 @@
 # App image cross-build
 
-App image DDIs target **Linux** only. The `apps/` flake `systems` list may include cross-only build hosts (e.g. `aarch64-darwin`) in addition to Linux.
+App image DDIs target Linux only. Artifacts use two explicit Linux systems:
 
-## Short names (`hello-http`)
-
-On **Linux** build hosts, `<id>` is a native build for that system.
-
-On **non-Linux** build hosts (e.g. `aarch64-darwin`), `<id>` builds a Linux package for the same CPU.
-Explicit cross attributes select other Linux targets.
-These builds require a Linux builder.
-Use the short name from a Mac:
-
-```bash
-nix build .#hello-http
+```text
+teka.apps.<id>.packages.<buildSystem>.<targetSystem>
 ```
 
-On **x86_64-linux** building for an **aarch64** appliance, use the explicit cross attr (short name stays native x86_64):
+Equal systems select a native build; different systems select a cross-build. Root `packages` contains SDK and CLI outputs. App artifacts live in `teka.apps` without short names, cross aliases, or a default bundle.
+
+## Build an app
+
+Run commands from the repository root. The CLI defaults to an AArch64 target:
 
 ```bash
-nix build .#hello-http-cross-aarch64-linux
+teka app build --arch aarch64 hello-http
 ```
 
-Explicit `*-cross-<system>` attrs remain on every build host for other targets.
+On an x86_64 Linux host, this selects:
+
+```bash
+nix build .#teka.apps.hello-http.packages.x86_64-linux.aarch64-linux
+```
+
+## Platform selection
+
+| Host | Target | Registry build system | Build |
+|------|--------|-----------------------|-------|
+| `x86_64-linux` | `x86_64-linux` | `x86_64-linux` | Native |
+| `x86_64-linux` | `aarch64-linux` | `x86_64-linux` | Cross |
+| `aarch64-linux` | `aarch64-linux` | `aarch64-linux` | Native |
+| `aarch64-linux` | `x86_64-linux` | `aarch64-linux` | Cross |
+| `aarch64-darwin` | `aarch64-linux` | `aarch64-linux` | Native on a configured Linux builder |
+| `aarch64-darwin` | `x86_64-linux` | `x86_64-linux` | Native on a configured Linux builder |
+
+`nix/apps/default.nix` exposes only Linux build and target systems. `teka app build` and `deploy` use the host system on Linux and the target Linux system on other hosts. A successful x86_64-to-ARM cross-build verifies compilation and packaging; it does not execute ARM tests or establish that native ARM builds pass.
+
+App binaries and the runner use target packages and their Crane library. Source preparation and image tools use build-platform packages. TPK packing runs the build-platform CLI.
 
 ## Distribution filenames
 
-Each public app derivation ships **`$out/<id>-<system>-v<compose>.tpk`** (see [naming.md](naming.md)).
-The flake **`default`** bundle re-exports every native app package with that basename so mixed-arch upload folders stay unique.
+Each app derivation contains one `$out/<id>-<targetSystem>-v<compose>.tpk` file (see [naming.md](naming.md)). `teka app build` links requested apps under `result/<id>`; deployments for multiple architectures use `result/<target>/<id>`.
 
-```bash
-nix build .#default   # on x86_64-linux: <id>-x86_64-linux-v<compose>.tpk for every native app package
-```
-
-Cross targets for other CPUs stay explicit (`hello-http-cross-aarch64-linux`, …).
-
-## `systems` summary
-
-| System | `hello-http` | Explicit cross |
-|--------|--------------|----------------|
-| `x86_64-linux` | native x86_64 | `hello-http-cross-aarch64-linux` |
-| `aarch64-linux` | native aarch64 | `hello-http-cross-x86_64-linux` |
-| `aarch64-darwin` | cross aarch64-linux | `hello-http-cross-x86_64-linux`, … |
-
-`nix/flake-outputs.nix` derives Linux targets from `systems` via the `*-linux` suffix.
-
-`teka app build` / `deploy` never select `packages.<darwin>.*`. A non-Linux builder asks for `packages.<linux-target>.<app>` so a Linux builder produces it. A Linux builder uses the short name for its own system and `<app>-cross-<target>` for the other Linux system.
+Image checks retain native names under `checks.<buildSystem>.<id>` and cross names under `checks.<buildSystem>.<id>-cross-<targetSystem>`.

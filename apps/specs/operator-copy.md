@@ -4,7 +4,7 @@ Casing and wording for text operators read in app UIs and host app-shell chrome.
 
 Related:
 
-- Portable web helpers in [apps/web/](../web/) (`formatChipLabel`, `formatEnumLabel`, `formatServiceSummary`).
+- Portable web helpers in [nix/apps/web/](../../nix/apps/web/) (`formatChipLabel`, `formatEnumLabel`, `formatServiceSummary`).
 
 ## Layers
 

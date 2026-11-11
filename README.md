@@ -1,6 +1,6 @@
 # Teka Example Apps
 
-Build app images from `apps/`, deploy to a Teka device (for example a ZedBox), and run them alongside other appliance apps.
+Build the examples in `apps/`, deploy to a Teka device (for example a ZedBox), and run them alongside other appliance apps.
 
 ## Start here
 
@@ -14,22 +14,22 @@ Browse [all examples](apps/examples/); each app has its own README.
 
 1. Complete the [Linux host setup](docs/linux.md).
 2. Clone this repository.
-3. [Install the CLI](tools/teka/README.md#install), or run `nix develop` at the repo root for `teka` on `PATH` without installing.
+3. [Install the CLI](crates/teka-cli/README.md#install), or run `nix develop` at the repo root for `teka` on `PATH` without installing.
 4. Build and deploy an app, or upload its image in the web UI.
 
-From `apps/`:
+From the repository root:
 
 **Build** (image on disk only, for web UI or app distribution):
 
 ```bash
-cd teka-sdk/apps
+cd teka-sdk
 teka app build hello-world
 ```
 
 **Build + Deploy** (normal workflow — build for the device, upload, sample logs):
 
 ```bash
-cd teka-sdk/apps
+cd teka-sdk
 teka app deploy --build hello-ouster-world --host http://<device>/
 ```
 
@@ -43,3 +43,9 @@ Full procedures: [Developer Guide](docs/developer-guide.md).
 | [Linux host setup](docs/linux.md)            | Packages and Nix                                 |
 | [WSL 2 host setup](docs/wsl2.md)             | Windows development host, networking             |
 | [Nix install and flake outputs](docs/nix.md) | Nix install and flake outputs                    |
+
+## Rust SDK
+
+- [`teka`](crates/teka/README.md) provides app runtime integration and optional device-client and TPK APIs.
+- [`teka-cli`](crates/teka-cli/README.md) provides the `teka` development CLI.
+- [`teka-runner`](crates/teka/teka-runner.md) manages registration, resource leases and lifecycle for external app executables.

@@ -11,10 +11,10 @@ Web assets install under `usr/lib/teka/mission-control/web/`.
 
 | Layer | Pattern | Example |
 |-------|---------|---------|
-| App id / flake attr | `hello-{topic}` | `hello-http` |
+| App id / registry key | `hello-{topic}` | `teka.apps.hello-http` |
 | Source dir | topic | `examples/hello-http/` |
 | App guide | `README.md` | `examples/hello-http/README.md` |
-| Shared web helper (source) | `apps/web/app-api.js` | — |
+| Shared web helper (source) | `nix/apps/web/app-api.js` | — |
 | Shared web helper (DDI install) | `usr/lib/teka/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
 | App panel JS global | `tekaAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
 
@@ -22,22 +22,21 @@ The Ouster viewers use distinct IDs and roles: `hello-ouster-world` is the direc
 
 ## Example discovery
 
-Each directory under `examples/` with a `default.nix` is discovered as an app. Cargo lockfile updates find projects from `Cargo.toml`, and app-specific image checks from `tests/image-check.nix`. `simpleCrossServices` in `apps/flake.nix` names the few apps that do not need the heavier cross-build workarounds.
+Each directory under `examples/` with a `default.nix` is discovered as an app. Cargo lockfile updates find projects from `Cargo.toml`, and app-specific image checks from `tests/image-check.nix`. `simpleCrossApps` in `apps/default.nix` names the few apps that do not need the heavier cross-build workarounds.
 
 ## Package names and identity
 
-App outputs use `<id>` and `<id>-cross-<system>` attributes and contain one signed `.tpk` each.
-`default` bundles the native app packages.
+App artifacts live under `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>` and contain one signed `.tpk` each. Native builds use equal systems; cross-builds use distinct systems.
 
-Package filenames use `<id>-<system>-v<compose>.tpk` in `nix build` outputs and the `#default` bundle.
+Package filenames use `<id>-<system>-v<compose>.tpk` in each app output.
 
 - **`<id>`** — app id (`os-release` **`ID=`**).
-- **`<system>`** — Nix platform (`x86_64-linux`, `aarch64-linux`); cross attrs use the **target**.
-- **`<compose>`** — **`${IMAGE_VERSION}+${BUILD_ID}`** from `apps/nix/version.nix`.
+- **`<system>`** — Nix platform (`x86_64-linux`, `aarch64-linux`); the filename uses the **target**.
+- **`<compose>`** — **`${IMAGE_VERSION}+${BUILD_ID}`** from `nix/apps/version.nix`.
 
 - Replace identity is **`(id, root_hash)`** from the verified package, independent of **`VERSION_ID`** and SemVer order.
 - Deploy requires exactly one **`.tpk`** per app output.
-- App manifest **`version`** should match the release version **`IMAGE_VERSION`** from `apps/nix/version.nix`.
+- App manifest **`version`** should match the release version **`IMAGE_VERSION`** from `nix/apps/version.nix`.
 
 App image `os-release`:
 
@@ -53,6 +52,6 @@ App image `os-release`:
 | `PRETTY_NAME` | `<id> portable <IMAGE_VERSION>` |
 | `PORTABLE_PREFIXES` | app id |
 
-- Filename **`<compose>`** is **`${IMAGE_VERSION}+${BUILD_ID}`** from `apps/nix/version.nix`. **`TEKA_TEST_VERSION`** overrides the SemVer core when set (flake eval reads env only with **`--impure`**); unset defaults to **`0.1.0-alpha.1`**. Malformed SemVer throws at eval.
-- Flake **`checks.<system>.<id>`** (and **`<id>-cross-<system>`**) validates image naming and `os-release` fields against `apps/nix/version.nix`, including **`VERSION_ID=1`**.
+- Filename **`<compose>`** is **`${IMAGE_VERSION}+${BUILD_ID}`** from `nix/apps/version.nix`. **`TEKA_TEST_VERSION`** overrides the SemVer core when set (flake eval reads env only with **`--impure`**); unset defaults to **`0.1.0-alpha.1`**. Malformed SemVer throws at eval.
+- Flake **`checks.<system>.<id>`** (and **`<id>-cross-<system>`**) validates image naming and `os-release` fields against `nix/apps/version.nix`, including **`VERSION_ID=1`**.
 - Host GPU **`extension-release.portable-gl-extension`** matches **`ID=teka-portable`** via **`ID_LIKE`** and **`VERSION_ID=1`** (same GPU compatibility generation as app images). Bump both sides only for a breaking GPU extension change.

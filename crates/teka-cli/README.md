@@ -1,6 +1,6 @@
 # Teka CLI
 
-Build app images and deploy them to Teka devices.
+Build app images, manage TPK packages, and deploy to Teka devices. The `teka-cli` package installs the `teka` executable and uses the [`teka`](../teka/README.md) SDK.
 
 ## Install
 
@@ -12,7 +12,9 @@ From the repository root, run:
 
 Bootstrap installs Nix if needed, builds Teka, and installs it to `~/.local/bin` when that directory is on `PATH`, otherwise `/usr/local/bin`. Rerun it after updating your checkout. For a downloaded portable binary, run `./teka-<system> build init`.
 
-For a temporary shell without installing Teka, run `nix develop` at the repository root, in `apps/`, or in `tools/teka/`. If Fish startup configuration puts an older installed Teka first on `PATH`, use `nix develop --command fish --no-config`, or run commands directly with `nix develop --command teka …`.
+For a temporary shell without installing Teka, run `nix develop` at the repository root. If Fish startup configuration puts an older installed Teka first on `PATH`, use `nix develop --command fish --no-config`, or run commands directly with `nix develop --command teka …`.
+
+Install from Cargo with `cargo install teka-cli --version 0.1.0 --locked`. Building requires Rust 1.95 or newer, a C compiler, `pkg-config`, and OpenSSL development headers/libraries. On macOS, install the Xcode command line tools and OpenSSL (for example, `brew install openssl@3 pkg-config`). App builds and build-environment commands also require Nix with `nix-command flakes` enabled.
 
 Nix packages include the UKI verifier. Portable and Cargo installs require `sbverify` from `sbsigntool` on Linux, or `brew install osslsigncode` on Darwin.
 
@@ -47,7 +49,7 @@ teka app init my-app
 
 Use `--example NAME` to choose an example; otherwise, initialization uses the catalog's default. The directory defaults to `.`. Initialization preserves the example's app ID and reports conflicting files without overwriting them. SDK examples use the SDK revision that supplied them.
 
-For the SDK examples, work from `apps/`:
+For the SDK examples, work from the repository root:
 
 ```sh
 teka app list
@@ -64,10 +66,10 @@ teka system update ./image.tpk --wait --host http://device.local
 
 App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
 
-- `package pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
-- `package verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.
-- `package inspect --verify` reports trust as unavailable unless `--trust` is supplied.
-- `package stream` requires publisher trust and emits authenticated member bytes. Disk input reads the selected member; HTTP(S) input validates the complete transport. Output may precede a late failure; check command success before using output.
+- `tpk pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
+- `tpk verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.
+- `tpk inspect --verify` reports trust as unavailable unless `--trust` is supplied.
+- `tpk stream` requires publisher trust and emits authenticated member bytes. Disk input reads the selected member; HTTP(S) input validates the complete transport. Output may precede a late failure; check command success before using output.
 
 `system update --wait` waits for a rebooting update to commit or fail.
 
@@ -109,7 +111,7 @@ teka build vm status       # service activity, guest state, and brief live usage
 teka build vm check        # prerequisites, SSH, internet access, and OOM kills; may boot
 ```
 
-The plugin uses Nixpkgs’ cached Linux guest and vzvm 1.1.0, with gvproxy userspace networking and no GUI. A separate `nixpkgs-unstable` input supplies vzvm and its NixOS VM module; guest packages retain the main Nixpkgs pin. The module configures idle timeout, console logging, and SSH forwarding through Nix options. Rosetta must already be installed on the Mac (`softwareupdate --install-rosetta --agree-to-license`). Keys, the sparse 64 GiB data disk, and logs live in `${XDG_DATA_HOME:-~/.local/share}/teka-build-vm`. The `runtime` out-link retains the runtime as a Nix GC root. SSH listens on localhost port 31023. A unique host key stays in the private state directory; init/reset updates the CLI and system builder pins automatically.
+The plugin uses Nixpkgs’ cached Linux guest and vzvm 1.1.0, with gvproxy userspace networking and no GUI. The shared `nixpkgs` input supplies the VM monitor, NixOS module, and guest packages. The module configures idle timeout, console logging, and SSH forwarding through Nix options. Rosetta must already be installed on the Mac (`softwareupdate --install-rosetta --agree-to-license`). Keys, the sparse 64 GiB data disk, and logs live in `${XDG_DATA_HOME:-~/.local/share}/teka-build-vm`. The `runtime` out-link retains the runtime as a Nix GC root. SSH listens on localhost port 31023. A unique host key stays in the private state directory; init/reset updates the CLI and system builder pins automatically.
 
 gvproxy carries guest TCP/UDP traffic and DNS through the Mac over a private Unix socket, supporting VPNs that block native VM NAT. It stays idle between guest boots and exits with the runner. No privileged helper or proxy settings are required. External ICMP/ping is unsupported.
 
@@ -125,7 +127,7 @@ Settings are validated before saving. If preparation or startup fails while stop
 
 `vm init --reset` stops and disables the service, waits for its process to exit, and removes the entire VM state directory and old LaunchAgent. It then creates fresh SSH keys and a new disk, restores default CPU/RAM and the 1800s on-demand policy, updates the system builder credentials through sudo, and enables the service at login. This deletes the old VM's writable store, logs, and saved settings, including invalid configuration. Normal `init` preserves existing state. If runtime setup or registration fails after deletion, the service stays disabled; retry `vm init` to finish setup.
 
-Nix builds embed both resolved Nixpkgs input revisions in the CLI; direct Cargo builds use `tools/teka/flake.lock`. After updating the flake lock, rebuild or upgrade Teka, then stop the VM service. The next start or `vm init` updates the runtime and store image while preserving the writable disk. To debug startup, inspect `~/.local/share/teka-build-vm/vm.log` and `vm/console.log` under the same data directory.
+Nix builds embed the resolved Nixpkgs input revision in the CLI; direct Cargo builds use the package-local `src/fallback-pins.json`. After updating the root `flake.lock`, run `python3 crates/teka-cli/update-pins.py` from the repository root and commit the refreshed pins. Rebuild or upgrade Teka, then stop the VM service. The next start or `vm init` updates the runtime and store image while preserving the writable disk. To debug startup, inspect `~/.local/share/teka-build-vm/vm.log` and `vm/console.log` under the same data directory.
 
 `vm ssh` forwards SSH options and commands and returns the SSH exit status. Its handshake timeout allows cold boot. It allocates a TTY when stdin and stdout are terminals; use `-T` to disable or `-t`/`-tt` to request one. `vm btop` opens the monitor bundled with the guest's Nixpkgs pin without runtime package downloads. The monitor is also on the guest PATH, so `vm ssh btop` and plain `btop` in the guest shell work.
 
@@ -190,17 +192,16 @@ The first executable on `PATH` wins, and its directory supplies the metadata. Bu
 
 ## Develop
 
-For Rust changes under `tools/teka/`:
+For Rust changes under `crates/teka-cli/`, run from the repository root:
 
 ```sh
-cd tools/teka
 nix flake check
-nix develop
-cargo run -p teka-cli -- --help
+nix develop -c cargo test -p teka-cli
+nix develop -c cargo run -p teka-cli -- --help
 ```
 
 Build downloadable binaries for the current platform from the repository root with `nix build .#teka.dist`. The `result/` directory contains the executable and `SHA256SUMS`.
 
-`nix run .#test-build-init` tests installation and AArch64 Linux compilation in a fresh Ubuntu VM on x86_64 Linux or an ARM macOS guest on Apple Silicon, streaming guest output and build logs. On macOS, a software-emulated Linux builder runs inside the Tart guest without nested hardware virtualization. See the [test spec](specs/installer-test.md).
+`nix run .#test-build-init` tests installation and AArch64 Linux compilation in a fresh Ubuntu VM on x86_64 Linux or an ARM macOS guest on Apple Silicon, streaming guest output and build logs. On macOS, a software-emulated Linux builder runs inside the Tart guest without nested hardware virtualization. See the [test spec](../../specs/installer-test.md).
 
-Agent implementation requirements live in [specs/teka-cli.md](specs/teka-cli.md). See the [developer guide](../../docs/developer-guide.md) for app workflows.
+Agent implementation requirements live in [specs/teka-cli.md](../../specs/teka-cli.md). See the [developer guide](../../docs/developer-guide.md) for app workflows.

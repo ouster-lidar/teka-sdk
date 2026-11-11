@@ -1,57 +1,46 @@
-# App lib flake exports
+# App build library
 
-Stable `lib` and `packages` outputs from `apps/flake.nix` for downstream flake consumers.
+The root `flake.nix` exports `lib.mkAppOutputs` for both the example collection and standalone downstream apps. These Nix interfaces are internal; update callers together when changing them.
 
-The shared runtime Cargo package is `teka-app`, imported as `teka_app`, per [Rust crate naming](../../specs/rust-crate-naming.md). Its Nix package attribute remains `app-runtime`; the installed Rust library is `libteka_app.rlib`.
+The shared SDK Cargo package is `teka`, with runtime APIs under `teka::app`, per [Rust crate naming](../../specs/rust-crate-naming.md). The `teka-runner` Nix package provides the standalone runtime executable; `teka-src` supplies SDK sources with workspace metadata materialized.
 
 ## Ownership
 
 Keep app-specific build expressions and runtime helpers inside their example.
-Shared implementations under `apps/nix/` need multiple actual consumers or a documented public-library purpose; a central import alone does not establish sharing.
+Shared implementations under `nix/apps/` need multiple actual consumers or a documented public-library purpose; a central import alone does not establish sharing.
 Group shared browser, SDK, overlay, and Wayland support by domain.
 
 ## `lib` API
 
 | Export | Role |
 |--------|------|
-| `mkApp` | App image builder context (`ps` in `default.nix`) |
-| `mkImageBuilder` | DDI image staging (`makeAppImage`, …) |
-| `flakeOutputs` | Signed `.tpk` app `packages` + image `checks` for a `services` attrset |
+| `mkAppOutputs` | App registry with signed `.tpk` artifacts and image/Cargo `checks` |
 | `mkVersion` | `version.nix` — `IMAGE_VERSION`, `BUILD_ID`, `appArtifactRawName` |
-| `appCrate` | `app-crate.nix` — crate/web/manifest helpers (also on `ps.appCrate`) |
-| `paths` | Stable paths to shared nix (`erofs-mkfs`, `core-version-validate`) |
-| `appArtifactRawName` | `<id>-<system>-v<compose>.raw` basename helper |
+| `paths` | Paths to shared Nix expressions (`erofs-mkfs`, `core-version-validate`) |
 
-## Shared infra `packages.<system>.*`
-
-| Attr | Purpose |
-|------|---------|
-| `app-api-js` | Web helper prepended into app `*.js` at image build |
-| `app-runtime-src` | Source tree for app-runtime path dependency overrides |
-| `app-runtime` | Standalone build of the runtime crate and its tests |
-
-Resolve attrs via `nix flake show`.
-
-## `exampleAppsPkgsFor`
-
-`flakeOutputs` accepts `exampleAppsPkgsFor` so consumers can supply shared infra packages from their pinned input:
+## Composition
 
 ```nix
-exampleAppsPkgsFor = _: {
-  app-api-js = example-apps + "/web/app-api.js";
-  app-runtime-src = example-apps + "/lib/app-runtime";
-};
+teka-sdk.lib.mkAppOutputs {
+  inherit self;
+  apps.my-app = import ./.;
+  advisoryDb = teka-sdk.inputs.rustsecAdvisoryDb;
+}
 ```
 
-Those are source paths, not `packages.${system}` derivations. App `default.nix` uses `ps.appCrate` (wired inside `mkApp`).
+`apps` contains app definitions with an `image` function. `self` provides version metadata. Optional `systems`, `version`, `overlays`, `ousterSdkSrc`, and `tekaSrc` configure actual build inputs. `advisoryDb` enables Cargo audit checks; omitting it disables them.
+
+`systems` defaults to `x86_64-linux` and `aarch64-linux`; only those Linux systems are supported. `mkAppOutputs` exports artifacts under `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>` and checks under `checks.<LinuxBuildSystem>`. App artifacts stay in this registry; root `packages` remains dedicated to SDK and CLI outputs.
+
+The root `packages.<system>.teka-src` output materializes workspace metadata for standalone SDK consumers. Pass a source path or source derivation as `tekaSrc` to override it. The runner and app binaries use target packages and their Crane library; source assembly uses `pkgs.buildPackages`, and TPK signing runs the build-platform CLI. macOS delegates app image builds to Linux builders.
 
 ## App-specific image checks
 
-`flakeOutputs` accepts `imageChecks`, an attrset keyed by service ID.
+`mkAppOutputs` accepts `imageChecks`, an attrset keyed by service ID.
 Each value is a function receiving `{ pkgs, imageVersion }` and returning a shell snippet added to that service's native and cross image checks.
 The snippet can inspect the image at `$raw`; generic filesystem, unit, and `os-release` validation remains shared.
 
-`flakeOutputs` accepts `simpleCrossServices` for apps that do not need the additional cross-build workarounds; it defaults to an empty list. The app flake keeps this small exception list explicit.
+`mkAppOutputs` accepts `simpleCrossApps` for apps that do not need the additional cross-build workarounds; it defaults to an empty list. `apps/default.nix` keeps this small exception list explicit.
 
 ## Host contract
 
@@ -73,11 +62,11 @@ Install app manifests and web assets at host paths under `usr/lib/teka/mission-c
 
 ## Flake input `follows`
 
-This flake pins `nixpkgs`, `crane`, and `jetpack`. Downstream flakes should use `inputs.<this-flake>.inputs.*.follows` so app builds inherit the consumer's toolchain pins.
+The root flake pins Nixpkgs, Crane, and Jetpack, with Jetpack following the same Nixpkgs pin. `apps/default.nix` selects the Jetpack overlays for the example collection. Standalone examples consume the root SDK flake.
 
 ## Downstream compatibility
 
-Commit and merge `lib` / app-api / app-runtime changes in **this repo** before downstreams bump their flake input. Consumers record the pinned git **commit** in `flake.lock`—not a release tag.
+Commit and merge `lib` / app-api / SDK changes in **this repo** before downstreams bump their flake input. Consumers record the pinned git **commit** in `flake.lock`—not a release tag.
 
 ## Change checklist
 
@@ -86,8 +75,18 @@ Commit and merge `lib` / app-api / app-runtime changes in **this repo** before d
 
 ## Rust app builds
 
-`flakeOutputs` requires the `crane` input. Direct `mkApp` and `appCrate` callers supply `craneLib = crane.mkLib pkgs` using the native or cross package set. Follow the apps flake's `crane` input downstream to share its pin.
+App definitions receive crate, web, and manifest helpers through `ps.appCrate`:
 
-Use `ps.appCrate.buildAppCrate { crateName = "my-app"; filteredSrc = ps.appCrate.appRustSrc { srcDir = ./.; }; }`. Optional `nativeBuildInputs`, `buildInputs`, and `meta` apply to the package; dependency builds receive the same build inputs. Cargo lockfiles drive vendoring, dependency artifacts are cached separately, and native builds run Cargo tests. Cross builds compile without executing target tests. Sources retain the `examples/<crateName>` and `lib/app-runtime` layout, with `appRuntimeSrc` supplying the shared runtime (including downstream overrides).
+```nix
+app.buildAppCrate (
+  (app.prepareAppSource {
+    crateName = "my-app";
+    src = app.appRustSrc { srcDir = ./.; };
+  })
+  // { meta.mainProgram = "my-app"; }
+)
+```
 
-Put build-platform tools in `nativeBuildInputs` and target libraries in `buildInputs`. Cargo provides crate names and caps third-party dependency lints; local Rust warnings remain errors. Run `nix run .#update-cargo-lock` from the apps directory when updating lockfiles.
+`prepareAppSource` returns `src`, `dummySrc`, `cargoRoot`, `cargoToml`, and `cargoLock`. It assembles both source trees with the same `apps/examples/<crateName>` and `crates/teka` layout so relative Cargo dependencies resolve consistently, including SDK overrides. Manifest and lockfile paths refer to the app source so reading build metadata does not require assembling the tree. For generated app sources, pass an evaluation-readable `cargoSrc` with matching manifests, lockfile and target layout. Generated SDK sources can expose a matching `dummySrc` passthru; the default `teka-src` provides this to avoid building sources during evaluation. `buildAppCrate` consumes those explicit inputs; it does not assemble sources. Optional `nativeBuildInputs`, `buildInputs`, and `meta` apply to the package; dependency builds receive the same build inputs. Cargo lockfiles drive vendoring, dependency artifacts are cached separately, and native builds run Cargo tests. Cross builds compile without executing target tests.
+
+Put build-platform tools in `nativeBuildInputs` and target libraries in `buildInputs`. Cargo provides crate names and caps third-party dependency lints; local Rust warnings remain errors. Run `nix run .#update-cargo-lock` from the repository root when updating lockfiles.
