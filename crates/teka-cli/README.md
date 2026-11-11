@@ -52,9 +52,14 @@ Use `--example NAME` to choose an example; otherwise, initialization uses the ca
 For the SDK examples, work from the repository root:
 
 ```sh
+teka device list --discover
+teka device list --discover gtw-onx
+teka device select
+teka device list
+teka device status --json
 teka app list
 teka app build hello-world
-teka app deploy --device http://device.local hello-world hello-pub
+teka app deploy --device http://device.local hello-world
 teka app deploy --device http://device.local --build hello-world hello-pub
 teka tpk pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
 teka tpk verify hello-world.tpk --trust ./trust
@@ -62,9 +67,10 @@ teka tpk inspect hello-world.tpk --verify --trust ./trust
 teka tpk stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
 teka system status --device http://device.local
 teka system update ./image.tpk --wait --device http://device.local
+teka device forget
 ```
 
-App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--device` or `TEKA_DEVICE`.
+App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--device`, `TEKA_DEVICE`, or the saved selection, in that order. Deployment uses all selected devices; for example, `teka app deploy --build hello-world` deploys to the saved selection. System commands accept one device; use `--device` or `TEKA_DEVICE` to override multiple saved targets. Repeat `--device` for multiple deployment targets.
 
 - `tpk pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
 - `tpk verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.
@@ -77,9 +83,17 @@ Unknown commands run `teka-<name>` from `PATH`; `teka --help` lists plugins.
 
 App builds, deployments, and listings use the nearest app project. Use `--flake DIR` or `TEKA_APPS_FLAKE_ROOT` to select another project.
 
-Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
+`teka device status [PATTERN…]` reports each matching known device, with a blank line between human reports. Without patterns, it reports all selected devices (or `TEKA_DEVICE` when set). Patterns use the same hostname/PN/SN matching as select and forget; explicit URLs work directly, and `--device URL` remains available for one target. Status never prompts or changes selection. `--json` returns an object keyed by canonical device URL; no targets produces `{}`. Each report includes credential source, reachability, authentication, and system-resolved addresses.
 
-Use `teka device discover` to find devices on the local network, or add `--json` for machine-readable results. HTTP clients resolve `.local` device names through mDNS.
+`teka device list` lists known devices offline, with `*` marking each selected deployment target. Add `--discover` to force a fresh network lookup, showing hostnames and available hardware details; discovery reports how many unique devices were found and how many matched the patterns; `--timeout SECONDS` controls the browse duration. `--json` gives machine-readable output in either mode.
+
+`teka device select` discovers devices and opens a multi-select menu. Use ↑/↓ to move, **Space to toggle each device**, **Enter to confirm**, and **Esc to cancel**. `teka device forget` uses the same menu over known devices, starting with nothing checked. Menus, password prompts, and select/forget messages show short hostnames without domains, retaining non-default ports and full IP addresses. Selecting replaces the default deployment target set; forgetting deletes the chosen known records and passwords while retaining the others.
+
+Supply one or more case-insensitive substring patterns to skip the menu and act on every match: `teka device select gtw-onx gtw-ona` or `teka device forget 123456`. Patterns match hostname, part number, or serial number; forgetting uses saved metadata and works offline. Every select/forget pattern must match before any action starts. List patterns filter output without changing selection: `teka device list --discover gtw-onx`. Explicit HTTP(S) URLs match exactly and can be selected directly without discovery: `teka device select http://device.local http://other.local:8080`.
+
+URLs accept HTTP(S), ports, and base paths; `.local` uses mDNS. Re-selecting a known device first verifies its saved password and skips prompting if it works; rejected saved passwords get a device-labelled prompt. A non-empty `TEKA_PASSWORD` still takes precedence. Selection prompts once for a shared password when needed; Enter skips it and asks separately for each device. If the shared password is rejected, the retry prompt identifies the device. Single-device and setup-confirmation prompts also identify their device. `TEKA_PASSWORD`, when non-empty, is tried on all selected devices concurrently before prompting; an empty export uses the interactive prompts. Rejections can be retried with a device-labelled prompt in a terminal; automation returns the rejection without prompting. Devices sharing a non-empty serial number are selected only once, even when advertised under multiple hostnames or addresses; devices without serials are distinguished by canonical URL. Selection prefers freshly discovered URLs over saved aliases for the same serial. Passwords stay in macOS Keychain or Linux Secret Service, never in config; `TEKA_PASSWORD` overrides stored passwords for automation. Credential labels use `Teka <short hostname>` without domains; IP addresses remain intact. Discovered serial numbers are stored as a Linux credential attribute or a macOS Keychain comment. Linux requires an unlocked keyring and uses the local session bus.
+
+Known URLs, selected targets, and discovered PN/SN metadata go in `${XDG_CONFIG_HOME:-~/.config}/teka/config.json`. Devices with authentication disabled are retained too. Selecting an empty set clears deployment targets while keeping known devices and saved passwords. If selection fails, the previous target set remains selected.
 
 ### Nested plugins
 

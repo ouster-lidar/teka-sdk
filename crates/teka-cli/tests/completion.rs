@@ -86,6 +86,8 @@ fn composes_plugins_without_changing_dispatch() {
             "certificate",
             "device",
             "discover",
+            "select",
+            "forget",
         ] {
             assert!(script.contains(word), "missing {word} in {shell}");
         }

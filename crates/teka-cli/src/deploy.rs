@@ -1,6 +1,6 @@
 use crate::{
     build::{self, BuildSource},
-    device::DeviceClient,
+    device::{parse_device, selected_devices, DeviceClient},
 };
 use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
@@ -18,12 +18,7 @@ const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 #[derive(Clone, Debug, Args)]
 pub struct DeployOptions {
     /// URL of a Teka device; may be repeated
-    #[arg(
-        long = "device",
-        env = "TEKA_DEVICE",
-        value_name = "URL",
-        required = true
-    )]
+    #[arg(long = "device", value_name = "URL")]
     pub hosts: Vec<String>,
     /// App IDs from ./result, or prebuilt .tpk files (default: the project's only app)
     #[arg(value_name = "INPUT")]
@@ -292,6 +287,17 @@ fn deploy_targets(
 }
 
 pub fn run(mut args: DeployOptions) -> Result<()> {
+    if args.hosts.is_empty() {
+        args.hosts = selected_devices()?;
+        if args.hosts.is_empty() {
+            return Err(crate::plugins::usage(
+                "need --device, TEKA_DEVICE or teka device select",
+            ));
+        }
+    }
+    for device in &args.hosts {
+        parse_device(device)?;
+    }
     let has_files = args.apps.iter().any(|input| is_file_input(input));
     if has_files && (args.build || args.remove) {
         return Err(crate::plugins::usage(

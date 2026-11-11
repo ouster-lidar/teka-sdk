@@ -39,7 +39,7 @@ pub struct DeviceClient {
 }
 
 impl DeviceClient {
-    pub fn new(host: &str) -> Result<Self> {
+    fn base_url(host: &str) -> Result<Url> {
         let has_scheme = host.contains("://")
             || host
                 .get(..5)
@@ -60,11 +60,20 @@ impl DeviceClient {
             || base.password().is_some()
             || base.query().is_some()
             || base.fragment().is_some()
+            || address.split_once("://").is_none_or(|(_, rest)| {
+                let authority = rest.split(['/', '\\']).next().unwrap_or_default();
+                authority.is_empty() || authority.contains('@')
+            })
         {
             bail!("host must be an HTTP(S) URL without credentials, query, or fragment");
         }
         let path = base.path().trim_end_matches('/').to_owned();
         base.set_path(&format!("{path}/"));
+        Ok(base)
+    }
+
+    pub fn new(host: &str) -> Result<Self> {
+        let base = Self::base_url(host)?;
         Ok(Self {
             client: Client::builder()
                 .cookie_store(true)
@@ -82,6 +91,10 @@ impl DeviceClient {
 
     pub fn endpoint(&self, path: &str) -> Result<String> {
         Ok(self.endpoint_url(path)?.into())
+    }
+
+    pub fn http(&self) -> &Client {
+        &self.client
     }
 
     /// Rejects unsuccessful responses, including the body in the error.
@@ -114,15 +127,38 @@ impl DeviceClient {
             bail!("device auth status does not allow login or setup");
         }
         let password = password.ok_or(PasswordRequired)?;
+        self.authenticate_password(&status, password)
+    }
+
+    pub fn authenticate_password(&self, status: &Value, password: &str) -> Result<()> {
         let path = if status["needs_setup"] == true {
             "api/v1/auth/setup"
-        } else {
+        } else if status["enforcement"] == true {
             "api/v1/auth/login"
+        } else {
+            bail!("device auth status does not allow login or setup");
         };
+        let response = self
+            .client
+            .post(self.endpoint(path)?)
+            .json(&json!({"password": password}))
+            .timeout(Duration::from_secs(30))
+            .send()?;
+        // Auth responses are untrusted and may contain submitted credentials.
+        let status = response.status();
+        if !status.is_success() {
+            response
+                .error_for_status()
+                .map_err(reqwest::Error::without_url)?;
+            bail!("device authentication HTTP {status}");
+        }
+        Ok(())
+    }
+
+    pub fn logout(&self) -> Result<()> {
         Self::response(
             self.client
-                .post(self.endpoint_url(path)?)
-                .json(&json!({"password": password}))
+                .post(self.endpoint("api/v1/auth/logout")?)
                 .timeout(Duration::from_secs(30))
                 .send()?,
         )?;
@@ -219,6 +255,11 @@ pub fn normalize_arch(arch: &str) -> Result<String> {
         "aarch64" | "arm64" => Ok("aarch64".into()),
         _ => bail!("unsupported device architecture '{arch}'"),
     }
+}
+
+/// Credential identity must remain independent of DNS and interface changes.
+pub fn canonical_url(host: &str) -> Result<String> {
+    Ok(DeviceClient::base_url(host)?.into())
 }
 
 /// Wait for a rebooting update to commit, retrying while device services restart.

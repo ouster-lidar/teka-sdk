@@ -1,4 +1,4 @@
-use crate::device::DeviceClient;
+use crate::device::{required_device, DeviceClient};
 use anyhow::{ensure, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::Value;
@@ -18,15 +18,15 @@ pub enum SystemCommand {
 #[derive(Clone, Debug, Args)]
 pub struct StatusOptions {
     /// URL of the Teka device
-    #[arg(long, env = "TEKA_DEVICE", value_name = "URL")]
-    pub device: String,
+    #[arg(long, value_name = "URL")]
+    pub device: Option<String>,
 }
 
 #[derive(Clone, Debug, Args)]
 pub struct UpdateOptions {
     /// URL of the Teka device
-    #[arg(long, env = "TEKA_DEVICE", value_name = "URL")]
-    pub device: String,
+    #[arg(long, value_name = "URL")]
+    pub device: Option<String>,
     /// System update image
     #[arg(value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     pub file: PathBuf,
@@ -62,10 +62,15 @@ pub fn apply(client: &DeviceClient, file: &Path, reboot: bool) -> Result<Value> 
     client.sysupdate_apply(file, reboot)
 }
 
-pub fn wait_for_commit(host: &str, before_version: &str, deadline: Instant) -> Result<Value> {
+pub fn wait_for_commit(
+    host: &str,
+    password: Option<&str>,
+    before_version: &str,
+    deadline: Instant,
+) -> Result<Value> {
     crate::device::authentication(teka::client::wait_for_commit(
         host,
-        crate::device::password().as_deref(),
+        password,
         before_version,
         deadline,
         poll_interval(),
@@ -73,7 +78,8 @@ pub fn wait_for_commit(host: &str, before_version: &str, deadline: Instant) -> R
 }
 
 pub fn run_status(args: StatusOptions) -> Result<()> {
-    let client = DeviceClient::new(&args.device)?;
+    let device = required_device(args.device.as_deref())?;
+    let client = DeviceClient::new(&device)?;
     client.authenticate()?;
     let status = client.teka_status()?;
     println!("{}", serde_json::to_string(&status)?);
@@ -81,13 +87,14 @@ pub fn run_status(args: StatusOptions) -> Result<()> {
 }
 
 pub fn run_update(args: UpdateOptions) -> Result<()> {
+    let device = required_device(args.device.as_deref())?;
     let manifest = teka::tpk::read_single(&args.file, teka::tpk::ComponentType::Os)?;
     let file = args
         .file
         .canonicalize()
         .with_context(|| format!("open {}", args.file.display()))?;
-    let client = DeviceClient::new(&args.device)?;
-    client.authenticate()?;
+    let client = DeviceClient::new(&device)?;
+    let password = client.authenticate()?;
     let architecture = client.architecture()?;
     ensure!(
         manifest.arch.as_str() == architecture,
@@ -104,7 +111,8 @@ pub fn run_update(args: UpdateOptions) -> Result<()> {
     let response = apply(&client, &file, reboot)?;
     if args.wait && response["result"].as_str() == Some("REBOOTING") {
         let before = before_version.context("missing pre-update version")?;
-        let final_status = wait_for_commit(&args.device, &before, update_deadline()?)?;
+        let final_status =
+            wait_for_commit(&device, password.as_deref(), &before, update_deadline()?)?;
         println!("{}", serde_json::to_string(&final_status)?);
     }
     Ok(())

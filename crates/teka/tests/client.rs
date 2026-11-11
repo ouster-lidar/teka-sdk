@@ -108,6 +108,7 @@ fn authentication_requires_explicit_password_only_when_needed() {
         (r#"{"auth_disabled":true}"#, false),
         (r#"{"authenticated":true}"#, false),
         (r#"{"enforcement":true}"#, true),
+        (r#"{"needs_setup":true}"#, true),
     ] {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let host = format!("http://{}", listener.local_addr().unwrap());
@@ -115,10 +116,30 @@ fn authentication_requires_explicit_password_only_when_needed() {
             let (mut stream, _) = listener.accept().unwrap();
             request(&mut stream);
             reply(&mut stream, status, "");
+            if required {
+                let (mut stream, _) = listener.accept().unwrap();
+                let (path, _, _) = request(&mut stream);
+                let action = if status.contains("needs_setup") {
+                    "setup"
+                } else {
+                    "login"
+                };
+                assert_eq!(path, format!("POST /api/v1/auth/{action} HTTP/1.1"));
+                write!(stream, "HTTP/1.1 401 Unauthorized\r\nContent-Length: 6\r\nConnection: close\r\n\r\nsecret").unwrap();
+            }
         });
-        let result = DeviceClient::new(&host).unwrap().authenticate(None);
+        let client = DeviceClient::new(&host).unwrap();
+        let result = client.authenticate(None);
         if required {
             assert!(result.unwrap_err().is::<PasswordRequired>());
+            let status = serde_json::from_str(status).unwrap();
+            let error = client.authenticate_password(&status, "secret").unwrap_err();
+            assert_eq!(
+                error.downcast_ref::<reqwest::Error>().unwrap().status(),
+                Some(reqwest::StatusCode::UNAUTHORIZED)
+            );
+            assert!(error.to_string().contains("401"));
+            assert!(!format!("{error:?}").contains("secret"));
         } else {
             result.unwrap();
         }

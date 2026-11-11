@@ -52,7 +52,7 @@
       # Preload is unit-wide in run-wayland.sh, not scoped to viz — viz was the canary.
       #
       # Copy shared libs only — a store ref to libllvm.lib pulls the whole llvm pkg (~500MiB).
-      # Omitted on aarch64 (zedbox-mini-nx / Tegra): NVIDIA path, no DDI LLVM blob.
+      # Omitted on aarch64 (zedbox-mini / Tegra): NVIDIA path, no DDI LLVM blob.
       mesaLlvmRuntimeClosure = lib.optionals stdenv.hostPlatform.isx86_64 [
         (runCommand "${name}-libllvm-preload" { } ''
           mkdir -p "$out/lib"

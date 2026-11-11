@@ -7,6 +7,7 @@ pub mod completion;
 pub mod deploy;
 pub mod device;
 pub mod device_commands;
+pub mod device_store;
 mod host;
 pub mod inspect;
 pub mod plugins;
@@ -54,7 +55,7 @@ Reload after updating Teka or plugins."#)]
         #[command(subcommand)]
         command: AppCommand,
     },
-    /// Discover Teka devices
+    /// Discover and select Teka devices
     Device {
         #[command(subcommand)]
         command: device_commands::DeviceCommand,

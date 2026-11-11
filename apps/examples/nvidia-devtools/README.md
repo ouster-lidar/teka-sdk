@@ -9,7 +9,7 @@ NVIDIA CUDA profiling tools with SSH shell and a web UI.
 Open **NVIDIA DevTools** in the Teka nav (`/app/nvidia-devtools`) for SSH commands and authorized keys. No keys are seeded; paste a public key in the UI before `ssh`.
 
 ```bash
-ssh -p 2223 js@zedbox-mini-nx-….local
+ssh -p 2223 js@teka-$SN.local
 ncu --version
 nsys --version
 tegrastats --interval 1000
