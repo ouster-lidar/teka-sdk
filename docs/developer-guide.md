@@ -7,10 +7,10 @@ Build the examples in `apps/` from the repository root and deploy them to a Teka
 ```mermaid
 flowchart TD
     subgraph setup [1. One-time install]
-        A[x86_64-linux host]
-        B[Install Nix + flakes]
-        C[Clone repository]
-        K[Install teka]
+        A[Linux or Apple Silicon macOS host]
+        B[Clone repository]
+        C[Run ./bootstrap.sh]
+        K[teka build check]
         A --> B --> C --> K
     end
 
@@ -24,12 +24,12 @@ flowchart TD
 
     subgraph auto [3. teka app deploy auto flow]
         H[Confirm Teka web UI loads]
-        I[teka app deploy --build --host http://teka-$SN/ hello-ouster-terminal]
+        I[teka app deploy --build --host http://device.local/ hello-ouster-terminal]
         J[Open app and verify]
         H --> I --> J
     end
 
-    C --> D
+    K --> D
     K --> H
 ```
 
@@ -37,9 +37,9 @@ The first workflow is required once. Choose either manual web UI installation or
 
 ## Workflow 1: One-time install
 
-1. Complete the [Linux host setup](linux.md) and [Nix configuration](nix.md).
-2. Clone this repository.
-3. [Install the Teka CLI](../crates/teka-cli/README.md#install) from the repository root.
+1. Use a Linux x86_64/AArch64 or Apple Silicon macOS host. On Windows, complete the [WSL 2 setup](wsl2.md) first.
+2. Clone this repository. See [Linux host setup](linux.md) for distribution packages.
+3. Run `./bootstrap.sh` from the repository root. See the [CLI installation guide](../crates/teka-cli/README.md#install) for alternatives and macOS builder setup.
 4. Run commands from the repository root, which contains `flake.nix`:
 
    ```bash
@@ -72,9 +72,29 @@ Replace `hello-ouster-terminal` with another app id as needed.
 3. From the repository root, run:
 
    ```bash
-   export TEKA_PASSWORD='…'
-   teka app deploy --build --host http://zedbox-mini-nx-$SN.local/ hello-ouster-terminal
+   export TEKA_PASSWORD='your-device-admin-password'
+   teka app deploy --build --host http://device.local/ hello-ouster-terminal
    ```
+
+Use the device's actual hostname or IP address.
+`--build` selects its architecture, builds the package, uploads it, and checks startup logs.
+You can set `TEKA_HOST` instead of passing `--host`, or repeat `--host` to deploy to several devices.
+
+## Create a standalone app
+
+List examples, then initialize a project from one:
+
+```sh
+teka app list --examples
+teka app init --example hello-world my-app
+cd my-app
+teka app build
+teka app deploy --build --host http://device.local/
+```
+
+Initialization pins the SDK revision and stages the generated files in Git without committing them.
+It preserves the example's app ID; `my-app` names the project directory.
+App names can be omitted when the project contains exactly one app.
 
 ## Verify and iterate
 

@@ -1,6 +1,6 @@
-# Teka Example Apps
+# Teka SDK and Example Apps
 
-Build the examples in `apps/`, deploy to a Teka device (for example a ZedBox), and run them alongside other appliance apps.
+Develop apps with the Rust SDK and `teka` CLI, build the examples in `apps/`, and deploy them to a Teka device (for example a ZedBox).
 
 ## Start here
 
@@ -12,26 +12,29 @@ Browse [all examples](apps/examples/); each app has its own README.
 
 ## Quick start
 
-1. Complete the [Linux host setup](docs/linux.md).
-2. Clone this repository.
-3. [Install the CLI](crates/teka-cli/README.md#install), or run `nix develop` at the repo root for `teka` on `PATH` without installing.
-4. Build and deploy an app, or upload its image in the web UI.
+1. Clone this repository on Linux x86_64/AArch64 or Apple Silicon macOS. For Windows, start with the [WSL 2 host setup](docs/wsl2.md).
+2. Run `./bootstrap.sh` from the repository root to install Nix if needed and build and install the CLI. See the [installation guide](crates/teka-cli/README.md#install) for alternatives.
+3. Build and deploy an app, or upload its package in the web UI.
 
 From the repository root:
 
-**Build** (image on disk only, for web UI or app distribution):
+**Build** (AArch64 package for web UI upload or distribution):
 
 ```bash
-cd teka-sdk
 teka app build hello-world
 ```
 
 **Build + Deploy** (normal workflow — build for the device, upload, sample logs):
 
 ```bash
-cd teka-sdk
-teka app deploy --build hello-ouster-world --host http://<device>/
+export TEKA_PASSWORD='your-device-admin-password'
+teka app deploy --build hello-ouster-world --host http://device.local/
 ```
+
+Builds create packages under `result/<app>/`.
+Replace `device.local` with your device's hostname or IP address.
+Deployment replaces an existing install and uses the device administrator password in `TEKA_PASSWORD`.
+`--build` builds for the device architecture before uploading.
 
 Full procedures: [Developer Guide](docs/developer-guide.md).
 

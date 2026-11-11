@@ -4,28 +4,29 @@ This repository uses Nix as the **build system** for app images and assumes a mu
 
 ## Install
 
-Install Nix using the [Determinate Nix documentation](https://docs.determinate.systems/determinate-nix/):
+From a source checkout, run `./bootstrap.sh` at the repository root.
+It installs Nix interactively if needed, checks its configuration and store, builds the portable CLI, and runs `teka build init` to install it.
+For other installation methods, see the [CLI installation guide](../crates/teka-cli/README.md#install).
 
-```bash
-curl -fsSL https://install.determinate.systems/nix | sh -s -- install
-```
-
-Determinate Nix handles configuration for you, including flakes. See [Configuring Determinate Nix](https://docs.determinate.systems/determinate-nix/#configuration) for `/etc/nix/nix.conf` and `/etc/nix/nix.custom.conf`.
+Existing Nix installations need `nix-command` and `flakes` enabled before bootstrap can build the CLI.
+For declaratively managed installations, enable them through your system's Nix options.
 
 ## Verify
 
-From any directory, test that the `nix` CLI can download and run a Nix package:
+Check local prerequisites without fetching inputs, building, or changing configuration:
 
-```bash
-$ nix run nixpkgs#hello
-Hello, world!
+```sh
+teka build check
 ```
 
-From the repository root (`teka-sdk/`), list the example apps:
+To also compile and validate an AArch64 Linux test executable:
 
-```bash
-$ teka app list
+```sh
+teka build check --full
 ```
+
+On Apple Silicon macOS, `teka build init` prepares a Linux build VM when no Linux builder is configured.
+See [macOS build VM](../crates/teka-cli/README.md#macos-build-vm) for setup and troubleshooting.
 
 ## Flake outputs and naming
 
@@ -45,13 +46,13 @@ App artifacts live at `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSy
 **Cross-build** (x86_64-linux host → aarch64-linux device):
 
 ```bash
-$ teka app build --arch aarch64 hello-world
+teka app build --arch aarch64 hello-world
 ```
 
 The equivalent explicit Nix build is:
 
 ```bash
-$ nix build .#teka.apps.hello-world.packages.x86_64-linux.aarch64-linux
+nix build .#teka.apps.hello-world.packages.x86_64-linux.aarch64-linux
 ```
 
 On macOS, `teka app build` selects a Linux build system and uses a configured Linux builder.
@@ -60,4 +61,5 @@ On macOS, `teka app build` selects a Linux build system and uses a configured Li
 
 | Issue | Fix |
 |-------|-----|
+| Missing Nix features | Run `teka build init` for an installed CLI, or enable `nix-command flakes` in Nix configuration before bootstrapping. |
 | Slow builds after cache miss | Expected without extra binary caches; add substituters to `/etc/nix/nix.custom.conf` if needed. |
