@@ -13,13 +13,17 @@
 
       helloPubSrc = app.appRustSrc { srcDir = ./.; };
 
-      helloPubBin = app.buildAppCrate {
-        crateName = "hello-pub";
-        filteredSrc = helloPubSrc;
-        meta = {
-          mainProgram = "hello-pub";
-        };
-      };
+      helloPubBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "hello-pub";
+          src = helloPubSrc;
+        })
+        // {
+          meta = {
+            mainProgram = "hello-pub";
+          };
+        }
+      );
 
       jp = app.appHostUnitDefaults;
 

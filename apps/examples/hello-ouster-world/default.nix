@@ -59,18 +59,22 @@
         "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
       ];
 
-      howBin = app.buildAppCrate {
-        crateName = "hello-ouster-world";
-        filteredSrc = howSrc;
-        nativeBuildInputs = [ pkgs.buildPackages.pkg-config ];
-        buildInputs = with pkgs; [
-          gst_all_1.gstreamer
-          gst_all_1.gst-plugins-base
-          glib
-          wayland
-        ];
-        meta.mainProgram = "hello-ouster-world";
-      };
+      howBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "hello-ouster-world";
+          src = howSrc;
+        })
+        // {
+          nativeBuildInputs = [ pkgs.buildPackages.pkg-config ];
+          buildInputs = with pkgs; [
+            gst_all_1.gstreamer
+            gst_all_1.gst-plugins-base
+            glib
+            wayland
+          ];
+          meta.mainProgram = "hello-ouster-world";
+        }
+      );
 
       howApiCmd = replaceVarsWith {
         name = "${name}-api";

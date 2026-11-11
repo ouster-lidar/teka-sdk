@@ -14,13 +14,17 @@
 
       helloSlidevSrc = app.appRustSrc { srcDir = ./.; };
 
-      helloSlidevBin = app.buildAppCrate {
-        crateName = "hello-slidev";
-        filteredSrc = helloSlidevSrc;
-        meta = {
-          mainProgram = "hello-slidev";
-        };
-      };
+      helloSlidevBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "hello-slidev";
+          src = helloSlidevSrc;
+        })
+        // {
+          meta = {
+            mainProgram = "hello-slidev";
+          };
+        }
+      );
 
       slidevSrc = builtins.path {
         path = ./slidev;

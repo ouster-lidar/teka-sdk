@@ -64,7 +64,7 @@ rec {
   packages = {
     inherit teka portable;
     teka-runner = pkgs.callPackage ./packages/teka-runner.nix { inherit craneLib; };
-    teka-src = pkgs.callPackage ./packages/teka-src.nix { };
+    teka-src = pkgs.callPackage ./packages/teka-src.nix { inherit craneLib; };
     default = teka;
   };
 

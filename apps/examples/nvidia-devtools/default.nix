@@ -28,11 +28,15 @@
 
       utilLinuxMount = pkgs.util-linux.mount;
 
-      nvidiaDevtoolsBin = app.buildAppCrate {
-        crateName = "nvidia-devtools";
-        filteredSrc = nvidiaDevtoolsSrc;
-        meta.mainProgram = "nvidia-devtools";
-      };
+      nvidiaDevtoolsBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "nvidia-devtools";
+          src = nvidiaDevtoolsSrc;
+        })
+        // {
+          meta.mainProgram = "nvidia-devtools";
+        }
+      );
 
       devBinPath = lib.makeBinPath [
         nvidiaDevtools

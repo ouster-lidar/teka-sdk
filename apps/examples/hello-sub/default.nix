@@ -13,13 +13,17 @@
 
       helloSubSrc = app.appRustSrc { srcDir = ./.; };
 
-      helloSubBin = app.buildAppCrate {
-        crateName = "hello-sub";
-        filteredSrc = helloSubSrc;
-        meta = {
-          mainProgram = "hello-sub";
-        };
-      };
+      helloSubBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "hello-sub";
+          src = helloSubSrc;
+        })
+        // {
+          meta = {
+            mainProgram = "hello-sub";
+          };
+        }
+      );
 
       jp = app.appHostUnitDefaults;
 

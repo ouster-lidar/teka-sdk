@@ -6,7 +6,7 @@
   craneLib,
   advisoryDb ? null,
   appApiJs ? ./web/app-api.js,
-  tekaSrc ? pkgs.buildPackages.callPackage ../packages/teka-src.nix { },
+  tekaSrc ? pkgs.buildPackages.callPackage ../packages/teka-src.nix { inherit craneLib; },
 }:
 
 let
@@ -19,34 +19,29 @@ let
         name = "app-api.js";
       };
 
+  prepareAppSource = pkgs.buildPackages.callPackage ./app-source.nix {
+    inherit tekaSrc craneLib;
+  };
+
   buildAppCrate =
     {
-      crateName,
-      filteredSrc,
+      src,
+      dummySrc,
+      cargoRoot,
+      cargoToml,
+      cargoLock,
       nativeBuildInputs ? [ ],
       buildInputs ? [ ],
       meta ? { },
     }:
     let
-      sdkSrc = if lib.isDerivation tekaSrc then tekaSrc else lib.cleanSource tekaSrc;
-      # Preserve Cargo's relative path dependency, including downstream overrides.
-      mkSource =
-        appSrc: sdkSrc:
-        pkgs.buildPackages.runCommand "${crateName}-source" { } ''
-          mkdir -p "$out/apps/examples/${crateName}" "$out/crates"
-          cp -r ${appSrc}/. "$out/apps/examples/${crateName}/"
-          cp -r ${sdkSrc} "$out/crates/teka"
-        '';
-      src = mkSource filteredSrc sdkSrc;
-      dummySrc = mkSource (craneLib.mkDummySrc { src = filteredSrc; }) (
-        craneLib.mkDummySrc { src = sdkSrc; }
-      );
+      manifest = builtins.fromTOML (builtins.readFile cargoToml);
       common = {
-        pname = crateName;
-        version = (builtins.fromTOML (builtins.readFile "${filteredSrc}/Cargo.toml")).package.version;
+        pname = manifest.package.name;
+        version = manifest.package.version;
         inherit src nativeBuildInputs buildInputs;
-        cargoVendorDir = craneLib.vendorCargoDeps { cargoLock = "${filteredSrc}/Cargo.lock"; };
-        postUnpack = "sourceRoot+=/apps/examples/${crateName}";
+        cargoVendorDir = craneLib.vendorCargoDeps { inherit cargoLock; };
+        postUnpack = "sourceRoot+=/${lib.escapeShellArg cargoRoot}";
         strictDeps = true;
         doCheck = pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform;
         # Cargo caps dependency lints, leaving warnings fatal for our local crates.
@@ -67,9 +62,9 @@ let
       }
       // lib.optionalAttrs (advisoryDb != null) {
         audit = craneLib.cargoAudit {
-          src = filteredSrc;
+          src = builtins.dirOf cargoLock;
           advisory-db = advisoryDb;
-          pname = crateName;
+          pname = manifest.package.name;
           version = common.version;
         };
       };
@@ -159,6 +154,7 @@ in
 {
   inherit
     appApiJsSrc
+    prepareAppSource
     buildAppCrate
     appRustSrc
     appHostUnitDefaults

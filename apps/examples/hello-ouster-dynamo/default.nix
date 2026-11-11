@@ -59,18 +59,22 @@
         "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
       ];
 
-      dynamoBin = app.buildAppCrate {
-        crateName = "hello-ouster-dynamo";
-        filteredSrc = dynamoSrc;
-        nativeBuildInputs = [ pkgs.buildPackages.pkg-config ];
-        buildInputs = with pkgs; [
-          gst_all_1.gstreamer
-          gst_all_1.gst-plugins-base
-          glib
-          wayland
-        ];
-        meta.mainProgram = "hello-ouster-dynamo";
-      };
+      dynamoBin = app.buildAppCrate (
+        (app.prepareAppSource {
+          crateName = "hello-ouster-dynamo";
+          src = dynamoSrc;
+        })
+        // {
+          nativeBuildInputs = [ pkgs.buildPackages.pkg-config ];
+          buildInputs = with pkgs; [
+            gst_all_1.gstreamer
+            gst_all_1.gst-plugins-base
+            glib
+            wayland
+          ];
+          meta.mainProgram = "hello-ouster-dynamo";
+        }
+      );
 
       dynamoApiCmd = replaceVarsWith {
         name = "${name}-api";

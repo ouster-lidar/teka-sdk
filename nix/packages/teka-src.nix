@@ -2,6 +2,7 @@
   lib,
   runCommand,
   formats,
+  craneLib,
 }:
 let
   workspace = (builtins.fromTOML (builtins.readFile ../../Cargo.toml)).workspace.package;
@@ -12,9 +13,22 @@ let
     ) manifest.package;
   };
   cargoToml = (formats.toml { }).generate "Cargo.toml" standalone;
+  workspaceToml = (formats.toml { }).generate "workspace.toml" { workspace.package = workspace; };
+  src = lib.cleanSource ../../crates/teka;
 in
-runCommand "teka-src" { } ''
-  cp -r ${lib.cleanSource ../../crates/teka} "$out"
-  chmod u+w "$out/Cargo.toml"
-  cp ${cargoToml} "$out/Cargo.toml"
-''
+runCommand "teka-src"
+  {
+    passthru.dummySrc = craneLib.mkDummySrc {
+      inherit src;
+      # Resolve inherited metadata without replacing Crane's cache-busting build script.
+      extraDummyScript = ''
+        chmod u+w "$out/Cargo.toml"
+        cat ${workspaceToml} >> "$out/Cargo.toml"
+      '';
+    };
+  }
+  ''
+    cp -r ${src} "$out"
+    chmod u+w "$out/Cargo.toml"
+    cp ${cargoToml} "$out/Cargo.toml"
+  ''
