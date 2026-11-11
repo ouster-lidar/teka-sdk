@@ -1,9 +1,7 @@
 {
-  appLib,
-  crane,
+  mkAppOutputs,
   nixpkgs,
   pkgs,
-  tekaFor,
   version,
 }:
 
@@ -12,26 +10,30 @@ let
   systems = [
     "x86_64-linux"
     "aarch64-linux"
-    "aarch64-darwin"
   ];
   markerOverlay = _: prev: { appOverlayMarker = (prev.appOverlayMarker or 0) + 1; };
   outputsFor =
-    simpleCrossServices:
-    appLib.flakeOutputs {
-      inherit
-        crane
-        systems
-        version
-        tekaFor
-        simpleCrossServices
-        nixpkgs
-        ;
-      appOverlays = [ markerOverlay ];
-      services.overlay-probe =
-        { pkgs, ... }:
+    simpleCrossApps:
+    mkAppOutputs {
+      self = { };
+      inherit systems version simpleCrossApps;
+      overlays = [ markerOverlay ];
+      apps.overlay-probe.image =
+        { pkgs, ps, ... }:
         pkgs.runCommand "overlay-probe"
           {
-            passthru.marker = pkgs.appOverlayMarker or null;
+            passthru = {
+              marker = pkgs.appOverlayMarker or null;
+              targetSystem = pkgs.stdenv.hostPlatform.system;
+              buildSystem = pkgs.stdenv.buildPlatform.system;
+              sourceSystem =
+                (ps.appCrate.prepareAppSource {
+                  crateName = "hello-pub";
+                  src = ../examples/hello-pub;
+                }).src.system;
+              runnerTarget = ps.tekaRunner.CARGO_BUILD_TARGET;
+              expectedRunnerTarget = pkgs.stdenv.hostPlatform.rust.rustcTarget;
+            };
           }
           ''
             touch "$out"
@@ -39,15 +41,24 @@ let
     };
   overlayApplied =
     outputs:
-    lib.all (
-      system:
+    !(outputs ? packages)
+    && lib.all (
+      buildSystem:
       lib.all (
-        name: !(lib.hasSuffix "-tpk" name) && outputs.packages.${system}.${name}.image.marker == 1
-      ) (lib.filter (name: name != "default") (lib.attrNames outputs.packages.${system}))
+        targetSystem:
+        let
+          package = outputs.teka.apps.overlay-probe.packages.${buildSystem}.${targetSystem};
+          image = package.image;
+        in
+        image.marker == 1
+        && image.targetSystem == targetSystem
+        && image.buildSystem == buildSystem
+        && image.sourceSystem == buildSystem
+        && image.runnerTarget == image.expectedRunnerTarget
+        && (builtins.elemAt package.nativeBuildInputs 1).system == buildSystem
+      ) systems
     ) systems;
 in
 assert overlayApplied (outputsFor [ "overlay-probe" ]);
 assert overlayApplied (outputsFor [ ]);
-pkgs.runCommand "flake-output-overlays-check" { } ''
-  touch "$out"
-''
+pkgs.emptyFile

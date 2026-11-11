@@ -1,7 +1,7 @@
 # Compose for distributable filenames (`<id>-<system>-v${imageVersion}+${buildId}.raw`).
 # Portable os-release IMAGE_VERSION / VERSION / BUILD_ID follow the app release scheme;
 # VERSION_ID is GPU compatibility generation 1 (not SemVer).
-# Path flakes (`hello-portable` via path:../apps) have no git rev; `rev` is then `0000000`.
+# Path flakes have no git revision; their revision defaults to `0000000`.
 { self, lib }:
 
 let

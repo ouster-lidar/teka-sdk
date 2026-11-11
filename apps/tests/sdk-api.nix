@@ -13,9 +13,25 @@ assert
   !(
     (sdk.lib.mkAppOutputs {
       self = { };
-      services.unbuilt = throw "metadata lookup forced a service value";
+      apps = { };
     })
-      ? teka
+      ? packages
   );
+assert
+  builtins.attrNames sdk.packages.${system} == [
+    "default"
+    "portable"
+    "teka"
+    "teka-runner"
+    "teka-src"
+  ];
+assert
+  builtins.attrNames sdk.teka.apps
+  == builtins.attrNames (import ../examples { inherit (pkgs) lib; }).apps;
+assert
+  builtins.attrNames sdk.teka.apps.hello-world.packages == [
+    "aarch64-linux"
+    "x86_64-linux"
+  ];
 assert sdk.templates.default.path == sdk.templates.hello-world.path;
 pkgs.emptyFile

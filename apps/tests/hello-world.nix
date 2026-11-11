@@ -9,7 +9,7 @@ let
   program = pkgs.callPackage (import example.source).image {
     ps.makeAppImage = image: builtins.head image.runtimeClosures;
   };
-  packages = pkgs.lib.filterAttrs (_: package: package ? image) example.outputs.packages.${system};
+  packages = example.outputs.teka.apps.hello-world.packages.${system};
 in
 {
   hello-world-example-run = pkgs.runCommand "hello-world-run-check" { } ''

@@ -6,6 +6,11 @@
 
     crane.url = "github:ipetkov/crane/master";
 
+    jetpack = {
+      url = "github:anduril/jetpack-nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     ouster-sdk = {
       url = "github:ouster-lidar/ouster-sdk/v1.0.1";
       flake = false;
@@ -22,12 +27,12 @@
       self,
       nixpkgs,
       crane,
+      jetpack,
       ouster-sdk,
       rustsecAdvisoryDb,
     }:
     let
       inherit (nixpkgs) lib;
-      appLib = import ./nix/apps/app-lib.nix;
       perSystem =
         lib.genAttrs
           [
@@ -43,20 +48,28 @@
                 config.allowUnfreePredicate = pkg: lib.getName pkg == "tart";
               };
             in
-            import ./nix/default.nix {
+            import ./nix {
               inherit pkgs crane;
               advisoryDb = rustsecAdvisoryDb;
               nixpkgsRev = nixpkgs.rev;
               sdkRef = if self ? rev then "github:ouster-lidar/teka-sdk/${self.rev}" else null;
             }
           );
+      examples = import ./apps {
+        sdk = self;
+        inherit jetpack;
+      };
       outputFor = name: lib.mapAttrs (_: outputs: outputs.${name}) perSystem;
     in
     {
-      lib = appLib // {
-        mkAppOutputs = import ./nix/apps/app-outputs.nix {
+      lib = {
+        mkVersion = import ./nix/apps/version.nix;
+        paths = {
+          erofsMkfs = ./nix/apps/erofs-mkfs.nix;
+          coreVersionValidate = ./nix/apps/core-version-validate.nix;
+        };
+        mkAppOutputs = import ./nix/apps {
           inherit
-            appLib
             nixpkgs
             crane
             ouster-sdk
@@ -65,15 +78,17 @@
         };
       };
 
-      templates = (import ./apps/examples { inherit lib; }).templates // {
+      inherit (examples) teka;
+
+      templates = examples.templates // {
         default = self.templates.hello-world;
       };
 
       packages = outputFor "packages";
-      apps = outputFor "apps";
+      apps = lib.recursiveUpdate (outputFor "apps") examples.apps;
       devShells = outputFor "devShells";
 
-      checks = lib.recursiveUpdate (outputFor "checks") (import ./apps/tests { sdk = self; });
+      checks = lib.recursiveUpdate (outputFor "checks") examples.checks;
 
       overlays.default = final: _: {
         inherit (self.packages.${final.stdenv.hostPlatform.system}) teka teka-runner;

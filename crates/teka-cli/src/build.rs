@@ -302,19 +302,6 @@ fn find_apps(explicit: Option<&Path>, examples: bool) -> Result<(String, Vec<Str
     )
 }
 
-pub fn target_package(builder: &str, app: &str, target: &str) -> (String, String) {
-    // Images are Linux. `packages.<darwin>.*` is a cross build that runs on
-    // Darwin; skip it and select the Linux target so a Linux builder produces it.
-    if !builder.ends_with("-linux") {
-        return (target.to_owned(), app.to_owned());
-    }
-    if builder == target {
-        (builder.to_owned(), app.to_owned())
-    } else {
-        (builder.to_owned(), format!("{app}-cross-{target}"))
-    }
-}
-
 /// One native derivation depending on the requested packages. Passed to
 /// `nix build --file -` so Nix does not treat a temp directory as a flake.
 fn result_expr(builder: &str, target: &str, apps: &[String]) -> String {
@@ -361,11 +348,16 @@ pkgs.linkFarm "teka-multi" [
 }
 
 fn package_entries(builder: &str, target: &str, apps: &[String]) -> String {
+    // App images require Linux; other hosts delegate to a target-native builder.
+    let build_system = if builder.ends_with("-linux") {
+        builder
+    } else {
+        target
+    };
     apps.iter()
         .map(|app| {
-            let (system, name) = target_package(builder, app, target);
             format!(
-                "    {{\n      name = \"{app}\";\n      path = apps.packages.\"{system}\".\"{name}\";\n    }}"
+                "    {{\n      name = \"{app}\";\n      path = apps.teka.apps.\"{app}\".packages.\"{build_system}\".\"{target}\";\n    }}"
             )
         })
         .collect::<Vec<_>>()

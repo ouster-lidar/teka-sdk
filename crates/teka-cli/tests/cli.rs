@@ -12,7 +12,7 @@ use std::{
 };
 use teka::tpk::{Architecture, Component, ComponentType, Manifest};
 use teka_cli::{
-    build::{single_package, target_package, validate_apps},
+    build::{single_package, validate_apps},
     deploy::check_logs,
     device::{normalize_arch, DeviceClient},
 };
@@ -222,10 +222,6 @@ fn cli(dir: &Path) -> Command {
 fn cross_targets_and_artifacts() {
     assert_eq!(normalize_arch("ARM64").unwrap(), "aarch64");
     assert!(normalize_arch("riscv64").is_err());
-    assert_eq!(
-        target_package("aarch64-darwin", "app", "x86_64-linux"),
-        ("x86_64-linux".into(), "app".into())
-    );
     let d = TempDir::new().unwrap();
     assert!(single_package(d.path()).is_err());
     fs::write(d.path().join("app.tpk"), b"data").unwrap();
@@ -771,8 +767,11 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     teka::tpk::verify(&mut file, &package).unwrap();
     assert_eq!(package.manifest.components[0].id, "hello-world");
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
-    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world-cross-aarch64-linux\""));
-    assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world\";"));
+    assert!(calls
+        .contains("apps.teka.apps.\"hello-world\".packages.\"x86_64-linux\".\"aarch64-linux\""));
+    assert!(
+        calls.contains("apps.teka.apps.\"hello-world\".packages.\"x86_64-linux\".\"x86_64-linux\"")
+    );
     assert!(calls.contains("builtins.getFlake") && calls.contains("?dir=\n"));
     assert!(calls.contains("--file"));
     assert!(calls.contains("--out-link"));
@@ -780,6 +779,40 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     let out = cli(d.path()).args(["app", "list"]).output().unwrap();
     success(&out);
     assert_eq!(out.stdout, b"app\nhello-world\n");
+}
+
+#[test]
+fn build_selects_explicit_linux_build_and_target_systems() {
+    for (builder, arch, build_system) in [
+        ("x86_64-linux", "x86_64", "x86_64-linux"),
+        ("x86_64-linux", "aarch64", "x86_64-linux"),
+        ("aarch64-linux", "x86_64", "aarch64-linux"),
+        ("aarch64-linux", "aarch64", "aarch64-linux"),
+        ("aarch64-darwin", "x86_64", "x86_64-linux"),
+        ("aarch64-darwin", "aarch64", "aarch64-linux"),
+    ] {
+        let d = TempDir::new().unwrap();
+        apps_flake(d.path());
+        success(
+            &cli(d.path())
+                .env("MOCK_SYSTEM", builder)
+                .args(["app", "build", "app", "--arch", arch])
+                .output()
+                .unwrap(),
+        );
+        let target = format!("{arch}-linux");
+        let expression = fs::read_to_string(d.path().join("calls")).unwrap();
+        assert!(
+            expression.contains(&format!(
+                "apps.teka.apps.\"app\".packages.\"{build_system}\".\"{target}\""
+            )),
+            "{expression}"
+        );
+        assert!(
+            expression.contains(&format!("legacyPackages.\"{builder}\"")),
+            "{expression}"
+        );
+    }
 }
 
 #[test]
@@ -1171,9 +1204,11 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
     assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
     for name in ["app", "hello-world"] {
         assert!(calls.contains(&format!(
-            "apps.packages.\"x86_64-linux\".\"{name}-cross-aarch64-linux\""
+            "apps.teka.apps.\"{name}\".packages.\"x86_64-linux\".\"aarch64-linux\""
         )));
-        assert!(calls.contains(&format!("apps.packages.\"x86_64-linux\".\"{name}\"")));
+        assert!(calls.contains(&format!(
+            "apps.teka.apps.\"{name}\".packages.\"x86_64-linux\".\"x86_64-linux\""
+        )));
     }
     let (arm_url, arm_server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
@@ -2125,7 +2160,9 @@ fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
             "{expression}"
         );
         assert!(
-            expression.contains(&format!("packages.\"{target}-linux\".\"app\"")),
+            expression.contains(&format!(
+                "teka.apps.\"app\".packages.\"{target}-linux\".\"{target}-linux\""
+            )),
             "{expression}"
         );
         assert!(expression.contains("--out-link\nresult"), "{expression}");

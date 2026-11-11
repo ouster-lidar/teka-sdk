@@ -13,14 +13,21 @@
     in
     builds
     // {
-      packages = builtins.mapAttrs (
-        system: packages:
-        packages
-        // {
-          test = teka-sdk.inputs.nixpkgs.legacyPackages.${system}.callPackage ./tests {
-            teka = teka-sdk.packages.${system}.teka;
+      apps = builtins.mapAttrs (
+        system: _:
+        let
+          pkgs = teka-sdk.inputs.nixpkgs.legacyPackages.${system};
+        in
+        {
+          test = {
+            type = "app";
+            program = pkgs.lib.getExe (
+              pkgs.callPackage ./tests {
+                teka = teka-sdk.packages.${system}.teka;
+              }
+            );
           };
         }
-      ) builds.packages;
+      ) teka-sdk.packages;
     };
 }

@@ -1,128 +1,76 @@
-{ mkApp }:
-
 {
   nixpkgs,
   crane,
-  systems,
-  services,
-  version,
-  advisoryDb ? null,
-  ousterSdkSrc ? null,
-  ousterSdkNix ? ./ouster/ouster-sdk.nix,
-  exampleAppsPkgsFor ? null,
+  ouster-sdk,
   tekaFor,
-  # Services outside this list also receive the PipeWire, onnxruntime,
-  # and openblas cross-build workarounds.
-  simpleCrossServices ? [ ],
-  appOverlays ? [ ],
+}:
+
+{
+  self,
+  apps,
+  systems ? [
+    "x86_64-linux"
+    "aarch64-linux"
+  ],
+  version ? import ./version.nix {
+    inherit self;
+    inherit (nixpkgs) lib;
+  },
+  advisoryDb ? null,
+  ousterSdkSrc ? ouster-sdk,
+  tekaSrc ? null,
+  overlays ? [ ],
+  simpleCrossApps ? [ ],
   imageChecks ? { },
 }:
 let
   inherit (nixpkgs) lib;
   inherit (version) appArtifactRawName imageVersion buildId;
+  appNames = lib.attrNames apps;
+  waylandOverlay = import ./overlays/wayland-compositors-overlay.nix;
+  crossOverlay = import ./overlays/cross.nix { inherit nixpkgs; };
 
-  waylandCompositorsOverlay = import ./overlays/wayland-compositors-overlay.nix;
-  appPkgsFor =
-    system:
-    nixpkgs.legacyPackages.${system}.appendOverlays (appOverlays ++ [ waylandCompositorsOverlay ]);
-
-  allServiceNames = lib.sort lib.lessThan (lib.attrNames services);
-  heavyCrossServices = lib.filter (n: !(lib.elem n simpleCrossServices)) allServiceNames;
-  # Portable images target Linux only; other `systems` members (e.g. aarch64-darwin) cross to these.
-  linuxSystems = lib.filter (lib.hasSuffix "-linux") systems;
-
-  hostCpu =
-    host:
-    if lib.hasSuffix "-linux" host then
-      lib.removeSuffix "-linux" host
-    else if lib.hasSuffix "-darwin" host then
-      lib.removeSuffix "-darwin" host
-    else
-      null;
-
-  defaultLinuxTarget =
-    host:
+  packageFor =
+    id: buildSystem: targetSystem:
     let
-      cpu = hostCpu host;
-    in
-    if cpu == null then null else "${cpu}-linux";
-
-  # Cross builds: PipeWire + ModemManager cross quirk — see
-  # nix/overlays/pipewire-cross-no-modemmanager-overlay.nix (shared with any separate
-  # nixpkgs import that must match this flake’s cross package set).
-  heavyCrossOverlay =
-    final: prev:
-    (import ./overlays/pipewire-cross-no-modemmanager-overlay.nix) final prev
-    // (import ./overlays/wayland-compositors-overlay.nix) final prev
-    // {
-      onnxruntime = prev.onnxruntime.overrideAttrs (old: {
-        cmakeFlags =
-          let
-            flags = old.cmakeFlags or [ ];
-          in
-          (builtins.filter (
-            f: !(builtins.isString f && prev.lib.strings.hasInfix "ONNX_CUSTOM_PROTOC_EXECUTABLE" f)
-          ) flags)
-          ++ [
-            (prev.lib.cmakeFeature "ONNX_CUSTOM_PROTOC_EXECUTABLE" (
-              prev.lib.getExe prev.buildPackages.protobuf
-            ))
-          ];
-      });
-      openblas =
-        if
-          final.stdenv.hostPlatform.isLinux
-          && final.stdenv.hostPlatform.isAarch64
-          && final.stdenv.hostPlatform.system != final.stdenv.buildPlatform.system
-        then
-          prev.openblas.override { dynamicArch = false; }
-        else
-          prev.openblas;
-      # FIXME: Remove when the pin includes https://github.com/NixOS/nixpkgs/pull/577654.
-      # Legacy GCC 16 omits the existing libgomp UID buffer fix and fails with -Werror=format-truncation.
-      gfortran =
-        if prev.stdenv.hostPlatform.system != prev.stdenv.buildPlatform.system then
-          prev.wrapCC (
-            prev.gfortran.cc.overrideAttrs (old: {
-              patches = old.patches ++ [
-                (nixpkgs + "/pkgs/development/compilers/gcc/ng/16/libgomp/uid-buffer-size.patch")
-              ];
-            })
-          )
-        else
-          prev.gfortran;
-    };
-
-  mkCross =
-    host: target:
-    import nixpkgs {
-      localSystem = {
-        system = host;
+      isCross = buildSystem != targetSystem;
+      pkgs = import nixpkgs (
+        {
+          config.allowUnfree = true;
+          overlays =
+            overlays
+            ++ [ waylandOverlay ]
+            ++ lib.optional (isCross && !(lib.elem id simpleCrossApps)) crossOverlay;
+        }
+        // (
+          if isCross then
+            {
+              localSystem = buildSystem;
+              crossSystem = targetSystem;
+            }
+          else
+            { system = buildSystem; }
+        )
+      );
+      ps = pkgs.callPackage ./app-image.nix {
+        inherit
+          version
+          advisoryDb
+          ousterSdkSrc
+          tekaSrc
+          ;
+        craneLib = crane.mkLib pkgs;
       };
-      crossSystem = {
-        system = target;
-      };
-      config.allowUnfree = true;
-      overlays = appOverlays ++ [ heavyCrossOverlay ];
-    };
-
-  mkTpk =
-    {
-      pkgs,
-      image,
-      id,
-      targetSystem,
-    }:
-    let
+      image = pkgs.callPackage apps.${id}.image { inherit ps; };
       artifact = appArtifactRawName id targetSystem;
       basename = lib.removeSuffix ".raw" artifact;
-      arch = hostCpu targetSystem;
+      arch = lib.removeSuffix "-linux" targetSystem;
     in
-    pkgs.runCommand "${id}-${targetSystem}-tpk"
+    pkgs.buildPackages.runCommand "${id}-${targetSystem}-tpk"
       {
         nativeBuildInputs = [
-          pkgs.jq
-          (tekaFor pkgs.stdenv.buildPlatform.system)
+          pkgs.buildPackages.jq
+          (tekaFor buildSystem)
         ];
         passthru = { inherit image; };
       }
@@ -141,118 +89,9 @@ let
           --output "$out/${basename}.tpk"
       '';
 
-  perHostPackages =
-    host:
-    let
-      builderSystem = defaultLinuxTarget host;
-      pkgs = appPkgsFor builderSystem;
-      callService = pkgs.callPackage;
-      crossTargets = lib.filter (t: t != host) linuxSystems;
-      nativeByName =
-        if lib.hasSuffix "-linux" host then
-          lib.genAttrs allServiceNames (
-            n:
-            mkTpk {
-              inherit pkgs;
-              id = n;
-              targetSystem = host;
-              image = callService services.${n} {
-                ps = mkApp {
-                  craneLib = crane.mkLib pkgs;
-                  inherit
-                    pkgs
-                    version
-                    advisoryDb
-                    ousterSdkSrc
-                    ousterSdkNix
-                    ;
-                  exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor builderSystem else null;
-                };
-              };
-            }
-          )
-        else
-          { };
-
-      crossPackages = lib.listToAttrs (
-        lib.concatMap (
-          n:
-          map (target: {
-            name = "${n}-cross-${target}";
-            value =
-              let
-                crossPkgs =
-                  if lib.elem n heavyCrossServices then
-                    mkCross builderSystem target
-                  else
-                    import nixpkgs {
-                      localSystem = {
-                        system = builderSystem;
-                      };
-                      crossSystem = {
-                        system = target;
-                      };
-                      config.allowUnfree = true;
-                      overlays = appOverlays ++ [ waylandCompositorsOverlay ];
-                    };
-              in
-              mkTpk {
-                inherit pkgs;
-                id = n;
-                targetSystem = target;
-                image = crossPkgs.callPackage services.${n} {
-                  ps = mkApp {
-                    craneLib = crane.mkLib crossPkgs;
-                    pkgs = crossPkgs;
-                    inherit
-                      version
-                      advisoryDb
-                      ousterSdkSrc
-                      ousterSdkNix
-                      ;
-                    # Shared infra pkgs from exampleAppsPkgsFor are build-time
-                    # inputs; use the build host system, not the cross target.
-                    exampleAppsPkgs = if exampleAppsPkgsFor != null then exampleAppsPkgsFor builderSystem else null;
-                  };
-                };
-              };
-          }) crossTargets
-        ) allServiceNames
-      );
-
-      # Non-Linux hosts: short attrs (hello-http) alias the same-CPU Linux cross build.
-      crossAliases =
-        if lib.hasSuffix "-linux" host then
-          { }
-        else
-          let
-            target = defaultLinuxTarget host;
-          in
-          if target == null then
-            { }
-          else
-            lib.genAttrs allServiceNames (n: crossPackages."${n}-cross-${target}");
-
-      # bundleMembers/defaultBundle are lazy; only referenced for Linux hosts below.
-      bundleMembers = lib.map (
-        n:
-        let
-          artifact = "${lib.removeSuffix ".raw" (appArtifactRawName n host)}.tpk";
-        in
-        {
-          name = artifact;
-          path = "${nativeByName.${n}}/${artifact}";
-        }
-      ) allServiceNames;
-
-      defaultBundle = pkgs.linkFarm "app-package-bundle" bundleMembers;
-    in
-    nativeByName
-    // crossPackages
-    // crossAliases
-    // lib.optionalAttrs (lib.hasSuffix "-linux" host) {
-      default = defaultBundle;
-    };
+  appPackages = lib.genAttrs appNames (
+    id: lib.genAttrs systems (buildSystem: lib.genAttrs systems (packageFor id buildSystem))
+  );
 
   mkRawCheck =
     pkgs: checkName: serviceName: drv: artifactRaw:
@@ -280,60 +119,57 @@ let
       touch "$out"
     '';
 
-  perSystemChecks =
-    system:
+  checksFor =
+    buildSystem:
     let
-      isLinux = lib.hasSuffix "-linux" system;
-      pkgs = appPkgsFor system;
-      # Match Teka: macOS delegates app builds to Linux builders.
-      hostPkgs = perHostPackages (if isLinux then system else artifactSystem);
-      crossTargets = lib.filter (t: t != system) linuxSystems;
-      artifactSystem = defaultLinuxTarget system;
-
-      nativeChecks = lib.genAttrs allServiceNames (
-        n:
-        mkRawCheck pkgs "app-image-check-${n}" n hostPkgs.${n}.image (appArtifactRawName n artifactSystem)
-      );
-
-      crossChecks = lib.listToAttrs (
-        lib.concatMap (
-          n:
-          map (
-            target:
-            let
-              attr = "${n}-cross-${target}";
-              drv = (if isLinux then hostPkgs.${attr} else (perHostPackages target).${n}).image;
-            in
-            {
-              name = attr;
-              value = mkRawCheck pkgs "app-image-check-${attr}" n drv (appArtifactRawName n target);
-            }
-          ) crossTargets
-        ) allServiceNames
-      );
-
-      nativeCargoChecks = lib.foldl' (
-        checks: n:
-        checks
-        // lib.mapAttrs' (checkName: drv: lib.nameValuePair "${n}-${checkName}" drv) (
-          hostPkgs.${n}.image.passthru.cargoChecks or { }
-        )
-      ) { } allServiceNames;
+      pkgs = nixpkgs.legacyPackages.${buildSystem};
     in
-    lib.optionalAttrs isLinux {
-      default = pkgs.runCommand "app-image-check-default" { } ''
-        ${lib.concatMapStringsSep "\n" (n: ''
-          test -f "${hostPkgs.default}/${lib.removeSuffix ".raw" (appArtifactRawName n system)}.tpk"
-        '') allServiceNames}
+    lib.foldl' (
+      checks: id:
+      checks
+      // lib.listToAttrs (
+        map (
+          targetSystem:
+          let
+            name = if buildSystem == targetSystem then id else "${id}-cross-${targetSystem}";
+            image = appPackages.${id}.${buildSystem}.${targetSystem}.image;
+          in
+          lib.nameValuePair name (
+            mkRawCheck pkgs "app-image-check-${name}" id image (appArtifactRawName id targetSystem)
+          )
+        ) systems
+      )
+      // lib.mapAttrs' (name: drv: lib.nameValuePair "${id}-${name}" drv) (
+        appPackages.${id}.${buildSystem}.${buildSystem}.image.cargoChecks or { }
+      )
+    ) { } appNames
+    // {
+      app-packages = pkgs.runCommand "app-packages-check" { } ''
+        ${lib.concatMapStringsSep "\n" (
+          id:
+          lib.concatMapStringsSep "\n" (
+            targetSystem:
+            let
+              package = appPackages.${id}.${buildSystem}.${targetSystem};
+              artifact = lib.removeSuffix ".raw" (appArtifactRawName id targetSystem);
+            in
+            ''
+              test -f ${package}/${artifact}.tpk
+            ''
+          ) systems
+        ) appNames}
         touch "$out"
       '';
-    }
-    // nativeChecks
-    // crossChecks
-    // nativeCargoChecks;
+    };
 in
-assert services != { };
+assert lib.assertMsg (lib.all (
+  system:
+  lib.elem system [
+    "x86_64-linux"
+    "aarch64-linux"
+  ]
+) systems) "Teka app builders and targets must be x86_64-linux or aarch64-linux";
 {
-  packages = lib.genAttrs systems perHostPackages;
-  checks = lib.genAttrs systems perSystemChecks;
+  teka.apps = lib.mapAttrs (_: packages: { inherit packages; }) appPackages;
+  checks = lib.genAttrs systems checksFor;
 }

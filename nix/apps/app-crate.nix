@@ -5,19 +5,11 @@
   runCommand,
   craneLib,
   advisoryDb ? null,
-  appApiJs ? ./web/app-api.js,
   tekaSrc ? pkgs.buildPackages.callPackage ../packages/teka-src.nix { inherit craneLib; },
 }:
 
 let
-  appApiJsSrc =
-    if lib.isDerivation appApiJs then
-      "${appApiJs}/app-api.js"
-    else
-      builtins.path {
-        path = appApiJs;
-        name = "app-api.js";
-      };
+  appApiJsSrc = ./web/app-api.js;
 
   prepareAppSource = pkgs.buildPackages.callPackage ./app-source.nix {
     inherit tekaSrc craneLib;
