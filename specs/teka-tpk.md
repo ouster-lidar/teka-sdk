@@ -93,7 +93,7 @@ Names are at most 100 UTF-8 bytes. Names contain neither `/`, `\` nor NUL. `.` a
 
 Draft manifests supply component metadata and payload paths. They may omit `bao_root` and payload `size`.
 
-`package pack` stages the payloads and fills those fields before signing. It replaces supplied storage values with the actual values.
+`tpk pack` stages the payloads and fills those fields before signing. It replaces supplied storage values with the actual values.
 
 ## Manifest signatures
 
@@ -132,7 +132,7 @@ Offline inspection can verify a signature with its embedded certificate. Without
 - Require exact stored-byte consumption, frame completion and the declared content size.
 - Reject additional frames or trailing data within a payload.
 
-`package pack` supports zstd levels 1–19, with level 9 as the default. Every payload stays zstd-encoded, including when the frame is larger than its input. The packer omits zstd checksums; BLAKE3 authenticates the frame and its contents.
+`tpk pack` supports zstd levels 1–19, with level 9 as the default. Every payload stays zstd-encoded, including when the frame is larger than its input. The packer omits zstd checksums; BLAKE3 authenticates the frame and its contents.
 
 ## Reading a package
 
@@ -158,11 +158,11 @@ Output may precede a later error. Check command success before using the complet
 2. Read and verify its Bao proof path and data groups.
 3. Decode that payload; earlier payloads need no traversal or decompression.
 
-A compressed range requires decoding from that payload's beginning. `package stream` drains the selected payload to complete its decoder checks. Other payloads remain unchecked. A lower-level read stopped early authenticates only the groups it accessed.
+A compressed range requires decoding from that payload's beginning. `tpk stream` drains the selected payload to complete its decoder checks. Other payloads remain unchecked. A lower-level read stopped early authenticates only the groups it accessed.
 
 ## Native verification
 
-`package verify` also checks native payload signatures and verity data.
+`tpk verify` also checks native payload signatures and verity data.
 
 DDIs contain GPT root, root-verity and root-verity-sig partitions. Validate discoverable partition types, architecture, bounds and geometry. The 16 KiB signature partition contains NUL-padded JSON:
 

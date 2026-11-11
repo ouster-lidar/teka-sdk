@@ -1,26 +1,29 @@
 # Rust crate naming
 
-## Motivation
+## Packages and features
 
-Namespace Teka tooling and reusable libraries under `teka` so package names identify the product, remain recognizable across repositories, and avoid generic names such as `app-runtime`. Use descriptive suffixes consistently. `teka-tpk` identifies the signed TPK format supported by its readers, packers and verifiers. `teka-app` names the app developer integration SDK, including runtime support.
+- The root Cargo workspace contains exactly `crates/teka` and `crates/teka-cli`, with shared release metadata, edition 2021 and resolver 2.
+- Both packages start at `0.1.0` and use BSD-3-Clause. Declare and test the minimum supported Rust version before release.
+- `teka` is the SDK dependency. Its default `app` feature exposes runtime, devres, startup and HTTP/WebSocket helpers under `teka::app`, plus `teka::declare_app_runtime!` at the crate root.
+- Optional `client` exposes blocking device HTTP/session APIs under `teka::client`, independently of `tpk`. Authentication inputs are explicit; credentials from the environment, progress and terminal output belong in CLI adapters.
+- Optional `tpk` exposes packing, parsing, streaming, trust verification, image and UKI APIs under `teka::tpk`. Preserve wire bytes, trust enforcement, streaming failure behavior and the module's unsafe-code restriction.
+- Use optional dependencies and explicit `dep:` feature entries. Keep features additive and retain target-specific dependencies. App builds exclude TPK-only dependencies and CLI code.
+- `teka-cli` provides the `teka` executable and shared command implementation library. It depends on `teka` with defaults disabled and `client,tpk` enabled.
+- Example apps remain independent packages with explicit workspace boundaries and lockfiles. Migrate consumers directly without compatibility aliases.
 
-## Names
+## Executables and source layout
 
-| Purpose | Cargo package | Rust crate |
-|---------|---------------|------------|
-| Main CLI and shared CLI library | `teka-cli` | `teka_cli` |
-| Signed TPK format library | `teka-tpk` | `teka_tpk` |
-| Application SDK and runtime | `teka-app` | `teka_app` |
+- The `teka` package provides `teka-runner`, gated by `app`, for registration, resource leases and lifecycle management of external app executables.
+- Appliance services invoke `teka-runner` directly. CLI plugin discovery also exposes it as `teka runner` without a built-in subcommand.
+- TPK commands use only `teka tpk`; preserve existing subcommands, arguments, output and exit codes.
+- Macro expansion uses `$crate` support paths, including a documentation-hidden Tokio re-export, and works with a renamed SDK dependency.
+- Nix workspace composition lives in `nix/default.nix`, package definitions in `nix/packages/`, and CLI checks in `nix/tests/`; reusable app builders live in `nix/apps/`. Export native `teka`, `teka.dist`, `teka-runner` and standalone `teka-src`; keep CLI and runner derivations and Cargo artifacts separate.
+- `teka-src` materializes workspace metadata for use outside this checkout. Cargo consumers build the SDK from source; the runner output installs only `bin/teka-runner`.
+- CLI archives include embedded VM resources and package-local fallback pins, with one documented update procedure and Nix overrides preserved.
 
-- Supporting tooling and libraries use `teka-<purpose>` with concise, descriptive suffixes. Prefer full words unless an abbreviation is established in the relevant domain.
-- Cargo dependency keys match package names; Rust imports use the corresponding underscore spelling without compatibility aliases.
-- Example application packages retain their app names, such as `hello-pub`.
-- Executable names remain `teka` and `app-runtime-process`; plugins retain `teka-<name>`.
-- Source directories, app IDs, macro names and the macro-generated app-local `app_runtime` module retain their existing names.
-- Nix derivation `pname` values for these crates match their Cargo package names. Existing flake attributes such as `teka`, `app-runtime` and `app-runtime-src` remain stable.
-- Nix-installed Rust libraries and consumers use the names produced by Cargo, including `libteka_app.rlib`.
+## Validation and release
 
-## Validation
-
-- Update manifests, Rust imports, package selectors and lockfiles together, including downstream consumers.
-- Verify CLI and runtime tests, example app builds and Nix checks without changing command behavior or refreshing unrelated dependencies.
+- Validate isolated feature combinations, downstream macro expansion, independent examples, runtime/Python lifecycle, TPK trust/transport and CLI dispatch/completion/plugins.
+- Run formatting, Clippy, documentation, packaging dry-runs and affected Nix builds/checks on supported Linux and Apple Silicon macOS systems where available.
+- Verify self-contained crate archives outside the checkout, and document build and external-tool prerequisites.
+- Publication, registry installs and remote changes are separate from local implementation and require explicit authorization.
