@@ -19,9 +19,8 @@ const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 pub struct DeployOptions {
     /// URL of a Teka device; may be repeated
     #[arg(
-        short = 'H',
-        long = "host",
-        env = "TEKA_HOST",
+        long = "device",
+        env = "TEKA_DEVICE",
         value_name = "URL",
         required = true
     )]

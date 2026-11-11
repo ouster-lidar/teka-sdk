@@ -24,7 +24,7 @@ flowchart TD
 
     subgraph auto [3. teka app deploy auto flow]
         H[Confirm Teka web UI loads]
-        I[teka app deploy --build --host http://device.local/ hello-ouster-terminal]
+        I[teka app deploy --build --device http://device.local/ hello-ouster-terminal]
         J[Open app and verify]
         H --> I --> J
     end
@@ -73,12 +73,12 @@ Replace `hello-ouster-terminal` with another app id as needed.
 
    ```bash
    export TEKA_PASSWORD='your-device-admin-password'
-   teka app deploy --build --host http://device.local/ hello-ouster-terminal
+   teka app deploy --build --device http://device.local/ hello-ouster-terminal
    ```
 
 Use the device's actual hostname or IP address.
 `--build` selects its architecture, builds the package, uploads it, and checks startup logs.
-You can set `TEKA_HOST` instead of passing `--host`, or repeat `--host` to deploy to several devices.
+You can set `TEKA_DEVICE` instead of passing `--device`, or repeat `--device` to deploy to several devices.
 
 ## Create a standalone app
 
@@ -89,7 +89,7 @@ teka app list --examples
 teka app init --example hello-world my-app
 cd my-app
 teka app build
-teka app deploy --build --host http://device.local/
+teka app deploy --build --device http://device.local/
 ```
 
 Initialization pins the SDK revision and stages the generated files in Git without committing them.

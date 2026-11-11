@@ -72,7 +72,7 @@ pub enum AppCommand {
     List(build::ListOptions),
     /// Deploy apps to one or more devices
     #[command(
-        after_help = "Examples:\n  teka app deploy --host http://device.local my-app another-app\n  teka app deploy --host http://device.local ./my-app.tpk\n  teka app deploy --build --host http://box-1/ --host http://box-2/ my-app another-app"
+        after_help = "Examples:\n  teka app deploy --device http://device.local my-app another-app\n  teka app deploy --device http://device.local ./my-app.tpk\n  teka app deploy --build --device http://box-1/ --device http://box-2/ my-app another-app"
     )]
     Deploy(deploy::DeployOptions),
     #[command(external_subcommand)]

@@ -72,7 +72,7 @@ def app(browser, pytestconfig):
                     "hello-ouster-world",
                     "--flake",
                     str(checkout.resolve()),
-                    "--host",
+                    "--device",
                     base,
                 ],
                 env=env,

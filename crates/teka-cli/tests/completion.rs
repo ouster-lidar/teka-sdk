@@ -86,6 +86,8 @@ fn composes_plugins_without_changing_dispatch() {
         ] {
             assert!(script.contains(word), "missing {word} in {shell}");
         }
+        assert!(!script.contains("--host"));
+        assert!(!script.contains("TEKA_HOST"));
         assert!(!script.contains("not-executable"));
         assert!(!script.contains("app-test"));
         assert!(!script.contains("app-build"));

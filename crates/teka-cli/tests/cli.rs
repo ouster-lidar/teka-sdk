@@ -200,7 +200,7 @@ fi"#;
 fn cli(dir: &Path) -> Command {
     let mut c = Command::new(env!("CARGO_BIN_EXE_teka"));
     c.env("TEKA_BUILD_VM", "never");
-    c.env_remove("TEKA_HOST")
+    c.env_remove("TEKA_DEVICE")
         .env_remove("TEKA_PASSWORD")
         .env_remove("TEKA_APPS_FLAKE_ROOT")
         .env("TEKA_POST_DEPLOY_SEC", "0")
@@ -347,7 +347,7 @@ fn authenticated_install_streams_with_cookie_and_profile() {
     ]);
     let output = cli(d.path())
         .env("TEKA_PASSWORD", "secret")
-        .env("TEKA_HOST", &url)
+        .env("TEKA_DEVICE", &url)
         .args(["app", "deploy", "app", "--profile", "a b", "--remove"])
         .output()
         .unwrap();
@@ -393,7 +393,7 @@ fn deploy_stops_when_removal_fails() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--build", "app", "--host", &url, "--remove",
+            "app", "deploy", "--build", "app", "--device", &url, "--remove",
         ])
         .output()
         .unwrap();
@@ -417,7 +417,7 @@ fn setup_sends_password() {
     success(
         &cli(d.path())
             .env("TEKA_PASSWORD", "secret")
-            .args(["app", "deploy", "app", "--host", &url])
+            .args(["app", "deploy", "app", "--device", &url])
             .output()
             .unwrap(),
     );
@@ -439,7 +439,7 @@ fn errors_without_password_and_rejects_login_redirect() {
     let d = TempDir::new().unwrap();
     let (url, server) = serve(vec![("200 OK", r#"{"enforcement":true}"#)]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--host", &url])
+        .args(["app", "deploy", "--build", "app", "--device", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -448,7 +448,7 @@ fn errors_without_password_and_rejects_login_redirect() {
     let (url, server) = serve(vec![("200 OK", "{}")]);
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "secret")
-        .args(["app", "deploy", "--build", "app", "--host", &url])
+        .args(["app", "deploy", "--build", "app", "--device", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -459,7 +459,7 @@ fn errors_without_password_and_rejects_login_redirect() {
         ("302 Found", "login"),
     ]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--host", &url])
+        .args(["app", "deploy", "--build", "app", "--device", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -700,7 +700,7 @@ fn build_and_deploy_reject_ambiguous_or_invalid_discovered_apps() {
             let mut process = cli(d.path());
             process.args(["app", command]);
             if command == "deploy" {
-                process.args(["--host", "http://127.0.0.1:1"]);
+                process.args(["--device", "http://127.0.0.1:1"]);
             }
             let output = process.output().unwrap();
             assert_eq!(output.status.code(), Some(1));
@@ -731,7 +731,7 @@ fn deploy_defaults_to_the_only_declared_app() {
             ("200 OK", "hello world"),
         ]);
         let mut process = cli(d.path());
-        process.args(["app", "deploy", "--host", &url]);
+        process.args(["app", "deploy", "--device", &url]);
         if build {
             process.arg("--build");
         }
@@ -751,7 +751,7 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     apps_flake(d.path());
     for target in [&["--arch", "aarch64"][..], &[], &["--arch", "x86_64"]] {
         let out = cli(d.path())
-            .env("TEKA_HOST", "not-a-host-url")
+            .env("TEKA_DEVICE", "not-a-host-url")
             .args(["app", "build", "hello-world"])
             .args(target)
             .output()
@@ -1041,13 +1041,17 @@ fn tpk_stream_rejects_corruption_in_selected_archive_group_before_output() {
 fn cli_rejects_invalid_usage() {
     let d = TempDir::new().unwrap();
     for args in [
+        vec!["app", "deploy", "--host", "device.local", "app"],
+        vec!["app", "deploy", "-H", "device.local", "app"],
+        vec!["system", "status", "--host", "device.local"],
+        vec!["system", "status", "-H", "device.local"],
         vec!["app", "deploy"],
         vec!["app", "deploy", "--build"],
         vec!["app", "deploy", "hello-world", "--build", "hello-world"],
         vec![
             "app",
             "deploy",
-            "--host",
+            "--device",
             "http://device",
             "--jobs",
             "0",
@@ -1075,7 +1079,7 @@ fn deploy_requires_host() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("--host"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--device"));
     assert!(!d.path().join("calls").exists());
 }
 
@@ -1109,8 +1113,8 @@ fn host_flag_overrides_environment() {
     ]);
     success(
         &cli(d.path())
-            .env("TEKA_HOST", "http://127.0.0.1:1")
-            .args(["app", "deploy", "hello-world", "--host", &url])
+            .env("TEKA_DEVICE", "http://127.0.0.1:1")
+            .args(["app", "deploy", "hello-world", "--device", &url])
             .output()
             .unwrap(),
     );
@@ -1162,9 +1166,9 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
             "--build",
             "--jobs",
             "2",
-            "--host",
+            "--device",
             &arm_url,
-            "--host",
+            "--device",
             &x86_url,
             "app",
             "hello-world",
@@ -1225,7 +1229,7 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
     success(
         &cli(d.path())
             .args([
-                "app", "deploy", "--host", &arm_url, "--host", &x86_url, "app",
+                "app", "deploy", "--device", &arm_url, "--device", &x86_url, "app",
             ])
             .output()
             .unwrap(),
@@ -1265,9 +1269,9 @@ fn deploy_reuses_one_build_for_same_architecture_hosts() {
             "app",
             "deploy",
             "--build",
-            "--host",
+            "--device",
             &first_url,
-            "--host",
+            "--device",
             &second_url,
             "app",
         ])
@@ -1303,7 +1307,7 @@ fn deploy_rejects_mixed_architectures_without_matching_build() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--host", &arm_url, "--host", &x86_url, "app",
+            "app", "deploy", "--device", &arm_url, "--device", &x86_url, "app",
         ])
         .output()
         .unwrap();
@@ -1339,7 +1343,7 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
         (os, "requires an app component"),
     ] {
         let out = cli(d.path())
-            .args(["app", "deploy", "--host", "http://127.0.0.1:1"])
+            .args(["app", "deploy", "--device", "http://127.0.0.1:1"])
             .arg(&valid)
             .arg(&path)
             .output()
@@ -1354,7 +1358,7 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
     }
     for option in ["--build", "--remove"] {
         let out = cli(d.path())
-            .args(["app", "deploy", "--host", "http://127.0.0.1:1", option])
+            .args(["app", "deploy", "--device", "http://127.0.0.1:1", option])
             .arg(&valid)
             .output()
             .unwrap();
@@ -1378,7 +1382,7 @@ fn deploy_accepts_bare_package_filename_and_preserves_named_app_lookup() {
         ]);
         success(
             &cli(d.path())
-                .args(["app", "deploy", "--host", &url, input])
+                .args(["app", "deploy", "--device", &url, input])
                 .output()
                 .unwrap(),
         );
@@ -1409,7 +1413,7 @@ fn deploy_preflight_blocks_device_mutation() {
             "app",
             "deploy",
             "--remove",
-            "--host",
+            "--device",
             &url,
             "app",
             "hello-world",
@@ -1446,7 +1450,7 @@ fn deploy_preflight_blocks_device_mutation() {
             ("200 OK", "{}"),
         ]);
         let out = cli(d.path())
-            .args(["app", "deploy", "--remove", "--host", &url, "app"])
+            .args(["app", "deploy", "--remove", "--device", &url, "app"])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(1));
@@ -1477,7 +1481,8 @@ fn deploy_preflight_blocks_device_mutation() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--build", "--remove", "--host", &arm_url, "--host", &x86_url, "app",
+            "app", "deploy", "--build", "--remove", "--device", &arm_url, "--device", &x86_url,
+            "app",
         ])
         .output()
         .unwrap();
@@ -1515,7 +1520,7 @@ fn deploy_collects_failures_after_other_hosts_finish() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--host", &good_url, "--host", &bad_url, "app",
+            "app", "deploy", "--device", &good_url, "--device", &bad_url, "app",
         ])
         .output()
         .unwrap();
@@ -1835,7 +1840,7 @@ fn system_status_prints_json_and_update_streams() {
         ("200 OK", r#"{"result":"INSTALLED_NO_REBOOT"}"#),
     ]);
     let out = system_cli(d.path())
-        .args(["system", "status", "--host", &url])
+        .args(["system", "status", "--device", &url])
         .output()
         .unwrap();
     success(&out);
@@ -1848,7 +1853,7 @@ fn system_status_prints_json_and_update_streams() {
             "system",
             "update",
             "--no-reboot",
-            "--host",
+            "--device",
             &url,
             image.to_str().unwrap(),
         ])
@@ -1881,7 +1886,8 @@ fn system_update_login_and_http_errors() {
     success(
         &system_cli(d.path())
             .env("TEKA_PASSWORD", "secret")
-            .args(["system", "update", "--host", &url, image.to_str().unwrap()])
+            .args(["system", "update", "--device", &url])
+            .arg(&image)
             .output()
             .unwrap(),
     );
@@ -1894,7 +1900,7 @@ fn system_update_login_and_http_errors() {
     assert_eq!(requests[3].body, fs::read(&image).unwrap());
     let (url, server) = serve(vec![("401 Unauthorized", "nope")]);
     let out = system_cli(d.path())
-        .args(["system", "status", "--host", &url])
+        .args(["system", "status", "--device", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -1948,7 +1954,7 @@ fn system_update_wait_commits_after_reboot() {
             "system",
             "update",
             "--wait",
-            "--host",
+            "--device",
             &url,
             image.to_str().unwrap(),
         ])
@@ -1985,7 +1991,7 @@ fn system_update_wait_aborts_on_unhealthy() {
             "system",
             "update",
             "--wait",
-            "--host",
+            "--device",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2024,7 +2030,7 @@ fn system_update_wait_detects_rollback() {
             "system",
             "update",
             "--wait",
-            "--host",
+            "--device",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2069,7 +2075,7 @@ fn system_update_rejects_invalid_packages_before_contacting_device() {
         (uki_digest, "HashMismatch"),
     ] {
         let out = system_cli(d.path())
-            .args(["system", "update", "--host", "http://127.0.0.1:1"])
+            .args(["system", "update", "--device", "http://127.0.0.1:1"])
             .arg(&path)
             .output()
             .unwrap();
@@ -2093,7 +2099,7 @@ fn system_update_rejects_architecture_before_upload() {
         ("200 OK", "{}"),
     ]);
     let out = system_cli(d.path())
-        .args(["system", "update", "--host", &url])
+        .args(["system", "update", "--device", &url])
         .arg(&image)
         .output()
         .unwrap();
@@ -2112,6 +2118,7 @@ fn system_update_rejects_architecture_before_upload() {
 fn system_requires_host() {
     let d = TempDir::new().unwrap();
     let out = system_cli(d.path())
+        .env("TEKA_HOST", "http://127.0.0.1:1")
         .args(["system", "status"])
         .output()
         .unwrap();
@@ -2146,7 +2153,7 @@ fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
         let out = cli(d.path())
             .env("TEKA_BUILD_VM", "always")
             .env("MOCK_SYSTEM", "aarch64-darwin")
-            .args(["app", "deploy", "--build", "app", "--host", &url])
+            .args(["app", "deploy", "--build", "app", "--device", &url])
             .output()
             .unwrap();
         success(&out);

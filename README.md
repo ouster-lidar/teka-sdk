@@ -28,7 +28,7 @@ teka app build hello-world
 
 ```bash
 export TEKA_PASSWORD='your-device-admin-password'
-teka app deploy --build hello-ouster-world --host http://device.local/
+teka app deploy --build hello-ouster-world --device http://device.local/
 ```
 
 Builds create packages under `result/<app>/`.

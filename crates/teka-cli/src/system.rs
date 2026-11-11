@@ -18,15 +18,15 @@ pub enum SystemCommand {
 #[derive(Clone, Debug, Args)]
 pub struct StatusOptions {
     /// URL of the Teka device
-    #[arg(short = 'H', long, env = "TEKA_HOST", value_name = "URL")]
-    pub host: String,
+    #[arg(long, env = "TEKA_DEVICE", value_name = "URL")]
+    pub device: String,
 }
 
 #[derive(Clone, Debug, Args)]
 pub struct UpdateOptions {
     /// URL of the Teka device
-    #[arg(short = 'H', long, env = "TEKA_HOST", value_name = "URL")]
-    pub host: String,
+    #[arg(long, env = "TEKA_DEVICE", value_name = "URL")]
+    pub device: String,
     /// System update image
     #[arg(value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     pub file: PathBuf,
@@ -73,7 +73,7 @@ pub fn wait_for_commit(host: &str, before_version: &str, deadline: Instant) -> R
 }
 
 pub fn run_status(args: StatusOptions) -> Result<()> {
-    let client = DeviceClient::new(&args.host)?;
+    let client = DeviceClient::new(&args.device)?;
     client.authenticate()?;
     let status = client.teka_status()?;
     println!("{}", serde_json::to_string(&status)?);
@@ -86,7 +86,7 @@ pub fn run_update(args: UpdateOptions) -> Result<()> {
         .file
         .canonicalize()
         .with_context(|| format!("open {}", args.file.display()))?;
-    let client = DeviceClient::new(&args.host)?;
+    let client = DeviceClient::new(&args.device)?;
     client.authenticate()?;
     let architecture = client.architecture()?;
     ensure!(
@@ -104,7 +104,7 @@ pub fn run_update(args: UpdateOptions) -> Result<()> {
     let response = apply(&client, &file, reboot)?;
     if args.wait && response["result"].as_str() == Some("REBOOTING") {
         let before = before_version.context("missing pre-update version")?;
-        let final_status = wait_for_commit(&args.host, &before, update_deadline()?)?;
+        let final_status = wait_for_commit(&args.device, &before, update_deadline()?)?;
         println!("{}", serde_json::to_string(&final_status)?);
     }
     Ok(())

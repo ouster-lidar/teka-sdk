@@ -54,17 +54,17 @@ For the SDK examples, work from the repository root:
 ```sh
 teka app list
 teka app build hello-world
-teka app deploy --host http://device.local hello-world hello-pub
-teka app deploy --host http://device.local --build hello-world hello-pub
+teka app deploy --device http://device.local hello-world hello-pub
+teka app deploy --device http://device.local --build hello-world hello-pub
 teka tpk pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
 teka tpk verify hello-world.tpk --trust ./trust
 teka tpk inspect hello-world.tpk --verify --trust ./trust
 teka tpk stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
-teka system status --host http://device.local
-teka system update ./image.tpk --wait --host http://device.local
+teka system status --device http://device.local
+teka system update ./image.tpk --wait --device http://device.local
 ```
 
-App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--host` or `TEKA_HOST`.
+App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--device` or `TEKA_DEVICE`.
 
 - `tpk pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
 - `tpk verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.
