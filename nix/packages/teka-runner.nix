@@ -22,7 +22,7 @@ craneLib.buildPackage (
   common
   // {
     inherit cargoArtifacts;
-    postCheck = lib.optionalString (common.doCheck && stdenv.hostPlatform.isLinux) ''
+    postCheck = lib.optionalString common.doCheck ''
       TEKA_RUNNER="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/teka-runner" \
         ${python3}/bin/python3 crates/teka/tests/resource_process.py
     '';

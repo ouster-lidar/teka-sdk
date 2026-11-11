@@ -14,7 +14,7 @@ Bootstrap installs Nix if needed, builds Teka, and installs it to `~/.local/bin`
 
 For a temporary shell without installing Teka, run `nix develop` at the repository root. If Fish startup configuration puts an older installed Teka first on `PATH`, use `nix develop --command fish --no-config`, or run commands directly with `nix develop --command teka …`.
 
-Install from Cargo with `cargo install teka-cli --version 0.1.0 --locked`. Building requires Rust 1.95 or newer, a C compiler, `pkg-config`, and OpenSSL development headers/libraries. On macOS, install the Xcode command line tools and OpenSSL (for example, `brew install openssl@3 pkg-config`). App builds and build-environment commands also require Nix with `nix-command flakes` enabled.
+Install from Cargo with `cargo install teka-cli --version 0.1.0 --locked`. Building requires Rust 1.95 or newer, a C compiler, `pkg-config`, and OpenSSL development headers/libraries. On macOS, install the Xcode command line tools, libclang, and OpenSSL (for example, `brew install llvm openssl@3 pkg-config` and set `LIBCLANG_PATH="$(brew --prefix llvm)/lib"`). App builds and build-environment commands also require Nix with `nix-command flakes` enabled.
 
 Nix packages include the UKI verifier. Portable and Cargo installs require `sbverify` from `sbsigntool` on Linux, or `brew install osslsigncode` on Darwin.
 

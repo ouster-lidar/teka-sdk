@@ -133,10 +133,11 @@ class ProcessFixture(unittest.TestCase):
         }, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     def ready(self):
-        self.notify.settimeout(5)
-        self.assertIn(b"READY=1", self.notify.recv(1024))
-        self.assertTrue(self.calls("/ports"))
+        if sys.platform == "linux":
+            self.notify.settimeout(5)
+            self.assertIn(b"READY=1", self.notify.recv(1024))
         self.wait_for(self.pid_file.exists)
+        self.assertTrue(self.calls("/ports"))
 
 
 class ResourceTests(ProcessFixture):
@@ -202,7 +203,7 @@ class ResourceTests(ProcessFixture):
         self.released()
 
     def test_child_exit_preserves_status_and_releases(self):
-        for code in (7, 130, 143):
+        for code in (0, 7, 42, 130, 143):
             with self.subTest(code=code):
                 releases = len(self.calls("/release"))
                 self.start([sys.executable, "-c", f"raise SystemExit({code})"])
@@ -223,10 +224,33 @@ class ResourceTests(ProcessFixture):
         self.released()
 
     def test_child_crash_preserves_status_and_releases(self):
-        self.start()
+        command = CHILD.replace(
+            "signal.signal(signal.SIGINT, lambda *_: sys.exit(42))",
+            "signal.signal(signal.SIGINT, signal.SIG_DFL)",
+        )
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGKILL):
+            with self.subTest(signal=sig):
+                self.pid_file.unlink(missing_ok=True)
+                releases = len(self.calls("/release"))
+                self.start([sys.executable, "-c", command, str(self.pid_file)])
+                self.ready()
+                os.kill(int(self.pid_file.read_text()), sig)
+                self.proc.communicate(timeout=15)
+                self.assertEqual(self.proc.returncode, -sig)
+                self.assertEqual(len(self.calls("/release")), releases + 1)
+                self.released()
+
+    def test_stop_kills_child_that_ignores_termination_after_timeout(self):
+        command = CHILD.replace(
+            "signal.signal(signal.SIGINT, lambda *_: sys.exit(42))",
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)",
+        )
+        self.start([sys.executable, "-c", command, str(self.pid_file)])
         self.ready()
-        os.kill(int(self.pid_file.read_text()), signal.SIGKILL)
+        started = time.monotonic()
+        self.proc.terminate()
         self.assertEqual(self.proc.wait(timeout=15), -signal.SIGKILL)
+        self.assertGreaterEqual(time.monotonic() - started, 9)
         self.released()
 
     def test_registration_loss_stops_dependent_child(self):
@@ -276,8 +300,14 @@ while True: time.sleep(1)
         self.proc.wait(timeout=15)
         pid = int(descendant.read_text())
         def dead():
-            status = Path(f"/proc/{pid}/stat")
-            return not status.exists() or status.read_text().split()[2] == "Z"
+            if sys.platform == "linux":
+                status = Path(f"/proc/{pid}/stat")
+                return not status.exists() or status.read_text().split()[2] == "Z"
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return True
+            return False
         self.wait_for(dead)
         self.released()
 

@@ -1,13 +1,11 @@
 //! Browser JPEG capture: zwlr_screencopy wl_shm → nvvidconv/nvjpegenc → WS.
 
 use std::fs::{File, OpenOptions};
-use std::os::fd::{AsFd, AsRawFd};
+use std::os::fd::AsFd;
+use std::os::unix::fs::FileExt;
 use std::path::PathBuf;
-use std::ptr;
-use std::slice;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, SyncSender};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -27,71 +25,6 @@ use wayland_protocols_wlr::screencopy::v1::client::{
 use crate::display::{write_stream_target, DisplayState};
 
 const DRM_FORMAT_XRGB8888: u32 = DrmFourcc::Xrgb8888 as u32;
-
-const PROT_READ: i32 = 1;
-const MAP_SHARED: i32 = 1;
-
-extern "C" {
-    fn mmap(
-        addr: *mut std::ffi::c_void,
-        len: usize,
-        prot: i32,
-        flags: i32,
-        fd: i32,
-        offset: i64,
-    ) -> *mut std::ffi::c_void;
-    fn munmap(addr: *mut std::ffi::c_void, len: usize) -> i32;
-}
-
-struct MappedShm {
-    ptr: *mut u8,
-    len: usize,
-}
-
-unsafe impl Send for MappedShm {}
-
-impl MappedShm {
-    fn map(file: &File, len: usize) -> anyhow::Result<Self> {
-        if len == 0 {
-            anyhow::bail!("mmap size 0");
-        }
-        let ptr = unsafe {
-            mmap(
-                ptr::null_mut(),
-                len,
-                PROT_READ,
-                MAP_SHARED,
-                file.as_raw_fd(),
-                0,
-            )
-        };
-        if ptr.is_null() || ptr == usize::MAX as *mut std::ffi::c_void {
-            anyhow::bail!("mmap screencopy shm failed");
-        }
-        Ok(Self {
-            ptr: ptr.cast(),
-            len,
-        })
-    }
-
-    fn bytes(&self, size: usize) -> anyhow::Result<&[u8]> {
-        if size > self.len {
-            anyhow::bail!("mmap slice {size} > mapping {}", self.len);
-        }
-        Ok(unsafe { slice::from_raw_parts(self.ptr, size) })
-    }
-}
-
-impl Drop for MappedShm {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe {
-                let _ = munmap(self.ptr.cast(), self.len);
-            }
-            self.ptr = ptr::null_mut();
-        }
-    }
-}
 
 pub fn spawn_capture(display: DisplayState) {
     thread::Builder::new()
@@ -146,6 +79,26 @@ fn fourcc_u32(fourcc: DrmFourcc) -> u32 {
     fourcc as u32
 }
 
+fn read_shm_pixels(
+    file: &File,
+    size: usize,
+    (width, height): (u32, u32),
+    stride: u32,
+    src_bpp: usize,
+    swap_rb: bool,
+) -> anyhow::Result<Vec<u8>> {
+    // Wayland has finished writing; read owned bytes before reusing the buffer.
+    let mut pixels = vec![0; size];
+    file.read_exact_at(&mut pixels, 0)?;
+    let row = (width as usize).saturating_mul(src_bpp);
+    if src_bpp == 4 && !swap_rb && stride as usize == row {
+        pixels.truncate(row.saturating_mul(height as usize));
+        Ok(pixels)
+    } else {
+        pack_to_bgrx(&pixels, stride, width, height, src_bpp, swap_rb)
+    }
+}
+
 fn pack_to_bgrx(
     src: &[u8],
     src_stride: u32,
@@ -159,7 +112,7 @@ fn pack_to_bgrx(
     let need = stride.saturating_mul(height as usize);
     if src.len() < need {
         anyhow::bail!(
-            "mapped buffer too small: {} < stride*height {}",
+            "capture buffer too small: {} < stride*height {}",
             src.len(),
             need
         );
@@ -367,7 +320,7 @@ impl EncodePipeline {
                     if !encoded_once.swap(true, Ordering::Relaxed) {
                         tracing::info!(bytes = bytes.len(), "gst: first jpeg frame");
                     }
-                    let _ = frame_tx.send(Arc::new(bytes));
+                    let _ = frame_tx.send(bytes.into());
                     Ok(FlowSuccess::Ok)
                 })
                 .build(),
@@ -557,10 +510,7 @@ struct CapturedFrame {
 }
 
 struct ShmCapturePool {
-    /// Kept alive so the mmap stays valid.
-    #[allow(dead_code)]
     file: File,
-    map: MappedShm,
     pool: wl_shm_pool::WlShmPool,
     buffer: wl_buffer::WlBuffer,
     capacity: usize,
@@ -589,7 +539,6 @@ impl ShmCapturePool {
     fn destroy(self) {
         self.buffer.destroy();
         self.pool.destroy();
-        drop(self.map);
     }
 }
 
@@ -754,7 +703,6 @@ impl WaylandCapture {
             .with_context(|| format!("shm file {}", path.display()))?;
         let _ = std::fs::remove_file(&path);
         file.set_len(size as u64)?;
-        let map = MappedShm::map(&file, size)?;
         let pool = shm.create_pool(file.as_fd(), size as i32, &self.queue.handle(), ());
         let buffer = pool.create_buffer(
             0,
@@ -767,7 +715,6 @@ impl WaylandCapture {
         );
         self.shm_pool = Some(ShmCapturePool {
             file,
-            map,
             pool,
             buffer,
             capacity: size,
@@ -799,8 +746,8 @@ impl WaylandCapture {
         let size = (stride as usize)
             .checked_mul(height as usize)
             .ok_or_else(|| anyhow::anyhow!("shm size overflow"))?;
-        if size > i32::MAX as usize {
-            anyhow::bail!("shm buffer too large ({size})");
+        if size == 0 || size > i32::MAX as usize {
+            anyhow::bail!("invalid shm buffer size ({size})");
         }
         self.ensure_shm_pool(&shm, width, height, stride, wl_fmt, size)?;
         let wl_buffer = self
@@ -821,18 +768,17 @@ impl WaylandCapture {
                             .shm_pool
                             .as_ref()
                             .ok_or_else(|| anyhow::anyhow!("screencopy shm pool missing"))?;
-                        let mapped = pool.map.bytes(size)?;
-                        let swap_rb = matches!(
-                            drm,
-                            DrmFourcc::Bgr888 | DrmFourcc::Xbgr8888 | DrmFourcc::Abgr8888
-                        );
-                        let row = (width as usize).saturating_mul(src_bpp);
-                        let pixels = if src_bpp == 4 && !swap_rb && stride as usize == row {
-                            let total = row.saturating_mul(height as usize);
-                            mapped[..total].to_vec()
-                        } else {
-                            pack_to_bgrx(mapped, stride, width, height, src_bpp, swap_rb)?
-                        };
+                        let pixels = read_shm_pixels(
+                            &pool.file,
+                            size,
+                            (width, height),
+                            stride,
+                            src_bpp,
+                            matches!(
+                                drm,
+                                DrmFourcc::Bgr888 | DrmFourcc::Xbgr8888 | DrmFourcc::Abgr8888
+                            ),
+                        )?;
                         return Ok(CapturedFrame {
                             format: DrmFourcc::Xrgb8888,
                             pixels,
@@ -998,7 +944,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                             .last_capture_ms
                             .store(started.elapsed().as_millis() as u64, Ordering::Relaxed);
                         display.set_error(None);
-                        write_stream_target_throttled(true);
+                        write_stream_target_throttled(false);
                     }
                 }
             }
@@ -1016,5 +962,47 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
         if reset_wl {
             wl = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shm_frames_are_owned_snapshots_read_from_offset_zero() {
+        let mut file = tempfile::tempfile().unwrap();
+        std::io::Write::write_all(&mut file, &[1, 2, 3, 4, 5, 6, 7, 8]).unwrap();
+        let pixels = read_shm_pixels(&file, 8, (2, 1), 8, 4, false).unwrap();
+        assert_eq!(pixels, [1, 2, 3, 4, 5, 6, 7, 8]);
+        file.write_all_at(&[9; 8], 0).unwrap();
+        assert_eq!(
+            read_shm_pixels(&file, 8, (2, 1), 8, 4, false).unwrap(),
+            [9; 8]
+        );
+        assert_eq!(pixels, [1, 2, 3, 4, 5, 6, 7, 8]);
+        file.set_len(4).unwrap();
+        assert!(read_shm_pixels(&file, 8, (2, 1), 8, 4, false).is_err());
+    }
+
+    #[test]
+    fn shm_frames_swap_red_and_blue_in_four_byte_pixels() {
+        let file = tempfile::tempfile().unwrap();
+        file.write_all_at(&[255, 0, 0, 17, 0, 0, 255, 23], 0)
+            .unwrap();
+        assert_eq!(
+            read_shm_pixels(&file, 8, (2, 1), 8, 4, true).unwrap(),
+            [0, 0, 255, 17, 255, 0, 0, 23]
+        );
+    }
+
+    #[test]
+    fn shm_frames_strip_padding_and_convert_rgb_to_bgrx() {
+        let file = tempfile::tempfile().unwrap();
+        file.write_all_at(&[1, 2, 3, 0, 4, 5, 6, 0], 0).unwrap();
+        assert_eq!(
+            read_shm_pixels(&file, 8, (1, 2), 4, 3, true).unwrap(),
+            [3, 2, 1, 255, 6, 5, 4, 255]
+        );
     }
 }

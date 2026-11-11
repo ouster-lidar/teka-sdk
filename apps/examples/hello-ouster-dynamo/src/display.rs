@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::Bytes;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
@@ -76,7 +77,7 @@ pub(crate) struct DisplayInner {
     pub(crate) source_size: Mutex<(u32, u32)>,
     pub(crate) scaled_size: Mutex<(u32, u32)>,
     controlling: Mutex<Option<u64>>,
-    pub(crate) frame_tx: broadcast::Sender<Arc<Vec<u8>>>,
+    pub(crate) frame_tx: broadcast::Sender<Bytes>,
     pub(crate) capture_gate: watch::Sender<bool>,
     inject_tx: mpsc::UnboundedSender<InjectCmd>,
     vpointer: Mutex<VirtualPointer>,
@@ -475,11 +476,7 @@ async fn stream_session(mut socket: WebSocket, state: AppState) {
                 while let Ok(au) = frames.try_recv() {
                     latest = au;
                 }
-                if socket
-                    .send(Message::Binary(latest.as_slice().to_vec().into()))
-                    .await
-                    .is_err()
-                {
+                if socket.send(Message::Binary(latest)).await.is_err() {
                     break;
                 }
             }

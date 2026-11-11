@@ -26,6 +26,8 @@ struct Host {
 
 impl Host {
     fn handle(&self, mut stream: TcpStream) {
+        // macOS inherits nonblocking mode from the listener.
+        stream.set_nonblocking(false).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
             .unwrap();

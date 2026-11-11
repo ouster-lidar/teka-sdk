@@ -5,6 +5,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 use std::time::Duration;
 
+use rustix::process::{kill_process_group, Pid, Signal};
 use teka::app::runtime::{self, ResourceAvailability};
 use tokio::process::{Child, Command};
 use tokio::signal::unix::{signal, SignalKind};
@@ -26,22 +27,21 @@ fn main() {
         _ => {}
     }
     match main_result() {
-        Ok(status) => {
-            if let Some(code) = status.code() {
-                std::process::exit(code);
-            }
-            let signal = status.signal().unwrap_or(libc::SIGTERM);
-            unsafe {
-                libc::signal(signal, libc::SIG_DFL);
-                libc::raise(signal);
-            }
-            std::process::exit(128 + signal);
-        }
+        Ok(status) => exit_with_status(status),
         Err(error) => {
             eprintln!("teka-runner: {error}");
             std::process::exit(1);
         }
     }
+}
+
+fn exit_with_status(status: ExitStatus) -> ! {
+    if let Some(code) = status.code() {
+        std::process::exit(code);
+    }
+    let signal = status.signal().unwrap_or(libc::SIGTERM);
+    let _ = signal_hook::low_level::emulate_default_handler(signal);
+    std::process::exit(128 + signal);
 }
 
 fn main_result() -> io::Result<ExitStatus> {
@@ -107,9 +107,12 @@ fn main_result() -> io::Result<ExitStatus> {
             .kill_on_drop(true)
             .spawn()?;
         let group = ProcessGroup(
-            child
-                .id()
-                .ok_or_else(|| io::Error::other("child has no PID"))?,
+            Pid::from_raw(
+                child
+                    .id()
+                    .ok_or_else(|| io::Error::other("child has no PID"))? as i32,
+            )
+            .ok_or_else(|| io::Error::other("invalid child PID"))?,
         );
         runtime::notify_ready();
         let resource_loss = async {
@@ -124,10 +127,10 @@ fn main_result() -> io::Result<ExitStatus> {
             }
         };
         let (observed, shutdown_signal) = tokio::select! {
-            status = child.wait() => (Some(status), libc::SIGTERM),
-            _ = terminate.recv() => (None, libc::SIGTERM),
-            _ = interrupt.recv() => (None, libc::SIGINT),
-            loss = resource_loss => (Some(loss), libc::SIGTERM),
+            status = child.wait() => (Some(status), Signal::TERM),
+            _ = terminate.recv() => (None, Signal::TERM),
+            _ = interrupt.recv() => (None, Signal::INT),
+            loss = resource_loss => (Some(loss), Signal::TERM),
         };
         stop_child(&mut child, &group, shutdown_signal).await;
         match observed {
@@ -155,36 +158,84 @@ fn ports(range: &str) -> io::Result<Vec<u16>> {
     Ok((first..=last).collect())
 }
 
-struct ProcessGroup(u32);
+struct ProcessGroup(Pid);
 
 impl ProcessGroup {
-    fn signal(&self, signal: i32) {
-        unsafe {
-            libc::kill(-(self.0 as i32), signal);
-        }
+    fn signal(&self, signal: Signal) {
+        let _ = kill_process_group(self.0, signal);
     }
 }
 
 impl Drop for ProcessGroup {
     fn drop(&mut self) {
         // Descendants may outlive the group leader or ignore its shutdown signal.
-        self.signal(libc::SIGKILL);
+        self.signal(Signal::KILL);
     }
 }
 
-async fn stop_child(child: &mut Child, group: &ProcessGroup, signal: i32) {
+async fn stop_child(child: &mut Child, group: &ProcessGroup, signal: Signal) {
     group.signal(signal);
     if tokio::time::timeout(Duration::from_secs(10), child.wait())
         .await
         .is_err()
     {
-        group.signal(libc::SIGKILL);
+        group.signal(Signal::KILL);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exit_status_preserves_codes_and_signals() {
+        const RAW_STATUS: &str = "TEKA_RUNNER_TEST_RAW_STATUS";
+        if let Ok(raw) = std::env::var(RAW_STATUS) {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let _enter = runtime.enter();
+            let _terminate = signal(SignalKind::terminate()).unwrap();
+            let _interrupt = signal(SignalKind::interrupt()).unwrap();
+            exit_with_status(ExitStatus::from_raw(raw.parse().unwrap()));
+        }
+        for raw in [0, 42 << 8, libc::SIGTERM, libc::SIGINT, libc::SIGKILL] {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "tests::exit_status_preserves_codes_and_signals"])
+                .env(RAW_STATUS, raw.to_string())
+                .status()
+                .unwrap();
+            let expected = ExitStatus::from_raw(raw);
+            assert_eq!(status.code(), expected.code());
+            assert_eq!(status.signal(), expected.signal());
+        }
+    }
+
+    #[test]
+    fn process_group_forwards_signals_and_kills_on_drop() {
+        use std::os::unix::process::CommandExt;
+
+        for signal in [Some(Signal::TERM), Some(Signal::INT), None] {
+            let mut child = std::process::Command::new("sleep")
+                .arg("60")
+                .process_group(0)
+                .spawn()
+                .unwrap();
+            let mut peer = std::process::Command::new("sleep")
+                .arg("60")
+                .process_group(child.id() as i32)
+                .spawn()
+                .unwrap();
+            let group = ProcessGroup(Pid::from_raw(child.id() as i32).unwrap());
+            if let Some(signal) = signal {
+                group.signal(signal);
+                assert_eq!(child.wait().unwrap().signal(), Some(signal.as_raw()));
+                assert_eq!(peer.wait().unwrap().signal(), Some(signal.as_raw()));
+            } else {
+                drop(group);
+                assert_eq!(child.wait().unwrap().signal(), Some(libc::SIGKILL));
+                assert_eq!(peer.wait().unwrap().signal(), Some(libc::SIGKILL));
+            }
+        }
+    }
 
     #[test]
     fn range_is_inclusive_and_configurable() {

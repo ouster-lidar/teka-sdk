@@ -35,7 +35,7 @@ impl Shell {
 }
 
 fn parent_shell() -> Option<Shell> {
-    let pid = unsafe { libc::getppid() };
+    let pid = rustix::process::getppid()?.as_raw_pid();
     #[cfg(target_os = "linux")]
     let path = {
         // Under binfmt emulation, exe points at the interpreter rather than the shell.
@@ -44,17 +44,8 @@ fn parent_shell() -> Option<Shell> {
     };
     #[cfg(target_os = "macos")]
     let path = {
-        use std::os::unix::ffi::OsStrExt;
-
         // /bin/ps is unavailable in sandboxed macOS builds.
-        let mut buffer = [0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
-        let len =
-            unsafe { libc::proc_pidpath(pid, buffer.as_mut_ptr().cast(), buffer.len() as u32) };
-        if len <= 0 {
-            return None;
-        }
-        let path = std::ffi::CStr::from_bytes_until_nul(&buffer).ok()?;
-        std::path::PathBuf::from(std::ffi::OsStr::from_bytes(path.to_bytes()))
+        std::path::PathBuf::from(libproc::proc_pid::pidpath(pid).ok()?)
     };
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     let path = {

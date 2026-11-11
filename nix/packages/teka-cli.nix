@@ -11,6 +11,7 @@
   openssl,
   osslsigncode,
   pkg-config,
+  rustPlatform,
   sbsigntool,
   removeReferencesTo,
   portable ? false,
@@ -36,7 +37,10 @@ let
     CARGO_BUILD_TARGET = stdenv.hostPlatform.rust.rustcTarget;
     cargoExtraArgs = "--locked -p teka-cli";
     doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
-    nativeBuildInputs = [ pkg-config ];
+    nativeBuildInputs = [
+      pkg-config
+    ]
+    ++ lib.optional stdenv.hostPlatform.isDarwin rustPlatform.bindgenHook;
     buildInputs = [ opensslPackage ];
     TEKA_VM_NIXPKGS_REV = nixpkgsRev;
   }

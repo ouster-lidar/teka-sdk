@@ -10,7 +10,7 @@ readme = "README.md"
 
 [features]
 default = ["app"]
-app = ["dep:axum", "dep:libc", "dep:parking_lot", "dep:reqwest", "dep:sd-notify", "dep:serde", "dep:serde_json", "dep:socket2", "dep:tokio", "dep:tracing"]
+app = ["dep:axum", "dep:libc", "dep:parking_lot", "dep:reqwest", "dep:rustix", "dep:sd-notify", "dep:serde", "dep:serde_json", "dep:signal-hook", "dep:socket2", "dep:tokio", "dep:tracing"]
 client = ["dep:anyhow", "dep:reqwest", "dep:serde_json", "reqwest/cookies", "reqwest/rustls-tls"]
 tpk = ["dep:anyhow", "dep:bao-tree", "dep:base64", "dep:crc32fast", "dep:object", "dep:openssl", "dep:serde", "dep:serde_json", "dep:tempfile", "dep:zstd"]
 
@@ -30,8 +30,10 @@ object = { version = "0.40", default-features = false, features = ["read_core", 
 openssl = { version = "0.10", optional = true }
 parking_lot = { version = "0.12", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "blocking"], optional = true }
+rustix = { version = "1", features = ["process"], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
+signal-hook = { version = "0.3", default-features = false, optional = true }
 socket2 = { version = "0.6", optional = true }
 tempfile = { version = "3", optional = true }
 tokio = { version = "1", features = ["sync", "time", "signal", "rt-multi-thread", "process"], optional = true }
@@ -43,3 +45,6 @@ sd-notify = { version = "0.5", optional = true }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints.rust]
+unsafe_code = "forbid"
