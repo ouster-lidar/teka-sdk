@@ -54,10 +54,10 @@ teka app list
 teka app build hello-world
 teka app deploy --host http://device.local hello-world hello-pub
 teka app deploy --host http://device.local --build hello-world hello-pub
-teka package pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
-teka package verify hello-world.tpk --trust ./trust
-teka package inspect hello-world.tpk --verify --trust ./trust
-teka package stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
+teka tpk pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
+teka tpk verify hello-world.tpk --trust ./trust
+teka tpk inspect hello-world.tpk --verify --trust ./trust
+teka tpk stream hello-world.tpk --trust ./trust --member hello-world.raw > hello-world.raw
 teka system status --host http://device.local
 teka system update ./image.tpk --wait --host http://device.local
 ```

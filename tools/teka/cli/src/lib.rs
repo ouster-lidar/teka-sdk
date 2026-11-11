@@ -9,8 +9,8 @@ pub mod deploy;
 pub mod device;
 mod host;
 pub mod inspect;
-pub mod package;
-pub use package::PackageCommand;
+pub mod tpk;
+pub use tpk::TpkCommand;
 pub mod plugins;
 pub mod system;
 
@@ -35,9 +35,9 @@ pub enum Command {
         command: build_check::BuildCommand,
     },
     /// Create, verify, stream, and inspect TPK packages
-    Package {
+    Tpk {
         #[command(subcommand)]
-        command: PackageCommand,
+        command: TpkCommand,
     },
     /// Generate shell completions
     #[command(after_help = r#"Load once per shell:
@@ -85,7 +85,7 @@ pub enum AppCommand {
 pub fn run(command: Command) -> Result<()> {
     match command {
         Command::Build { command } => build_check::run(command),
-        Command::Package { command } => package::run(command),
+        Command::Tpk { command } => tpk::run(command),
         Command::Completion { shell } => completion::run(shell),
         Command::App { command } => match command {
             AppCommand::Init(args) => app_init::run(args),
@@ -132,7 +132,7 @@ pub fn main_entry() -> i32 {
             }
             if plugins::is_usage(&e) {
                 2
-            } else if e.is::<package::Rejected>() {
+            } else if e.is::<tpk::Rejected>() {
                 3
             } else {
                 1

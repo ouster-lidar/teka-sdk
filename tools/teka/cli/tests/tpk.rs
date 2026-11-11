@@ -33,7 +33,7 @@ fn pack_zstd_encodes_and_verifies() {
     let tool = env!("CARGO_BIN_EXE_teka");
     let pack = |output: &std::path::Path, level: &str| {
         Command::new(tool)
-            .args(["package", "pack", "--manifest"])
+            .args(["tpk", "pack", "--manifest"])
             .arg(&input)
             .arg("--private-key")
             .arg(&key)
@@ -117,7 +117,7 @@ fn pack_zstd_encodes_and_verifies() {
     assert!(!package.signature.is_empty());
     let stream = |arguments: &[&str]| {
         Command::new(tool)
-            .args(["package", "stream"])
+            .args(["tpk", "stream"])
             .arg(&output)
             .arg("--trust")
             .arg(dir.path())
@@ -162,7 +162,7 @@ fn pack_zstd_encodes_and_verifies() {
     bytes[envelope + package.members[0].offset as usize + 2048] ^= 1;
     fs::write(&noise_output, bytes).unwrap();
     let rejected = Command::new(tool)
-        .args(["package", "stream"])
+        .args(["tpk", "stream"])
         .arg(&noise_output)
         .arg("--trust")
         .arg(dir.path())
@@ -292,7 +292,7 @@ fn trusted_http_streams_third_member_and_rejects_incomplete_transport() {
     let run = |source: &str, member: &str| {
         Command::new(env!("CARGO_BIN_EXE_teka"))
             .args([
-                "package", "stream", source, "--member", member, "--offset", "23", "--size", "101",
+                "tpk", "stream", source, "--member", member, "--offset", "23", "--size", "101",
                 "--trust",
             ])
             .arg(trust)
@@ -473,7 +473,7 @@ fn inspect_groups_verification_and_publisher_trust() {
     let inspect = |trusted: bool, json: bool| {
         let mut command = Command::new(env!("CARGO_BIN_EXE_teka"));
         command
-            .args(["package", "inspect", "--verify"])
+            .args(["tpk", "inspect", "--verify"])
             .arg(&package);
         if trusted {
             command.arg("--trust").arg(dir);
@@ -531,7 +531,7 @@ fn inspect_groups_verification_and_publisher_trust() {
         );
         if trusted {
             let output = Command::new(env!("CARGO_BIN_EXE_teka"))
-                .args(["package", "verify"])
+                .args(["tpk", "verify"])
                 .arg(&package)
                 .arg("--trust")
                 .arg(dir)
@@ -550,7 +550,7 @@ fn inspect_groups_verification_and_publisher_trust() {
     )
     .unwrap();
     let rejected = Command::new(env!("CARGO_BIN_EXE_teka"))
-        .args(["package", "verify"])
+        .args(["tpk", "verify"])
         .arg(&package)
         .arg("--trust")
         .arg(dir)
@@ -585,7 +585,7 @@ fn verify_distinguishes_invalid_payloads_from_environment_failures() {
     fs::write(trust.join("apps.pem"), certificate.to_pem().unwrap()).unwrap();
     let verify = |input: &std::path::Path, trust: &std::path::Path, code| {
         let output = Command::new(env!("CARGO_BIN_EXE_teka"))
-            .args(["package", "verify"])
+            .args(["tpk", "verify"])
             .arg(input)
             .arg("--trust")
             .arg(trust)

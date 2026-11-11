@@ -36,7 +36,7 @@ fn rejection(error: anyhow::Error) -> anyhow::Error {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum PackageCommand {
+pub enum TpkCommand {
     /// Inspect a TPK package offline
     Inspect(crate::inspect::InspectOptions),
     /// Verify trusted package and native image signatures, verity, and UKIs
@@ -75,10 +75,10 @@ pub enum PackageCommand {
     },
 }
 
-pub fn run(command: PackageCommand) -> Result<()> {
+pub fn run(command: TpkCommand) -> Result<()> {
     match command {
-        PackageCommand::Inspect(args) => crate::inspect::run(args),
-        PackageCommand::Verify { file, trust } => {
+        TpkCommand::Inspect(args) => crate::inspect::run(args),
+        TpkCommand::Verify { file, trust } => {
             use teka_tpk::verify::{signatures, Certificates};
             let mut file = File::open(file)?;
             ensure!(file.metadata()?.is_file(), "input must be a regular file");
@@ -95,7 +95,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
             )?;
             Ok(())
         }
-        PackageCommand::Stream {
+        TpkCommand::Stream {
             file,
             trust,
             member,
@@ -139,7 +139,7 @@ pub fn run(command: PackageCommand) -> Result<()> {
                 .context("missing member")?;
             member.copy_range(&mut file, offset, size, &mut std::io::stdout().lock())
         }
-        PackageCommand::Pack {
+        TpkCommand::Pack {
             manifest,
             member,
             output,

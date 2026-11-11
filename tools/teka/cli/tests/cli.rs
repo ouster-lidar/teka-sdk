@@ -863,7 +863,7 @@ fn package_inspect_lists_manifest_without_verifying() {
     let package = teka_tpk::read(&mut std::io::Cursor::new(&original)).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(&package.manifest_bytes).unwrap();
     let out = cli(d.path())
-        .args(["package", "inspect"])
+        .args(["tpk", "inspect"])
         .arg(&path)
         .output()
         .unwrap();
@@ -879,7 +879,7 @@ fn package_inspect_lists_manifest_without_verifying() {
     );
     let inspect_json = || {
         let out = cli(d.path())
-            .args(["package", "inspect", "--json"])
+            .args(["tpk", "inspect", "--json"])
             .arg(&path)
             .output()
             .unwrap();
@@ -901,7 +901,7 @@ fn package_inspect_lists_manifest_without_verifying() {
         fs::write(&path, bytes).unwrap();
         inspect_json();
         let rejected = cli(d.path())
-            .args(["package", "inspect", "--json", "--verify"])
+            .args(["tpk", "inspect", "--json", "--verify"])
             .arg(&path)
             .output()
             .unwrap();
@@ -938,7 +938,7 @@ fn package_inspect_preserves_raw_json_and_bounds_manifest() {
     fs::write(&path, &bytes).unwrap();
     let inspect = |json: bool| {
         let mut command = cli(d.path());
-        command.args(["package", "inspect"]).arg(&path);
+        command.args(["tpk", "inspect"]).arg(&path);
         if json {
             command.arg("--json");
         }
@@ -986,7 +986,7 @@ fn package_stream_rejects_corruption_in_selected_archive_group_before_output() {
     .unwrap();
     let stream = || {
         cli(directory.path())
-            .args(["package", "stream"])
+            .args(["tpk", "stream"])
             .arg(&package)
             .arg("--trust")
             .arg(directory.path())
@@ -1021,7 +1021,7 @@ fn cli_rejects_invalid_usage() {
             "app",
         ],
         vec!["app", "build", "hello-world", "--arch", "unknown"],
-        vec!["package", "inspect", "x.tpk", "--trust", "dir"],
+        vec!["tpk", "inspect", "x.tpk", "--trust", "dir"],
     ] {
         let out = cli(d.path()).args(&args).output().unwrap();
         assert_eq!(

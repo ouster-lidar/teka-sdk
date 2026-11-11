@@ -50,7 +50,7 @@ fn composes_plugins_without_changing_dispatch() {
         "app-test",
         "app-build",
         "app-help",
-        "package",
+        "tpk",
         "help",
         "completion",
         "not-executable",
