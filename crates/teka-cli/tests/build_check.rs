@@ -51,9 +51,9 @@ case "$1" in
       esac
       shift
     done
+    printf '%s\n' "${MOCK_BUILD_DIAGNOSTIC-mock compiler diagnostic}" >&2
+    [ "${MOCK_BUILD_STATUS:-0}" = 0 ] || exit "$MOCK_BUILD_STATUS"
     if [ -n "${expression:-}" ]; then
-      printf '%s\n' "${MOCK_BUILD_DIAGNOSTIC-mock compiler diagnostic}" >&2
-      [ "${MOCK_BUILD_STATUS:-0}" = 0 ] || exit "$MOCK_BUILD_STATUS"
       "$MOCK_LN" -s "$MOCK_OUTPUT" "$out_link"
     fi
     printf '%s\n' "$MOCK_OUTPUT" ;;
@@ -418,7 +418,13 @@ fn bootstrap_checks_nix_then_builds_portable_and_delegates_installation() {
     if !bootstrap.exists() {
         return;
     }
-    for version_status in ["0", "1"] {
+    for (setting, value) in [
+        ("MOCK_VERSION_STATUS", "0"),
+        ("MOCK_VERSION_STATUS", "1"),
+        ("MOCK_CONFIG", "false"),
+        ("MOCK_STORE_STATUS", "1"),
+        ("MOCK_BUILD_STATUS", "1"),
+    ] {
         let host = Host::new();
         executable(
             &host.path("output/bin/teka"),
@@ -437,15 +443,26 @@ fn bootstrap_checks_nix_then_builds_portable_and_delegates_installation() {
             .env("XDG_DATA_HOME", host.path("data"))
             .env("MOCK_OUTPUT", host.path("output"))
             .env("MOCK_INIT", host.path("init"))
-            .env("MOCK_VERSION_STATUS", version_status)
-            .checked(version_status.parse().unwrap());
-        if version_status == "0" {
+            .env(setting, value)
+            .checked(if value == "0" { 0 } else { 1 });
+        if value == "0" {
             assert!(output.stdout.is_empty(), "{output:?}");
             host.files(&[("init", "build init\n")]);
             assert!(host.read("calls").contains(".#portable"));
+            contains(&output.stderr, "✓ Nix: nix (Nix) 2.28.0\n✓ Nix config: valid (flakes)\n✓ Nix store: reachable\n⏳︎ Building portable Teka with Nix...\n✓ Portable Teka: built (");
+            excludes(&output.stderr, "mock compiler diagnostic");
         } else {
-            host.files(&[("calls", "--version\n")]);
             host.missing(&["init"]);
+            assert_eq!(output.stderr.matches('✗').count(), 1);
+            if setting == "MOCK_VERSION_STATUS" {
+                host.files(&[("calls", "--version\n")]);
+            } else if setting == "MOCK_BUILD_STATUS" {
+                contains(&output.stderr, "✗ Portable Teka: build failed (");
+                assert!(output.stderr.ends_with("s)\n\nmock compiler diagnostic\n"));
+                assert_eq!(output.stderr.matches("mock compiler diagnostic").count(), 1);
+            } else {
+                excludes(&host.read("calls"), ".#portable");
+            }
         }
     }
 }
