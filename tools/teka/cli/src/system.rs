@@ -1,10 +1,9 @@
 use crate::device::DeviceClient;
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
-    thread,
     time::{Duration, Instant},
 };
 
@@ -55,18 +54,8 @@ pub fn update_deadline() -> Result<Instant> {
     Ok(Instant::now() + Duration::from_secs(secs))
 }
 
-fn fetch_status(host: &str) -> Result<Value> {
-    let client = DeviceClient::new(host)?;
-    client.authenticate()?;
-    client.teka_status()
-}
-
 fn status_version(status: &Value) -> &str {
     status["version"].as_str().unwrap_or("")
-}
-
-fn commit_state(status: &Value) -> &str {
-    status["update"]["commit_state"].as_str().unwrap_or("")
 }
 
 pub fn apply(client: &DeviceClient, file: &Path, reboot: bool) -> Result<Value> {
@@ -74,64 +63,13 @@ pub fn apply(client: &DeviceClient, file: &Path, reboot: bool) -> Result<Value> 
 }
 
 pub fn wait_for_commit(host: &str, before_version: &str, deadline: Instant) -> Result<Value> {
-    let poll = poll_interval();
-    let mut changed_version = loop {
-        if Instant::now() >= deadline {
-            bail!("timed out waiting for system update to commit");
-        }
-        match fetch_status(host) {
-            Ok(status) => {
-                if status_version(&status) != before_version {
-                    break true;
-                }
-            }
-            Err(_) => break false,
-        }
-        thread::sleep(poll);
-    };
-
-    // Services restart while the device boots, so failed polls are retried until the deadline.
-    loop {
-        if Instant::now() >= deadline {
-            bail!("timed out waiting for system update to commit");
-        }
-        let Ok(status) = fetch_status(host) else {
-            thread::sleep(poll);
-            continue;
-        };
-        changed_version |= status_version(&status) != before_version;
-        match commit_state(&status) {
-            "COMMITTED" | "NONE" => {
-                if status_version(&status) != before_version {
-                    return Ok(status);
-                }
-                if changed_version {
-                    bail!("system update rolled back");
-                }
-                thread::sleep(poll);
-            }
-            "ABORTED_UNHEALTHY" | "FAILED_SET_DEFAULT" => {
-                let units = failed_units(&status);
-                bail!("system update failed ({units})");
-            }
-            // PENDING, or a status without `update` while services start.
-            _ => thread::sleep(poll),
-        }
-    }
-}
-
-fn failed_units(status: &Value) -> String {
-    status["update"]["failed_units"]
-        .as_array()
-        .map(|units| {
-            units
-                .iter()
-                .filter_map(|u| u.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        })
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "no failed_units listed".into())
+    crate::device::authentication(crate::client::wait_for_commit(
+        host,
+        crate::device::password().as_deref(),
+        before_version,
+        deadline,
+        poll_interval(),
+    ))
 }
 
 pub fn run_status(args: StatusOptions) -> Result<()> {

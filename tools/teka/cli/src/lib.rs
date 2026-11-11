@@ -4,6 +4,7 @@ pub mod build_check;
 pub mod build_init;
 #[cfg(any(test, all(target_os = "macos", target_arch = "aarch64")))]
 pub mod build_vm;
+pub mod client;
 pub mod completion;
 pub mod deploy;
 pub mod device;
@@ -14,7 +15,6 @@ pub use tpk::TpkCommand;
 pub mod plugins;
 pub mod system;
 
-pub use reqwest;
 
 use anyhow::{bail, Context, Result};
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};

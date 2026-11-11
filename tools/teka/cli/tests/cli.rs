@@ -10,12 +10,12 @@ use std::{
     sync::mpsc,
     time::Duration,
 };
+use teka_tpk::{Architecture, Component, ComponentType, Manifest};
 use teka_cli::{
     build::{single_package, target_package, validate_apps},
     deploy::check_logs,
     device::{normalize_arch, DeviceClient},
 };
-use teka_tpk::{Architecture, Component, ComponentType, Manifest};
 use tempfile::TempDir;
 
 fn apps_flake(dir: &Path) {
@@ -856,7 +856,7 @@ fi"#,
 }
 
 #[test]
-fn package_inspect_lists_manifest_without_verifying() {
+fn tpk_inspect_lists_manifest_without_verifying() {
     let d = TempDir::new().unwrap();
     let path = os_package(d.path(), "os.tpk", Architecture::X86_64);
     let original = fs::read(&path).unwrap();
@@ -912,7 +912,7 @@ fn package_inspect_lists_manifest_without_verifying() {
 }
 
 #[test]
-fn package_inspect_preserves_raw_json_and_bounds_manifest() {
+fn tpk_inspect_preserves_raw_json_and_bounds_manifest() {
     let d = TempDir::new().unwrap();
     let path = d.path().join("diagnostic.tpk");
     let manifest = serde_json::json!({
@@ -971,7 +971,7 @@ fn package_inspect_preserves_raw_json_and_bounds_manifest() {
 }
 
 #[test]
-fn package_stream_rejects_corruption_in_selected_archive_group_before_output() {
+fn tpk_stream_rejects_corruption_in_selected_archive_group_before_output() {
     let directory = TempDir::new().unwrap();
     let package = app_package(
         directory.path(),
@@ -1567,6 +1567,41 @@ fn plugins_dispatch_with_builtin_precedence() {
             assert_eq!(out.stderr, b"teka: error: unknown command 'nope'\n");
         }
     }
+}
+
+#[test]
+fn runner_plugin_preserves_arguments_and_exit_status() {
+    let d = TempDir::new().unwrap();
+    let bin = d.path().join("bin");
+    fs::create_dir(&bin).unwrap();
+    plugin_bin(d.path(), "runner", "printf '%s\\n' \"$@\"; exit 7");
+    let args = ["--", "python3", "app.py", "two words", ""];
+    for nested in [false, true] {
+        let mut command = if nested {
+            let mut command = cli(d.path());
+            command.env("PATH", &bin).arg("runner");
+            command
+        } else {
+            Command::new(bin.join("teka-runner"))
+        };
+        let output = command.args(args).output().unwrap();
+        assert_eq!(output.status.code(), Some(7), "{output:?}");
+        assert_eq!(output.stdout, format!("{}\n", args.join("\n")).as_bytes());
+    }
+}
+
+#[test]
+fn tpk_is_builtin_and_package_is_not() {
+    let d = TempDir::new().unwrap();
+    let out = cli(d.path()).args(["tpk", "--help"]).output().unwrap();
+    success(&out);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("teka tpk <COMMAND>"));
+    let out = cli(d.path())
+        .env("PATH", d.path())
+        .args(["package", "--help"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
 }
 
 #[test]
