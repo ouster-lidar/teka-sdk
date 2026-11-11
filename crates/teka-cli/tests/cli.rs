@@ -10,7 +10,7 @@ use std::{
     sync::mpsc,
     time::Duration,
 };
-use teka_tpk::{Architecture, Component, ComponentType, Manifest};
+use teka::tpk::{Architecture, Component, ComponentType, Manifest};
 use teka_cli::{
     build::{single_package, target_package, validate_apps},
     deploy::check_logs,
@@ -51,7 +51,7 @@ fn app_package(dir: &Path, name: &str, arch: Architecture, apps: &[&str]) -> std
     for app in apps {
         let raw = source.path().join(format!("{app}.raw"));
         fs::write(&raw, b"test app image".repeat(256)).unwrap();
-        let image = teka_tpk::file_descriptor(&raw, &format!("{app}.raw")).unwrap();
+        let image = teka::tpk::file_descriptor(&raw, &format!("{app}.raw")).unwrap();
         files.insert(image.path.clone(), raw);
         components.push(Component {
             kind: ComponentType::App,
@@ -69,7 +69,7 @@ fn app_package(dir: &Path, name: &str, arch: Architecture, apps: &[&str]) -> std
         components,
     };
     let path = dir.join(name);
-    teka_tpk::pack(
+    teka::tpk::pack(
         &mut fs::File::create(&path).unwrap(),
         &manifest,
         &files,
@@ -96,12 +96,12 @@ fn os_package(dir: &Path, name: &str, arch: Architecture) -> std::path::PathBuf 
             id: "device".into(),
             version: "test".into(),
             root_hash: "a".repeat(64),
-            image: teka_tpk::file_descriptor(&image, "os.raw").unwrap(),
-            uki: Some(teka_tpk::file_descriptor(&uki, "os.efi").unwrap()),
+            image: teka::tpk::file_descriptor(&image, "os.raw").unwrap(),
+            uki: Some(teka::tpk::file_descriptor(&uki, "os.efi").unwrap()),
         }],
     };
     let path = dir.join(name);
-    teka_tpk::pack(
+    teka::tpk::pack(
         &mut fs::File::create(&path).unwrap(),
         &manifest,
         &BTreeMap::from([("os.raw".into(), image), ("os.efi".into(), uki)]),
@@ -119,7 +119,7 @@ fn prebuilt_app(dir: &Path, app: &str, arch: Architecture) -> std::path::PathBuf
 
 fn corrupt_package(path: &Path, member: usize) {
     let mut file = fs::File::open(path).unwrap();
-    let package = teka_tpk::read(&mut file).unwrap();
+    let package = teka::tpk::read(&mut file).unwrap();
     let mut bytes = fs::read(path).unwrap();
     let member = &package.members[member];
     let envelope = 16 + u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
@@ -767,8 +767,8 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
         );
     }
     let mut file = fs::File::open(d.path().join("result/hello-world/app.tpk")).unwrap();
-    let package = teka_tpk::read(&mut file).unwrap();
-    teka_tpk::verify(&mut file, &package).unwrap();
+    let package = teka::tpk::read(&mut file).unwrap();
+    teka::tpk::verify(&mut file, &package).unwrap();
     assert_eq!(package.manifest.components[0].id, "hello-world");
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
     assert!(calls.contains("apps.packages.\"x86_64-linux\".\"hello-world-cross-aarch64-linux\""));
@@ -860,7 +860,7 @@ fn tpk_inspect_lists_manifest_without_verifying() {
     let d = TempDir::new().unwrap();
     let path = os_package(d.path(), "os.tpk", Architecture::X86_64);
     let original = fs::read(&path).unwrap();
-    let package = teka_tpk::read(&mut std::io::Cursor::new(&original)).unwrap();
+    let package = teka::tpk::read(&mut std::io::Cursor::new(&original)).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(&package.manifest_bytes).unwrap();
     let out = cli(d.path())
         .args(["tpk", "inspect"])
@@ -931,7 +931,7 @@ fn tpk_inspect_preserves_raw_json_and_bounds_manifest() {
     .unwrap()
     .to_der()
     .unwrap();
-    let mut bytes = teka_tpk::MAGIC.to_vec();
+    let mut bytes = teka::tpk::MAGIC.to_vec();
     bytes.extend((cms.len() as u32).to_le_bytes());
     bytes.extend(0u32.to_le_bytes());
     bytes.extend(&cms);
@@ -957,7 +957,7 @@ fn tpk_inspect_preserves_raw_json_and_bounds_manifest() {
     let mut bad_magic = bytes.clone();
     bad_magic[0] ^= 1;
     invalid.push(bad_magic);
-    for (offset, size) in [(8, 0), (8, teka_tpk::MAX_SIGNATURE as u32 + 1), (12, 1)] {
+    for (offset, size) in [(8, 0), (8, teka::tpk::MAX_SIGNATURE as u32 + 1), (12, 1)] {
         let mut changed = bytes.clone();
         changed[offset..offset + 4].copy_from_slice(&size.to_le_bytes());
         invalid.push(changed);

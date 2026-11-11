@@ -1,4 +1,4 @@
-use crate::{image::Image, uki::VerifiedUki, ComponentType, Package};
+use crate::tpk::{image::Image, uki::VerifiedUki, ComponentType, Package};
 use anyhow::{ensure, Context, Result};
 use openssl::x509::X509;
 use serde::Serialize;
@@ -122,13 +122,17 @@ pub fn signatures(
     let trusted = match (certificates, role) {
         (Some(certificates), ComponentType::App) => certificates.app.clone(),
         (Some(certificates), ComponentType::Os) => certificates.os.clone(),
-        (None, _) => crate::cms::embedded(&package.signature)?,
+        (None, _) => crate::tpk::cms::embedded(&package.signature)?,
     };
-    let fingerprint =
-        crate::cms::verify_manifest(&package.manifest_bytes, &package.signature, &trusted, role)
-            .context("verify package manifest signature")?;
+    let fingerprint = crate::tpk::cms::verify_manifest(
+        &package.manifest_bytes,
+        &package.signature,
+        &trusted,
+        role,
+    )
+    .context("verify package manifest signature")?;
 
-    crate::validate_metadata(package)?;
+    crate::tpk::validate_metadata(package)?;
     let package_signature = PackageSignature {
         valid: true,
         certificate_fingerprint: fingerprint,
@@ -162,15 +166,15 @@ pub fn signatures(
             "verity partition exceeds staging limit"
         );
         let mut input = member.open(reader)?;
-        crate::image::skip(&mut input, image.verity.offset)?;
+        crate::tpk::image::skip(&mut input, image.verity.offset)?;
         let mut hash = vec![0; image.verity.size as usize];
         input
             .read_exact(&mut hash)
             .context("read verity partition")?;
         drop(input);
         let mut input = member.open(reader)?;
-        crate::image::skip(&mut input, image.root.offset)?;
-        crate::image::verify_verity_sized(
+        crate::tpk::image::skip(&mut input, image.root.offset)?;
+        crate::tpk::image::verify_verity_sized(
             &hash,
             input.take(image.root.size),
             Some(image.root.size),
@@ -191,13 +195,13 @@ pub fn signatures(
             stage_uki(&mut input, staging.as_file_mut())?;
             let trusted = match certificates {
                 Some(certificates) => certificates.os.clone(),
-                None => crate::uki::embedded_certificates(staging.path())?,
+                None => crate::tpk::uki::embedded_certificates(staging.path())?,
             };
             ensure!(
                 !trusted.is_empty(),
                 "no trusted UKI certificates configured"
             );
-            Some(crate::uki::verify_component(
+            Some(crate::tpk::uki::verify_component(
                 staging.path(),
                 &trusted,
                 component,

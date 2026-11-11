@@ -1,4 +1,4 @@
-use crate::{cms::hex, validate_digest, Architecture, Component, ComponentType};
+use crate::tpk::{cms::hex, validate_digest, Architecture, Component, ComponentType};
 use anyhow::{ensure, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use openssl::x509::X509;
@@ -262,19 +262,19 @@ impl Image {
     }
 
     pub fn embedded_certificates(&self) -> Result<Vec<X509>> {
-        crate::cms::embedded(&self.signature.der()?)
+        crate::tpk::cms::embedded(&self.signature.der()?)
     }
 
     pub fn verify_signature(&self, trusted: &[X509], kind: ComponentType) -> Result<()> {
         let trusted = trusted
             .iter()
             .filter(|certificate| {
-                crate::cms::fingerprint(certificate)
+                crate::tpk::cms::fingerprint(certificate)
                     .is_ok_and(|value| value == self.signature.certificate_fingerprint)
             })
             .cloned()
             .collect::<Vec<_>>();
-        crate::cms::verify(
+        crate::tpk::cms::verify(
             self.signature.root_hash.as_bytes(),
             &self.signature.der()?,
             &trusted,
@@ -316,7 +316,8 @@ pub fn verify_verity_sized(
         .checked_mul(data_block as u64)
         .context("verity data size overflow")?;
     ensure!(
-        expected_data <= crate::MAX_MEMBER && data_size.is_none_or(|size| size == expected_data),
+        expected_data <= crate::tpk::MAX_MEMBER
+            && data_size.is_none_or(|size| size == expected_data),
         "verity data geometry does not match root partition"
     );
     let mut count = blocks;

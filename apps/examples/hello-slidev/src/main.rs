@@ -3,7 +3,7 @@
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use ::teka_app::api_error::ApiError;
+use ::teka::app::api_error::ApiError;
 use axum::{
     body::Body,
     extract::{Path as AxumPath, State},

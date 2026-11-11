@@ -1,3 +1,5 @@
+#![cfg(feature = "app")]
+
 use std::{os::unix::process::CommandExt, process::Command};
 
 #[test]

@@ -3,8 +3,8 @@
 use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
 
-use ::teka_app::api_error::ApiError;
-use ::teka_app::status_stream::{serve_broadcast, serve_summary_broadcast_with_initial};
+use ::teka::app::api_error::ApiError;
+use ::teka::app::status_stream::{serve_broadcast, serve_summary_broadcast_with_initial};
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::{IntoResponse, Response};

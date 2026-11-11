@@ -413,8 +413,8 @@ fn broken_nix_or_configuration_stops_before_installation() {
 
 #[test]
 fn bootstrap_checks_nix_then_builds_portable_and_delegates_installation() {
-    let bootstrap = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../bootstrap.sh");
-    // Nix package sources contain only the tools/teka workspace.
+    let bootstrap = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bootstrap.sh");
+    // Packaged sources omit the repository bootstrap script.
     if !bootstrap.exists() {
         return;
     }
@@ -442,7 +442,7 @@ fn bootstrap_checks_nix_then_builds_portable_and_delegates_installation() {
         if version_status == "0" {
             assert!(output.stdout.is_empty(), "{output:?}");
             host.files(&[("init", "build init\n")]);
-            assert!(host.read("calls").contains("./tools/teka#portable"));
+            assert!(host.read("calls").contains(".#portable"));
         } else {
             host.files(&[("calls", "--version\n")]);
             host.missing(&["init"]);

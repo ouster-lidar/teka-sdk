@@ -164,7 +164,10 @@ fn copied_binary_initializes_selected_example_outside_checkout() {
         serde_json::json!({ "url": revision }).to_string(),
     );
     let stderr = success(command.output().unwrap());
-    assert!(stderr.starts_with("⏳\u{fe0e} Initializing example\n"), "{stderr}");
+    assert!(
+        stderr.starts_with("⏳\u{fe0e} Initializing example\n"),
+        "{stderr}"
+    );
     assert!(stderr.contains("✓ App: hello-world"), "{stderr}");
     assert!(stderr.contains("wrote: \"default.nix\""), "{stderr}");
     let app = temp.path().join(directory).canonicalize().unwrap();

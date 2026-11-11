@@ -1,9 +1,11 @@
+#![cfg(feature = "tpk")]
+
 use std::{
     cell::RefCell,
     io::{self, Cursor, Read, Seek, SeekFrom, Write},
     rc::Rc,
 };
-use teka_tpk::transport::{encoded_size, Encoder, SeekReader, StreamReader, BLOCK_SIZE};
+use teka::tpk::transport::{encoded_size, Encoder, SeekReader, StreamReader, BLOCK_SIZE};
 
 fn encoded(size: usize) -> (Vec<u8>, Vec<u8>, [u8; 32]) {
     let data: Vec<u8> = (0..size)

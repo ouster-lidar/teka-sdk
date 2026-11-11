@@ -1,3 +1,4 @@
+#![cfg(feature = "tpk")]
 #![forbid(unsafe_code)]
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -7,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use teka_tpk::{
+use teka::tpk::{
     uki::{verify, verify_component},
     Architecture, Component, ComponentType, FileDescriptor,
 };

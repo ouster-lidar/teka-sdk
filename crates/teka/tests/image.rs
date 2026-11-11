@@ -1,3 +1,4 @@
+#![cfg(feature = "tpk")]
 #![forbid(unsafe_code)]
 
 mod common;
@@ -16,8 +17,8 @@ use std::io::Cursor;
 #[cfg(target_os = "linux")]
 use std::io::Read;
 #[cfg(target_os = "linux")]
-use teka_tpk::image::verify_verity_sized;
-use teka_tpk::{
+use teka::tpk::image::verify_verity_sized;
+use teka::tpk::{
     image::{Image, VeritySignature},
     Architecture, Component, ComponentType,
 };

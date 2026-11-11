@@ -1,7 +1,9 @@
+#![cfg(feature = "app")]
+
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 
-::teka_app::declare_app_runtime!("test-app");
+::teka::declare_app_runtime!("test-app");
 
 #[test]
 fn macro_propagates_acquisition_failure_and_stops_before_final_release() {

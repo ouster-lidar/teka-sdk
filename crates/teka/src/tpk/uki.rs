@@ -1,4 +1,4 @@
-use crate::verify::Operational;
+use crate::tpk::verify::Operational;
 use anyhow::{bail, ensure, Context, Result};
 use object::{
     endian::LittleEndian,
@@ -198,7 +198,7 @@ pub fn verify(path: &Path, trusted: &[X509], expected_root_hash: &str) -> Result
         .filter_map(|word| word.strip_prefix("roothash="));
     let root_hash = hashes.next().context("UKI missing roothash=")?;
     ensure!(hashes.next().is_none(), "duplicate UKI roothash=");
-    crate::validate_digest(root_hash).context("invalid UKI root hash")?;
+    crate::tpk::validate_digest(root_hash).context("invalid UKI root hash")?;
     ensure!(
         root_hash == expected_root_hash,
         "UKI root hash does not match component"
@@ -254,7 +254,7 @@ fn osslsigncode(path: &Path, certificate: &Path, signer: &X509) -> Result<std::p
             .arg("-CAfile")
             .arg(certificate)
             .arg("-require-leaf-hash")
-            .arg(format!("sha256:{}", crate::cms::fingerprint(signer)?))
+            .arg(format!("sha256:{}", crate::tpk::cms::fingerprint(signer)?))
             .args(["-ignore-timestamp", "-ignore-crl"]),
     )
 }
@@ -262,13 +262,13 @@ fn osslsigncode(path: &Path, certificate: &Path, signer: &X509) -> Result<std::p
 pub fn verify_component(
     path: &Path,
     trusted: &[X509],
-    component: &crate::Component,
-    arch: crate::Architecture,
+    component: &crate::tpk::Component,
+    arch: crate::tpk::Architecture,
 ) -> Result<VerifiedUki> {
     let verified = verify(path, trusted, &component.root_hash)?;
     let expected = match arch {
-        crate::Architecture::Aarch64 => PeArchitecture::Aarch64,
-        crate::Architecture::X86_64 => PeArchitecture::X86_64,
+        crate::tpk::Architecture::Aarch64 => PeArchitecture::Aarch64,
+        crate::tpk::Architecture::X86_64 => PeArchitecture::X86_64,
     };
     with_pe(File::open(path).context(Operational)?, |cache| {
         let pe = PeFile64::parse(cache).context("invalid UKI PE executable")?;

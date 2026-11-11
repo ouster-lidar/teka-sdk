@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::teka_app::resource_stream::send_snapshot;
-use ::teka_app::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
+use ::teka::app::resource_stream::send_snapshot;
+use ::teka::app::status_stream::{serve_summary_broadcast_with_initial, SummaryStream};
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},

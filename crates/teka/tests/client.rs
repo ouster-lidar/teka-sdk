@@ -1,10 +1,12 @@
+#![cfg(feature = "client")]
+
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     thread,
     time::{Duration, Instant},
 };
-use teka_cli::client::{wait_for_commit, DeviceClient, PasswordRequired};
+use teka::client::{wait_for_commit, DeviceClient, PasswordRequired};
 
 fn request(stream: &mut TcpStream) -> (String, Vec<(String, String)>, Vec<u8>) {
     stream

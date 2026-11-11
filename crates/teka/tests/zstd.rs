@@ -1,3 +1,5 @@
+#![cfg(feature = "tpk")]
+
 mod common;
 #[path = "common/archive.rs"]
 mod fixture;
@@ -27,14 +29,14 @@ fn zstd_transport() {
     }
     fn verify(bytes: &[u8]) -> anyhow::Result<()> {
         let mut input = Cursor::new(bytes);
-        let p = teka_tpk::read(&mut input)?;
-        teka_tpk::verify(&mut input, &p)
+        let p = teka::tpk::read(&mut input)?;
+        teka::tpk::verify(&mut input, &p)
     }
     let data = (0..262144).map(|i| (i % 251) as u8).collect::<Vec<_>>();
     let zst = encode(&data, false);
     let mut input = Cursor::new(fixture(&common::manifest(data.len()), &zst));
-    let p = teka_tpk::read(&mut input).unwrap();
-    teka_tpk::verify(&mut input, &p).unwrap();
+    let p = teka::tpk::read(&mut input).unwrap();
+    teka::tpk::verify(&mut input, &p).unwrap();
     assert_eq!(p.members[0].size, zst.len() as u64);
     assert_eq!(
         p.members[0].open(&mut input).unwrap().size(),
@@ -63,7 +65,7 @@ fn zstd_transport() {
     assert_eq!(oversized_window[4] & 0x20, 0);
     oversized_window[5] = 0x70;
     let mut oversized_content = vec![0x28, 0xb5, 0x2f, 0xfd, 0xe0];
-    oversized_content.extend((teka_tpk::MAX_MEMBER + 1).to_le_bytes());
+    oversized_content.extend((teka::tpk::MAX_MEMBER + 1).to_le_bytes());
     for invalid_header in [
         data.clone(),
         oversized_window,
@@ -74,7 +76,7 @@ fn zstd_transport() {
     ] {
         let bytes = fixture(&common::manifest(data.len()), &invalid_header);
         let mut input = Cursor::new(&bytes);
-        let package = teka_tpk::read(&mut input).unwrap();
+        let package = teka::tpk::read(&mut input).unwrap();
         let mut output = Vec::new();
         assert!(package.members[0]
             .copy_range(&mut input, 0, None, &mut output)
@@ -110,11 +112,11 @@ fn zstd_transport() {
             .as_object_mut()
             .unwrap()
             .remove("size");
-        teka_tpk::pack_manifest(
+        teka::tpk::pack_manifest(
             &mut enc,
             &serde_json::to_vec(&draft).unwrap(),
             &BTreeMap::from([("demo.raw".into(), raw.clone())]),
-            teka_tpk::DEFAULT_ZSTD_LEVEL,
+            teka::tpk::DEFAULT_ZSTD_LEVEL,
             &key,
             &certificate,
         )
@@ -132,7 +134,7 @@ fn zstd_transport() {
         .collect::<Vec<_>>();
     let enc = pack(&noise);
     let mut input = Cursor::new(&enc);
-    let package = teka_tpk::read(&mut input).unwrap();
+    let package = teka::tpk::read(&mut input).unwrap();
     assert!(package.members[0].size > noise.len() as u64);
     let mut output = Vec::new();
     package.members[0]
@@ -141,7 +143,7 @@ fn zstd_transport() {
     assert_eq!(output, noise);
     let enc = pack(&data);
     let mut input = Cursor::new(&enc);
-    let package = teka_tpk::read(&mut input).unwrap();
+    let package = teka::tpk::read(&mut input).unwrap();
     let mut output = Vec::new();
     package.members[0]
         .copy_range(&mut input, 4090, Some(33), &mut output)
@@ -177,7 +179,7 @@ fn authenticated_zstd_framing_error_remains_terminal() {
     let (certificate, key) = common::signer();
     let bytes = fixture::archive(&manifest, &[("demo.raw.zst", &stored)], &certificate, &key);
     let mut source = Cursor::new(bytes);
-    let package = teka_tpk::read(&mut source).unwrap();
+    let package = teka::tpk::read(&mut source).unwrap();
     let mut reader = package.members[0].open(&mut source).unwrap();
     let mut output = Vec::new();
     let error = reader.read_to_end(&mut output).unwrap_err();

@@ -267,7 +267,7 @@ pub async fn push_to_dynamo(cfg: &PersistedSourceConfig) -> serde_json::Value {
     let kind = normalize_producer_kind(&cfg.producer_kind);
     let url = format!(
         "{}/api/v1/app/ouster-dynamo/source-config",
-        ::teka_app::runtime::app_base_url().trim_end_matches('/')
+        ::teka::app::runtime::app_base_url().trim_end_matches('/')
     );
     let client = match reqwest::Client::builder()
         .timeout(Duration::from_secs(3))

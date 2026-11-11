@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::{fs::File, ops::Deref, path::Path};
-use crate::client::{DeviceClient as Client, UploadResponse};
+use teka::client::{DeviceClient as Client, UploadResponse};
 
-pub use crate::client::normalize_arch;
+pub use teka::client::normalize_arch;
 
 pub struct DeviceClient(Client);
 
@@ -41,7 +41,7 @@ pub(crate) fn password() -> Option<String> {
 
 pub(crate) fn authentication<T>(result: Result<T>) -> Result<T> {
     result.map_err(|error| {
-        if error.is::<crate::client::PasswordRequired>() {
+        if error.is::<teka::client::PasswordRequired>() {
             error.context("device requires a session; set TEKA_PASSWORD")
         } else {
             error

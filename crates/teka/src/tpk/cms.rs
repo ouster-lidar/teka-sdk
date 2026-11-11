@@ -1,4 +1,4 @@
-use crate::ComponentType;
+use crate::tpk::ComponentType;
 use anyhow::{ensure, Context, Result};
 use openssl::{
     cms::{CMSOptions, CmsContentInfo},
@@ -99,7 +99,7 @@ fn parse(der: &[u8]) -> Result<Pkcs7> {
 
 fn manifest_size(content: &[u8]) -> Result<()> {
     ensure!(
-        !content.is_empty() && content.len() as u64 <= crate::MAX_MANIFEST,
+        !content.is_empty() && content.len() as u64 <= crate::tpk::MAX_MANIFEST,
         "CMS manifest exceeds limit or is empty"
     );
     Ok(())
@@ -326,7 +326,7 @@ fn verify_content(
 }
 
 #[cfg(test)]
-#[path = "../tests/common/mod.rs"]
+#[path = "../../tests/common/mod.rs"]
 pub(crate) mod fixtures;
 
 #[cfg(test)]
@@ -602,7 +602,7 @@ mod tests {
     #[test]
     fn manifest_content_must_be_nonempty_and_bounded() {
         let (certificate, key) = fixtures::signer();
-        let oversized = vec![0; crate::MAX_MANIFEST as usize + 1];
+        let oversized = vec![0; crate::tpk::MAX_MANIFEST as usize + 1];
         for content in [b"".as_slice(), oversized.as_slice()] {
             assert!(sign_manifest(content, &key, &certificate).is_err());
             let der = Pkcs7::sign(

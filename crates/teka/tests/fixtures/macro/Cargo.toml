@@ -1,0 +1,10 @@
+[package]
+name = "teka-macro-consumer"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+renamed_sdk = { package = "teka", path = "../../..", default-features = false, features = ["app"] }

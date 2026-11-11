@@ -12,7 +12,7 @@ name = "hello-sub"
 path = "src/main.rs"
 
 [dependencies]
-teka-app = { path = "../../lib/app-runtime" }
+teka = { path = "../../../crates/teka", version = "0.1.0" }
 axum = { version = "0.8", features = ["json", "ws"] }
 tower-http = { version = "0.6", features = ["cors"] }
 serde = { version = "1", features = ["derive"] }
@@ -26,3 +26,5 @@ parking_lot = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 futures-util = "0.3"
+
+[workspace]

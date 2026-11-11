@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use crate::runtime;
+use crate::app::runtime;
 
 pub trait HostnameResolver: Send + Sync {
     fn hostname_for_ip(&self, ip: &str) -> Option<String>;

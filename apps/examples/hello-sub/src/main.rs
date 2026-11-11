@@ -2,7 +2,7 @@
 
 use std::net::SocketAddr;
 
-use ::teka_app::status_stream::SummaryStream;
+use ::teka::app::status_stream::SummaryStream;
 use axum::Router;
 use clap::Parser;
 use hello_sub::api;

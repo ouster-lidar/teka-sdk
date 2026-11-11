@@ -12,7 +12,7 @@ pub fn resolve_http_bind(
 ) -> Result<SocketAddr, String> {
     match dev_override {
         Some(addr) => Ok(addr),
-        None => crate::runtime::activate_http_listen(app_id),
+        None => crate::app::runtime::activate_http_listen(app_id),
     }
 }
 
@@ -32,10 +32,10 @@ pub async fn bind_http_listener(
             );
             let app_id = app_id.to_string();
             let bind = tokio::task::spawn_blocking(move || {
-                crate::runtime::release(&app_id);
-                let bind = crate::runtime::activate_http_listen(&app_id)?;
-                if let Err(error) = crate::runtime::replay_resources(&app_id) {
-                    crate::runtime::release(&app_id);
+                crate::app::runtime::release(&app_id);
+                let bind = crate::app::runtime::activate_http_listen(&app_id)?;
+                if let Err(error) = crate::app::runtime::replay_resources(&app_id) {
+                    crate::app::runtime::release(&app_id);
                     return Err(error);
                 }
                 Ok(bind)

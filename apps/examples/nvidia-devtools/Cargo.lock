@@ -673,7 +673,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "teka-app",
+ "teka",
  "tokio",
  "tower-http",
  "tracing",
@@ -826,11 +826,11 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "reqwest"
-version = "0.13.5"
+version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
+checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
- "base64 0.23.1",
+ "base64 0.22.1",
  "bytes",
  "futures-channel",
  "futures-core",
@@ -846,6 +846,7 @@ dependencies = [
  "pin-project-lite",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tower",
@@ -1057,7 +1058,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "teka-app"
+name = "teka"
 version = "0.1.0"
 dependencies = [
  "axum",

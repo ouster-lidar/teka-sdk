@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::teka_app::api_error::ApiError;
+use ::teka::app::api_error::ApiError;
 use axum::body::{Body, Bytes};
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, State};
 use axum::http::{header, HeaderValue, StatusCode};
@@ -412,10 +412,8 @@ fn find_studio_osf(files: &Value) -> Option<&Value> {
         arr.as_slice()
     } else if let Some(arr) = files.get("results").and_then(Value::as_array) {
         arr.as_slice()
-    } else if let Some(arr) = files.get("files").and_then(Value::as_array) {
-        arr.as_slice()
     } else {
-        return None;
+        files.get("files").and_then(Value::as_array)?.as_slice()
     };
     items.iter().find(|o| {
         o.get("output_type").and_then(Value::as_str) == Some("osf")

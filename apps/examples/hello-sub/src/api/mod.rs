@@ -1,7 +1,7 @@
 //! hello-sub HTTP API — see README.md.
 
-use ::teka_app::resource_stream::send_snapshot;
-use ::teka_app::status_stream::serve_summary_broadcast_with_initial;
+use ::teka::app::resource_stream::send_snapshot;
+use ::teka::app::status_stream::serve_summary_broadcast_with_initial;
 use axum::{
     extract::{
         ws::{WebSocket, WebSocketUpgrade},

@@ -63,7 +63,7 @@ pub fn apply(client: &DeviceClient, file: &Path, reboot: bool) -> Result<Value> 
 }
 
 pub fn wait_for_commit(host: &str, before_version: &str, deadline: Instant) -> Result<Value> {
-    crate::device::authentication(crate::client::wait_for_commit(
+    crate::device::authentication(teka::client::wait_for_commit(
         host,
         crate::device::password().as_deref(),
         before_version,
@@ -81,7 +81,7 @@ pub fn run_status(args: StatusOptions) -> Result<()> {
 }
 
 pub fn run_update(args: UpdateOptions) -> Result<()> {
-    let manifest = teka_tpk::read_single(&args.file, teka_tpk::ComponentType::Os)?;
+    let manifest = teka::tpk::read_single(&args.file, teka::tpk::ComponentType::Os)?;
     let file = args
         .file
         .canonicalize()

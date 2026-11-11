@@ -1,16 +1,14 @@
 {
   nixpkgsRev,
-  nixpkgsUnstableRev,
   idleTimeout,
   networkSource,
 }:
 let
   nixpkgs = builtins.getFlake "github:NixOS/nixpkgs/${nixpkgsRev}";
-  unstable = builtins.getFlake "github:NixOS/nixpkgs/${nixpkgsUnstableRev}";
   pkgs = nixpkgs.legacyPackages.aarch64-darwin;
   btop = nixpkgs.legacyPackages.aarch64-linux.btop;
   inherit (pkgs) lib;
-  monitor = unstable.legacyPackages.aarch64-darwin.vzvm.overrideAttrs (old: {
+  monitor = pkgs.vzvm.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       cp ${pkgs.writeText "HostNetwork.swift" networkSource} Sources/vzvm/HostNetwork.swift
       substituteInPlace Sources/vzvm/HostNetwork.swift \
@@ -93,8 +91,6 @@ let
   builder = pkgs.darwin.linux-builder-vz.override {
     modules = [
       {
-        disabledModules = [ "virtualisation/vz-vm.nix" ];
-        imports = [ "${unstable}/nixos/modules/virtualisation/vz-vm.nix" ];
         virtualisation.vz = {
           inherit idleTimeout;
           package = vzvm;

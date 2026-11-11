@@ -195,7 +195,7 @@ fn prepare_deployments(
     inputs: &[String],
     named_paths: &[PathBuf],
     target: &str,
-    file_manifests: &BTreeMap<String, teka_tpk::Manifest>,
+    file_manifests: &BTreeMap<String, teka::tpk::Manifest>,
 ) -> Result<Vec<Deployment>> {
     let arch = target
         .strip_suffix("-linux")
@@ -219,7 +219,7 @@ fn prepare_deployments(
                     .get(input)
                     .context("missing file preflight")?
             } else {
-                named_manifest = teka_tpk::read_single(&path, teka_tpk::ComponentType::App)?;
+                named_manifest = teka::tpk::read_single(&path, teka::tpk::ComponentType::App)?;
                 &named_manifest
             };
             ensure!(
@@ -315,7 +315,7 @@ pub fn run(mut args: DeployOptions) -> Result<()> {
     build::validate_apps(&apps)?;
     let mut file_manifests = BTreeMap::new();
     for input in args.apps.iter().filter(|input| is_file_input(input)) {
-        let manifest = teka_tpk::read_single(Path::new(input), teka_tpk::ComponentType::App)?;
+        let manifest = teka::tpk::read_single(Path::new(input), teka::tpk::ComponentType::App)?;
         file_manifests.insert(input.clone(), manifest);
     }
     let targets = prepare_targets(&args.hosts)?;

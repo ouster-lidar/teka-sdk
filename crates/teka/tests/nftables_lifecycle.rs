@@ -1,14 +1,16 @@
+#![cfg(feature = "app")]
+
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use ::teka_app::devres::{NftablesLease, NftablesSet};
-use ::teka_app::runtime::{self, ResourceAvailability};
+use ::teka::app::devres::{NftablesLease, NftablesSet};
+use ::teka::app::runtime::{self, ResourceAvailability};
 use serde_json::{json, Value};
 
-::teka_app::declare_app_runtime!("lease-test");
+::teka::declare_app_runtime!("lease-test");
 
 #[derive(Default)]
 struct Host {

@@ -24,17 +24,13 @@ fn fields<'a>(output: &'a str, prefix: &'a str) -> impl Iterator<Item = &'a str>
 
 pub fn runtime_expression(idle_timeout: u32) -> Result<String> {
     let revision = crate::build_check::nixpkgs_revision()?;
-    let lock: serde_json::Value = serde_json::from_str(include_str!("../../flake.lock"))?;
-    let unstable = option_env!("TEKA_VM_NIXPKGS_UNSTABLE_REV")
-        .or_else(|| lock["nodes"]["nixpkgs-unstable"]["locked"]["rev"].as_str())
-        .context("unstable Nixpkgs revision missing from embedded flake.lock")?;
     let idle_timeout = if idle_timeout == 0 {
         "null".into()
     } else {
         idle_timeout.to_string()
     };
     Ok(format!(
-        "({}) {{ nixpkgsRev = \"{revision}\"; nixpkgsUnstableRev = \"{unstable}\"; idleTimeout = {idle_timeout}; networkSource = ''\n{}\n''; }}",
+        "({}) {{ nixpkgsRev = \"{revision}\"; idleTimeout = {idle_timeout}; networkSource = ''\n{}\n''; }}",
         include_str!("build_vm.nix"),
         include_str!("build_vm_network.swift")
     ))
@@ -163,6 +159,7 @@ pub(crate) fn needed(nix: &std::path::Path) -> Result<bool> {
     needs_vm(builders)
 }
 
+#[cfg(any(test, all(target_os = "macos", target_arch = "aarch64")))]
 fn needs_vm(builders: &str) -> Result<bool> {
     let rows = config::rows(builders)?;
     Ok(rows.iter().any(|row| config::managed(row))

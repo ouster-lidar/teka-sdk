@@ -4,7 +4,7 @@ use openssl::{
 };
 use serde_json::{json, Value};
 use std::io::Write;
-use teka_tpk::transport::Encoder;
+use teka::tpk::transport::Encoder;
 
 pub fn archive(
     manifest: &Value,
@@ -45,7 +45,7 @@ pub fn archive(
     manifest["bao_root"] = json!(encoder.root());
     let bytes = serde_json::to_vec(&manifest).unwrap();
     let signature = crate::common::sign_manifest(&bytes, certificate, key);
-    let mut output = teka_tpk::MAGIC.to_vec();
+    let mut output = teka::tpk::MAGIC.to_vec();
     output.extend((signature.len() as u32).to_le_bytes());
     output.extend(0u32.to_le_bytes());
     output.extend(signature);

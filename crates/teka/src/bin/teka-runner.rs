@@ -5,7 +5,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
 use std::time::Duration;
 
-use teka_app::runtime::{self, ResourceAvailability};
+use teka::app::runtime::{self, ResourceAvailability};
 use tokio::process::{Child, Command};
 use tokio::signal::unix::{signal, SignalKind};
 

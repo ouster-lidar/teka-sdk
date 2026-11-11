@@ -91,11 +91,11 @@ pub fn check_store(nix: &Path) -> Result<()> {
 }
 
 pub(crate) fn nixpkgs_revision() -> Result<String> {
-    let lock: serde_json::Value = serde_json::from_str(include_str!("../../flake.lock"))?;
+    let pins: serde_json::Value = serde_json::from_str(include_str!("fallback-pins.json"))?;
     option_env!("TEKA_VM_NIXPKGS_REV")
-        .or_else(|| lock["nodes"]["nixpkgs"]["locked"]["rev"].as_str())
+        .or_else(|| pins["nixpkgs"].as_str())
         .map(str::to_owned)
-        .context("Nixpkgs revision missing from embedded flake.lock")
+        .context("Nixpkgs revision missing from embedded fallback pins")
 }
 
 // Pinned independently of channels and registries so the installed binary can run anywhere.

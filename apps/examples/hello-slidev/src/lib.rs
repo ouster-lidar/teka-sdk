@@ -1,3 +1,3 @@
 //! hello-slidev — guest-access API and auth-gated deck for the Slidev app.
 
-::teka_app::declare_app_runtime!("hello-slidev");
+::teka::declare_app_runtime!("hello-slidev");

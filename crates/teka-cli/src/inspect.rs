@@ -1,7 +1,7 @@
 use anyhow::{ensure, Context, Result};
 use clap::Args;
 use std::{fs::File, path::PathBuf};
-use teka_tpk::{
+use teka::tpk::{
     verify::{signatures, Certificates, PublisherTrust},
     ComponentType,
 };
@@ -36,13 +36,13 @@ pub fn run(args: InspectOptions) -> Result<()> {
             .map(|trust| Certificates::load(trust))
             .transpose()?;
         let package = match &certificates {
-            Some(certificates) => teka_tpk::read_trusted(&mut file, certificates)?,
-            None => teka_tpk::read(&mut file)?,
+            Some(certificates) => teka::tpk::read_trusted(&mut file, certificates)?,
+            None => teka::tpk::read(&mut file)?,
         };
         let verified = signatures(&mut file, &package, certificates.as_ref())?;
         (package.manifest_bytes, Some(verified))
     } else {
-        (teka_tpk::inspect_manifest(&mut file)?, None)
+        (teka::tpk::inspect_manifest(&mut file)?, None)
     };
     if args.json {
         let report = match &verified {
@@ -54,7 +54,7 @@ pub fn run(args: InspectOptions) -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&report)?);
         return Ok(());
     }
-    let manifest = teka_tpk::Manifest::parse(&manifest_bytes)?;
+    let manifest = teka::tpk::Manifest::parse(&manifest_bytes)?;
     println!("Manifest");
     for (index, component) in manifest.components.iter().enumerate() {
         if index > 0 {

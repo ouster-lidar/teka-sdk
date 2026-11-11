@@ -3,11 +3,11 @@
 pub mod api;
 pub mod store;
 
-::teka_app::declare_app_runtime!("hello-pub");
+::teka::declare_app_runtime!("hello-pub");
 
 use std::sync::Arc;
 
-use ::teka_app::status_stream::SummaryStream;
+use ::teka::app::status_stream::SummaryStream;
 
 use crate::store::EventStore;
 

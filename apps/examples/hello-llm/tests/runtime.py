@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib/app-runtime/tests"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "crates/teka/tests"))
 import resource_process
 
 

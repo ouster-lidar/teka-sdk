@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tracing::{info, warn};
 
-use crate::devres::{self, NftablesBody, NftablesLease, PortBody, SyncBody};
+use crate::app::devres::{self, NftablesBody, NftablesLease, PortBody, SyncBody};
 
 const HOST_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const HOST_WAIT_POLL: Duration = Duration::from_secs(2);
@@ -224,6 +224,7 @@ pub fn notify_ready() {
     if let Err(error) = start_supervisor() {
         publish_availability(ResourceAvailability::Unavailable(error.clone()));
         warn!("app-runtime: {error}");
+        #[cfg(target_os = "linux")]
         return;
     }
     #[cfg(target_os = "linux")]

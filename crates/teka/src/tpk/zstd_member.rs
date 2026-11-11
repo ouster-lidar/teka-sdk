@@ -1,4 +1,4 @@
-use crate::{FileDescriptor, Manifest, Member, MAX_MANIFEST, MAX_MEMBER};
+use crate::tpk::{FileDescriptor, Manifest, Member, MAX_MANIFEST, MAX_MEMBER};
 use anyhow::{ensure, Context, Result};
 use openssl::{
     pkey::{PKeyRef, Private},
@@ -68,7 +68,7 @@ impl Member {
     pub fn open<'a, R: Read + Seek>(
         &self,
         reader: &'a mut R,
-    ) -> Result<LogicalReader<crate::transport::SeekReader<&'a mut R>>> {
+    ) -> Result<LogicalReader<crate::tpk::transport::SeekReader<&'a mut R>>> {
         self.decode(self.stored(reader)?)
     }
 
@@ -240,9 +240,9 @@ pub(crate) fn pack(
     certificate: &X509Ref,
 ) -> Result<()> {
     ensure!(
-        (1..=crate::MAX_ZSTD_LEVEL).contains(&level),
+        (1..=crate::tpk::MAX_ZSTD_LEVEL).contains(&level),
         "zstd level must be 1-{}",
-        crate::MAX_ZSTD_LEVEL
+        crate::tpk::MAX_ZSTD_LEVEL
     );
     ensure!(bytes.len() as u64 <= MAX_MANIFEST, "manifest exceeds limit");
     let mut manifest = Manifest::parse_draft(bytes)?;
@@ -268,20 +268,20 @@ pub(crate) fn pack(
             .checked_add(descriptor.size)
             .context("payload size overflow")?;
         ensure!(
-            total_size <= crate::MAX_ARCHIVE,
+            total_size <= crate::tpk::MAX_ARCHIVE,
             "payloads exceed size limit"
         );
     }
-    let encoding = crate::transport::Encoder::new(stored.as_file())?;
+    let encoding = crate::tpk::transport::Encoder::new(stored.as_file())?;
     manifest.bao_root = Some(encoding.root());
     let bytes = serde_json::to_vec(&manifest)?;
     Manifest::parse(&bytes)?;
-    let signature = crate::cms::sign_manifest(&bytes, private_key, certificate)?;
+    let signature = crate::tpk::cms::sign_manifest(&bytes, private_key, certificate)?;
     ensure!(
-        signature.len() as u64 <= crate::MAX_SIGNATURE,
+        signature.len() as u64 <= crate::tpk::MAX_SIGNATURE,
         "signature exceeds limit"
     );
-    writer.write_all(crate::MAGIC)?;
+    writer.write_all(crate::tpk::MAGIC)?;
     writer.write_all(&(signature.len() as u32).to_le_bytes())?;
     writer.write_all(&0u32.to_le_bytes())?;
     writer.write_all(&signature)?;

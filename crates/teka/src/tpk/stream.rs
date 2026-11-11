@@ -1,4 +1,4 @@
-use crate::{read_envelope, transport, verify::Certificates};
+use crate::tpk::{read_envelope, transport, verify::Certificates};
 use anyhow::{ensure, Context, Result};
 use std::io::{self, Read, Write};
 
