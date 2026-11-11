@@ -8,3 +8,6 @@ publish = false
 
 [dependencies]
 renamed_sdk = { package = "teka", path = "../../..", default-features = false, features = ["app"] }
+
+[lints.rust]
+unsafe_code = "forbid"

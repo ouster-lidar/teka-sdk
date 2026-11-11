@@ -25,3 +25,6 @@ anyhow = "1"
 parking_lot = "0.12"
 
 [workspace]
+
+[lints.rust]
+unsafe_code = "forbid"

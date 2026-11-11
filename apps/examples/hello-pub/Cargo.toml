@@ -26,3 +26,6 @@ parking_lot = "0.12"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [workspace]
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -28,3 +28,6 @@ tokio-tungstenite = { version = "0.26", default-features = false, features = ["c
 futures-util = "0.3"
 
 [workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
