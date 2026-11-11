@@ -53,6 +53,7 @@ fn composes_plugins_without_changing_dispatch() {
         "tpk",
         "help",
         "completion",
+        "device",
         "not-executable",
     ] {
         plugin(dir.path(), name);
@@ -83,6 +84,8 @@ fn composes_plugins_without_changing_dispatch() {
             "inspect",
             "private-key",
             "certificate",
+            "device",
+            "discover",
         ] {
             assert!(script.contains(word), "missing {word} in {shell}");
         }

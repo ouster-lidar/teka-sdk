@@ -1,3 +1,6 @@
+#[path = "client_discovery.rs"]
+pub mod discovery;
+
 use anyhow::{bail, Context, Result};
 use reqwest::{
     blocking::{Body, Client, Response},
@@ -66,6 +69,7 @@ impl DeviceClient {
             client: Client::builder()
                 .cookie_store(true)
                 .redirect(Policy::none())
+                .dns_resolver(std::sync::Arc::new(discovery::MdnsResolver))
                 .connect_timeout(Duration::from_secs(15))
                 .build()?,
             base,

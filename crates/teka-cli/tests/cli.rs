@@ -1550,7 +1550,7 @@ fn plugins_dispatch_with_builtin_precedence() {
     fs::create_dir(&bin).unwrap();
     fs::create_dir(&shadow).unwrap();
     for (parents, name, builtins) in [
-        (&[][..], "foo", &["system", "app", "help"][..]),
+        (&[][..], "foo", &["system", "app", "device", "help"][..]),
         (
             &["app"][..],
             "test",

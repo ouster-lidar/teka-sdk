@@ -11,7 +11,7 @@ readme = "README.md"
 [features]
 default = ["app"]
 app = ["dep:axum", "dep:libc", "dep:parking_lot", "dep:reqwest", "dep:rustix", "dep:sd-notify", "dep:serde", "dep:serde_json", "dep:signal-hook", "dep:socket2", "dep:tokio", "dep:tracing"]
-client = ["dep:anyhow", "dep:reqwest", "dep:serde_json", "reqwest/cookies", "reqwest/rustls-tls"]
+client = ["dep:anyhow", "dep:mdns-sd", "dep:reqwest", "dep:scopeguard", "dep:serde", "dep:serde_json", "dep:tokio", "reqwest/cookies", "reqwest/rustls-tls"]
 tpk = ["dep:anyhow", "dep:bao-tree", "dep:base64", "dep:crc32fast", "dep:object", "dep:openssl", "dep:serde", "dep:serde_json", "dep:tempfile", "dep:zstd"]
 
 [[bin]]
@@ -26,11 +26,13 @@ bao-tree = { version = "=0.17.0", default-features = false, optional = true }
 base64 = { version = "0.23", optional = true }
 crc32fast = { version = "1", optional = true }
 libc = { version = "0.2", optional = true }
+mdns-sd = { version = "0.21", default-features = false, features = ["async"], optional = true }
 object = { version = "0.40", default-features = false, features = ["read_core", "pe", "std"], optional = true }
 openssl = { version = "0.10", optional = true }
 parking_lot = { version = "0.12", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["json", "blocking"], optional = true }
 rustix = { version = "1", features = ["process"], optional = true }
+scopeguard = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 signal-hook = { version = "0.3", default-features = false, optional = true }

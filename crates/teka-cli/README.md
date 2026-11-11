@@ -79,6 +79,8 @@ App builds, deployments, and listings use the nearest app project. Use `--flake 
 
 Set `TEKA_PASSWORD` to the device administrator password. Host URLs accept HTTP and HTTPS.
 
+Use `teka device discover` to find devices on the local network, or add `--json` for machine-readable results. HTTP clients resolve `.local` device names through mDNS.
+
 ### Nested plugins
 
 Built-in command groups can opt into the same runtime plugin dispatch using their command path as the executable prefix. The `app` and `build` groups enable this: `teka app <name> ARGS…` runs `teka-app-<name> ARGS…` from `PATH`; `teka build <name>` runs `teka-build-<name>`. Help and completion list plugins under their parent group using the local name. Built-in commands and `help` take precedence. Plugins parse their own arguments, including `--help`.

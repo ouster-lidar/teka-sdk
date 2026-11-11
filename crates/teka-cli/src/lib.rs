@@ -6,6 +6,7 @@ pub mod build_vm;
 pub mod completion;
 pub mod deploy;
 pub mod device;
+pub mod device_commands;
 mod host;
 pub mod inspect;
 pub mod plugins;
@@ -53,6 +54,11 @@ Reload after updating Teka or plugins."#)]
         #[command(subcommand)]
         command: AppCommand,
     },
+    /// Discover Teka devices
+    Device {
+        #[command(subcommand)]
+        command: device_commands::DeviceCommand,
+    },
     /// Inspect and update Teka systems
     System {
         #[command(subcommand)]
@@ -91,6 +97,7 @@ pub fn run(command: Command) -> Result<()> {
             AppCommand::List(args) => build::list(args),
             AppCommand::External(args) => plugins::run_external_in(&["app"], args),
         },
+        Command::Device { command } => device_commands::run(command),
         Command::System { command } => match command {
             system::SystemCommand::Status(args) => system::run_status(args),
             system::SystemCommand::Update(args) => system::run_update(args),
