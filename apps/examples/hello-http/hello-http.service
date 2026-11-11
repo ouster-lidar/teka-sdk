@@ -6,7 +6,7 @@ Wants=mission-control.service
 [Service]
 Type=notify
 @serviceFragment@
-ExecStart=@appRuntime@/bin/app-runtime-process hello-http tcp @port@ @python3Minimal@/bin/python3 /usr/lib/hello-http/server.py
+ExecStart=@appRuntime@/bin/teka-runner hello-http tcp @port@ @python3Minimal@/bin/python3 /usr/lib/hello-http/server.py
 SyslogIdentifier=hello-http
 Restart=on-failure
 TimeoutStartSec=90

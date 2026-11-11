@@ -125,7 +125,7 @@ class ProcessFixture(unittest.TestCase):
     def start(self, command=None, ports="7000-8000"):
         command = command or [sys.executable, "-c", CHILD, str(self.pid_file)]
         self.proc = subprocess.Popen([
-            os.environ["APP_RUNTIME_PROCESS"], self.app_id, self.proto, ports, *command,
+            os.environ["TEKA_RUNNER"], self.app_id, self.proto, ports, *command,
         ], env={**os.environ,
             "APP_ID": "wrong-holder",
             "MC_RUNTIME_URL": f"http://127.0.0.1:{self.mc.server_port}",

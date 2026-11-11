@@ -2,7 +2,7 @@
 
 ## Goal
 
-**Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/runtime-process.md) for lidar/IMU traffic.
+**Sway** kiosk app with **foot** terminal running **ouster-cli viz** (Wayland/GLFW). Leases the configured UDP range (7000–8000 inclusive by default) through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/lib/app-runtime/teka-runner.md) for lidar/IMU traffic.
 The manifest uses `backend.mode = none`; the host must support resource-only activation.
 
 ## Build and deploy

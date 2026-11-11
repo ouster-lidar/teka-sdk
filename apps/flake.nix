@@ -148,7 +148,7 @@
               ;
           };
           hello-llm-runtime = pkgs.runCommand "hello-llm-runtime-check" { } ''
-            APP_RUNTIME_PROCESS=${runtime}/bin/app-runtime-process \
+            TEKA_RUNNER=${runtime}/bin/teka-runner \
               ${pkgs.python3}/bin/python3 ${./.}/examples/hello-llm/tests/runtime.py
             touch "$out"
           '';

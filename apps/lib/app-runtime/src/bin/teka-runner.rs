@@ -10,6 +10,21 @@ use tokio::process::{Child, Command};
 use tokio::signal::unix::{signal, SignalKind};
 
 fn main() {
+    match std::env::args_os()
+        .nth(1)
+        .as_deref()
+        .and_then(std::ffi::OsStr::to_str)
+    {
+        Some("--help" | "-h") => {
+            println!("Run an app with Teka registration, resource leases, and lifecycle management.\n\nUsage: teka-runner APP_ID tcp|udp PORT[-PORT] COMMAND [ARG...]");
+            return;
+        }
+        Some("--version" | "-V") => {
+            println!("teka-runner {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        _ => {}
+    }
     match main_result() {
         Ok(status) => {
             if let Some(code) = status.code() {
@@ -23,7 +38,7 @@ fn main() {
             std::process::exit(128 + signal);
         }
         Err(error) => {
-            eprintln!("app-runtime-process: {error}");
+            eprintln!("teka-runner: {error}");
             std::process::exit(1);
         }
     }
@@ -121,13 +136,13 @@ fn main_result() -> io::Result<ExitStatus> {
         }
     });
     if let Err(error) = runtime::stop_and_release(&id) {
-        eprintln!("app-runtime-process: {error}");
+        eprintln!("teka-runner: {error}");
     }
     result
 }
 
 fn usage() -> io::Error {
-    io::Error::other("usage: app-runtime-process APP_ID tcp|udp PORT[-PORT] COMMAND [ARG...]")
+    io::Error::other("usage: teka-runner APP_ID tcp|udp PORT[-PORT] COMMAND [ARG...]")
 }
 
 fn ports(range: &str) -> io::Result<Vec<u16>> {

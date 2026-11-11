@@ -244,7 +244,7 @@
       unit = ps.mkGpuWaylandUnit {
         inherit name jp;
         description = "hello-ouster-terminal (Sway Wayland kiosk + foot; native GLFW Wayland viz; systemd-run /bin)";
-        execStart = "${appRuntime}/bin/app-runtime-process ${name} udp ${ousterUdpFirewallRange} ${runLoop}";
+        execStart = "${appRuntime}/bin/teka-runner ${name} udp ${ousterUdpFirewallRange} ${runLoop}";
         serviceType = "notify";
         runtimeDirectory = name;
         useTty = true;

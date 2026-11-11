@@ -19,7 +19,7 @@ rustPlatform.buildRustPackage rec {
   RUSTFLAGS = "-Dwarnings";
 
   postCheck = lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
-    APP_RUNTIME_PROCESS="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/app-runtime-process" \
+    TEKA_RUNNER="$PWD/target/${stdenv.hostPlatform.rust.rustcTarget}/release/teka-runner" \
       ${python3}/bin/python3 tests/resource_process.py
   '';
 
