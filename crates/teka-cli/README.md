@@ -4,13 +4,21 @@ Build app images, manage TPK packages, and deploy to Teka devices. The `teka-cli
 
 ## Install
 
-From the repository root, run:
+Install the latest GitHub release on Linux x86_64 or Apple Silicon macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | sh
+```
+
+The installer downloads the portable binary, verifies it against the release's `SHA256SUMS`, and runs `teka build init`. It requires a published release with assets for both platforms. Rerun it to upgrade to the latest release.
+
+For CLI development or Linux AArch64, build from the repository root:
 
 ```sh
 ./bootstrap.sh
 ```
 
-Bootstrap installs Nix if needed, builds Teka, and installs it to `~/.local/bin` when that directory is on `PATH`, otherwise `/usr/local/bin`. Rerun it after updating your checkout. For a downloaded portable binary, run `./teka-<system> build init`.
+Bootstrap installs Nix if needed and builds Teka from the checkout. Both scripts use `teka build init` to install to `~/.local/bin` when that directory is on `PATH`, otherwise `/usr/local/bin`, and prepare the build environment. Rerun bootstrap after updating your checkout. For a downloaded portable binary, run `./teka-<system> build init`.
 
 For a temporary shell without installing Teka, run `nix develop` at the repository root. If Fish startup configuration puts an older installed Teka first on `PATH`, use `nix develop --command fish --no-config`, or run commands directly with `nix develop --command teka …`.
 

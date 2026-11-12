@@ -1,5 +1,8 @@
 #!/bin/sh
-# Build portable teka from a source checkout, then initialize the host.
+# For Teka CLI development, run ./bootstrap.sh from a source checkout.
+# Installs Nix if needed, builds portable Teka, and runs teka build init.
+# Supports x86_64-linux, aarch64-linux, and aarch64-darwin; rerun after source changes.
+# To install the latest release instead, use install.sh.
 set -eu
 
 timestamp() {

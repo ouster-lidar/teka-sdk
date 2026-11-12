@@ -12,8 +12,14 @@ Browse [all examples](apps/examples/); each app has its own README.
 
 ## Quick start
 
-1. Clone this repository on Linux x86_64/AArch64 or Apple Silicon macOS. For Windows, start with the [WSL 2 host setup](docs/wsl2.md).
-2. Run `./bootstrap.sh` from the repository root to install Nix if needed and build and install the CLI. See the [installation guide](crates/teka-cli/README.md#install) for alternatives.
+1. Install the latest released CLI on Linux x86_64 or Apple Silicon macOS:
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | sh
+   ```
+
+   The installer sets up the CLI and Nix if needed. For Windows, start with the [WSL 2 host setup](docs/wsl2.md).
+2. Clone this repository for the examples below. See the [installation guide](crates/teka-cli/README.md#install) for other installation options.
 3. Build and deploy an app, or upload its package in the web UI.
 
 From the repository root:
