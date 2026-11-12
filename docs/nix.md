@@ -28,6 +28,8 @@ teka build check --full
 On Apple Silicon macOS, `teka build init` prepares a Linux build VM when no Linux builder is configured.
 See [macOS build VM](../crates/teka-cli/README.md#macos-build-vm) for setup and troubleshooting.
 
+See [Nix cache](../specs/nix-cache.md) for cache configuration, publishing and release retention.
+
 ## Flake outputs and naming
 
 The root Cargo workspace contains `teka` and `teka-cli`. Rust examples remain independent Cargo packages with their own lockfiles.

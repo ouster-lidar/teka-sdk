@@ -84,7 +84,16 @@
         default = self.templates.hello-world;
       };
 
-      packages = outputFor "packages";
+      packages = lib.mapAttrs (
+        system: outputs:
+        outputs.packages
+        // {
+          publish-cache = import ./nix/publish-cache.nix {
+            pkgs = nixpkgs.legacyPackages.${system};
+            sdk = self;
+          };
+        }
+      ) perSystem;
       apps = lib.recursiveUpdate (outputFor "apps") examples.apps;
       devShells = outputFor "devShells";
 
