@@ -1,6 +1,6 @@
 # Teka SDK and Example Apps
 
-Develop apps with the Rust SDK and `teka` CLI, build the examples in `apps/`, and deploy them to a Teka device (for example a ZedBox).
+Develop apps with the Rust SDK and `teka` CLI, start from an example without cloning this repository, and deploy to a Teka device (for example a ZED Box).
 
 ## Start here
 
@@ -19,30 +19,36 @@ Browse [all examples](apps/examples/); each app has its own README.
    ```
 
    The installer sets up the CLI and Nix if needed. For Windows, start with the [WSL 2 host setup](docs/wsl2.md).
-2. Clone this repository for the examples below. See the [installation guide](crates/teka-cli/README.md#install) for other installation options.
-3. Build and deploy an app, or upload its package in the web UI.
+2. Browse the examples and create your first app:
 
-From the repository root:
+   ```sh
+   teka app list --examples
+   teka app init --example hello-webui my-first-app
+   cd my-first-app
+   ```
 
-**Build** (AArch64 package for web UI upload or distribution):
+   The CLI fetches the example and sets up a standalone project. No repository clone is needed.
 
-```bash
-teka app build hello-world
+**If you have a device**, select it and build and deploy your app:
+
+```sh
+teka device select
+teka app deploy --build
 ```
 
-**Build + Deploy** (normal workflow — build for the device, upload, sample logs):
+Selection discovers devices, prompts for the administrator password, and saves your deployment targets and credentials. `--build` builds for the selected devices before uploading.
 
-```bash
-export TEKA_PASSWORD='your-device-admin-password'
-teka app deploy --build hello-ouster-world --device http://device.local/
+View the deployed app at `http://<teka-device>.local` or your device's IP address.
+
+**If you don't have a device**, build a package:
+
+```sh
+teka app build
 ```
 
-Builds create packages under `result/<app>/`.
-Replace `device.local` with your device's hostname or IP address.
-Deployment replaces an existing install and uses the device administrator password in `TEKA_PASSWORD`.
-`--build` builds for the device architecture before uploading.
+Builds create packages under `result/<app>/` for later web UI upload or distribution.
 
-Full procedures: [Developer Guide](docs/developer-guide.md).
+See the [installation guide](crates/teka-cli/README.md#install) for other installation options and the [Developer Guide](docs/developer-guide.md) for full build, deploy, and auth procedures.
 
 ## Documentation
 
