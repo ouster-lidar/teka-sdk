@@ -1,4 +1,4 @@
-use crate::device::{required_device, DeviceClient};
+use crate::{device::DeviceClient, target::BoxOptions};
 use anyhow::{ensure, Context, Result};
 use clap::{Args, Subcommand};
 use serde_json::Value;
@@ -17,16 +17,14 @@ pub enum SystemCommand {
 
 #[derive(Clone, Debug, Args)]
 pub struct StatusOptions {
-    /// URL of the Teka device
-    #[arg(long, value_name = "URL")]
-    pub device: Option<String>,
+    #[command(flatten)]
+    pub target: BoxOptions,
 }
 
 #[derive(Clone, Debug, Args)]
 pub struct UpdateOptions {
-    /// URL of the Teka device
-    #[arg(long, value_name = "URL")]
-    pub device: Option<String>,
+    #[command(flatten)]
+    pub target: BoxOptions,
     /// System update image
     #[arg(value_name = "FILE", value_hint = clap::ValueHint::FilePath)]
     pub file: PathBuf,
@@ -78,7 +76,7 @@ pub fn wait_for_commit(
 }
 
 pub fn run_status(args: StatusOptions) -> Result<()> {
-    let device = required_device(args.device.as_deref())?;
+    let device = args.target.single()?;
     let client = DeviceClient::new(&device)?;
     client.authenticate()?;
     let status = client.teka_status()?;
@@ -87,7 +85,7 @@ pub fn run_status(args: StatusOptions) -> Result<()> {
 }
 
 pub fn run_update(args: UpdateOptions) -> Result<()> {
-    let device = required_device(args.device.as_deref())?;
+    let device = args.target.single()?;
     let manifest = teka::tpk::read_single(&args.file, teka::tpk::ComponentType::Os)?;
     let file = args
         .file

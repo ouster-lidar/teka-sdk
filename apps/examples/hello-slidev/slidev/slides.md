@@ -197,7 +197,7 @@ teka app build hello-slidev
 ```
 
 ```bash
-teka app deploy --build hello-slidev --device http://HOST/
+teka app deploy --build hello-slidev
 ```
 
 | Step | Command |

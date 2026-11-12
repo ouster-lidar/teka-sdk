@@ -202,6 +202,7 @@ fn cli(dir: &Path) -> Command {
     c.env("TEKA_BUILD_VM", "never");
     c.env_remove("TEKA_HOST")
         .env("XDG_CONFIG_HOME", dir.join("config"))
+        .env_remove("TEKA_BOX")
         .env_remove("TEKA_DEVICE")
         .env_remove("TEKA_PASSWORD")
         .env_remove("TEKA_APPS_FLAKE_ROOT")
@@ -358,7 +359,7 @@ fn authenticated_install_streams_with_cookie_and_profile() {
     ]);
     let output = cli(d.path())
         .env("TEKA_PASSWORD", "secret")
-        .env("TEKA_DEVICE", &url)
+        .env("TEKA_BOX", &url)
         .args(["app", "deploy", "app", "--profile", "a b", "--remove"])
         .output()
         .unwrap();
@@ -403,9 +404,7 @@ fn deploy_stops_when_removal_fails() {
         ("500 Internal Server Error", "removal failed"),
     ]);
     let out = cli(d.path())
-        .args([
-            "app", "deploy", "--build", "app", "--device", &url, "--remove",
-        ])
+        .args(["app", "deploy", "--build", "app", "--box", &url, "--remove"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -428,7 +427,7 @@ fn setup_sends_password() {
     success(
         &cli(d.path())
             .env("TEKA_PASSWORD", "secret")
-            .args(["app", "deploy", "app", "--device", &url])
+            .args(["app", "deploy", "app", "--box", &url])
             .output()
             .unwrap(),
     );
@@ -450,7 +449,7 @@ fn errors_without_password_and_rejects_login_redirect() {
     let d = TempDir::new().unwrap();
     let (url, server) = serve(vec![("200 OK", r#"{"enforcement":true}"#)]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--device", &url])
+        .args(["app", "deploy", "--build", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -459,7 +458,7 @@ fn errors_without_password_and_rejects_login_redirect() {
     let (url, server) = serve(vec![("200 OK", "{}")]);
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "secret")
-        .args(["app", "deploy", "--build", "app", "--device", &url])
+        .args(["app", "deploy", "--build", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -470,7 +469,7 @@ fn errors_without_password_and_rejects_login_redirect() {
         ("302 Found", "login"),
     ]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--device", &url])
+        .args(["app", "deploy", "--build", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -711,7 +710,7 @@ fn build_and_deploy_reject_ambiguous_or_invalid_discovered_apps() {
             let mut process = cli(d.path());
             process.args(["app", command]);
             if command == "deploy" {
-                process.args(["--device", "http://127.0.0.1:1"]);
+                process.args(["--box", "http://127.0.0.1:1"]);
             }
             let output = process.output().unwrap();
             assert_eq!(output.status.code(), Some(1));
@@ -742,7 +741,7 @@ fn deploy_defaults_to_the_only_declared_app() {
             ("200 OK", "hello world"),
         ]);
         let mut process = cli(d.path());
-        process.args(["app", "deploy", "--device", &url]);
+        process.args(["app", "deploy", "--box", &url]);
         if build {
             process.arg("--build");
         }
@@ -762,7 +761,7 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     apps_flake(d.path());
     for target in [&["--arch", "aarch64"][..], &[], &["--arch", "x86_64"]] {
         let out = cli(d.path())
-            .env("TEKA_DEVICE", "not-a-host-url")
+            .env("TEKA_BOX", "not-a-host-url")
             .args(["app", "build", "hello-world"])
             .args(target)
             .output()
@@ -1057,7 +1056,7 @@ fn cli_rejects_invalid_usage() {
         vec!["box", "connect"],
         vec!["box", "disconnect"],
         vec!["box", "list", "--timeout", "1"],
-        vec!["box", "status", "box", "--device", "http://box/"],
+        vec!["box", "status", "box", "--box", "http://box/"],
         vec!["app", "deploy", "--host", "device.local", "app"],
         vec!["app", "deploy", "-H", "device.local", "app"],
         vec!["system", "status", "--host", "device.local"],
@@ -1068,7 +1067,7 @@ fn cli_rejects_invalid_usage() {
         vec![
             "app",
             "deploy",
-            "--device",
+            "--box",
             "http://device",
             "--jobs",
             "0",
@@ -1097,8 +1096,138 @@ fn deploy_requires_host() {
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("--device"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("--box"));
     assert!(!d.path().join("calls").exists());
+}
+
+#[test]
+fn box_resolution_precedence_and_cardinality() {
+    use clap::Parser;
+    #[derive(Parser)]
+    struct Options {
+        #[command(flatten)]
+        target: teka_cli::target::BoxOptions,
+    }
+    if let Ok(flags) = std::env::var("TEKA_TEST_TARGET_FLAGS") {
+        let options = Options::parse_from(std::iter::once("test").chain(flags.split_whitespace()));
+        let expected: Option<Vec<String>> =
+            serde_json::from_str(&std::env::var("TEKA_TEST_TARGET_EXPECTED").unwrap()).unwrap();
+        match expected {
+            Some(expected) => {
+                assert_eq!(options.target.resolve().unwrap(), expected);
+                assert_eq!(options.target.required().is_ok(), !expected.is_empty());
+                if expected.len() == 1 {
+                    assert_eq!(options.target.single().unwrap(), expected[0]);
+                } else {
+                    assert!(options.target.single().is_err());
+                }
+            }
+            None => {
+                assert!(options.target.resolve().is_err());
+                assert!(options.target.required().is_err());
+                assert!(options.target.single().is_err());
+            }
+        }
+        return;
+    }
+    let d = TempDir::new().unwrap();
+    let config = d.path().join("config/teka/config.json");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(&config, r#"{"selected_devices":["http://saved.local/"]}"#).unwrap();
+    let check =
+        |flags: &str, primary: Option<&str>, legacy: Option<&str>, expected: Option<Vec<&str>>| {
+            let mut command = Command::new(std::env::current_exe().unwrap());
+            command
+                .args(["--exact", "box_resolution_precedence_and_cardinality"])
+                .env("XDG_CONFIG_HOME", d.path().join("config"))
+                .env_remove("TEKA_BOX")
+                .env_remove("TEKA_DEVICE")
+                .env("TEKA_TEST_TARGET_FLAGS", flags)
+                .env(
+                    "TEKA_TEST_TARGET_EXPECTED",
+                    serde_json::to_string(&expected).unwrap(),
+                );
+            if let Some(value) = primary {
+                command.env("TEKA_BOX", value);
+            }
+            if let Some(value) = legacy {
+                command.env("TEKA_DEVICE", value);
+            }
+            success(&command.output().unwrap());
+        };
+    for (flags, primary, legacy, expected) in [
+        (
+            "--box primary.local --device invalid?legacy",
+            Some("invalid?env"),
+            Some("invalid?old"),
+            vec!["http://primary.local/"],
+        ),
+        (
+            "--device invalid?legacy --box one.local --box two.local",
+            None,
+            None,
+            vec!["http://one.local/", "http://two.local/"],
+        ),
+        (
+            "--device old.local --device other.local",
+            Some("invalid?env"),
+            None,
+            vec!["http://old.local/", "http://other.local/"],
+        ),
+        (
+            "",
+            Some("env.local"),
+            Some("invalid?old"),
+            vec!["http://env.local/"],
+        ),
+        (
+            "",
+            None,
+            Some("old-env.local"),
+            vec!["http://old-env.local/"],
+        ),
+        ("--box SAVED", None, None, vec!["http://saved.local/"]),
+        ("--device saved", None, None, vec!["http://saved.local/"]),
+        ("", Some("saved"), None, vec!["http://saved.local/"]),
+        ("", None, Some("saved"), vec!["http://saved.local/"]),
+        ("", None, None, vec!["http://saved.local/"]),
+    ] {
+        check(flags, primary, legacy, Some(expected));
+    }
+    for value in ["", "invalid?host"] {
+        check("", Some(value), None, None);
+    }
+    fs::write(
+        &config,
+        r#"{"selected_devices":["http://one.local/","http://two.local/"]}"#,
+    )
+    .unwrap();
+    check(
+        "",
+        None,
+        None,
+        Some(vec!["http://one.local/", "http://two.local/"]),
+    );
+    fs::write(&config, "{}").unwrap();
+    check("", None, None, Some(vec![]));
+}
+
+#[test]
+fn box_flags_hide_compatibility_inputs() {
+    let d = TempDir::new().unwrap();
+    for args in [
+        vec!["box", "status", "--help"],
+        vec!["app", "deploy", "--help"],
+        vec!["system", "status", "--help"],
+        vec!["system", "update", "--help"],
+    ] {
+        let out = cli(d.path()).args(args).output().unwrap();
+        success(&out);
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("--box"));
+        assert!(!text.contains("--device"));
+        assert!(!text.contains("TEKA_DEVICE"));
+    }
 }
 
 #[test]
@@ -1134,7 +1263,7 @@ fn device_list_retains_connections_without_credentials() {
     let list = || {
         cli(d.path())
             .env("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent")
-            .env("TEKA_DEVICE", "ignored.local")
+            .env("TEKA_BOX", "ignored.local")
             .args(["box", "list"])
             .output()
             .unwrap()
@@ -1224,7 +1353,7 @@ fn selected_devices_are_default_deployment_targets() {
     });
     success(
         &cli(d.path())
-            .env("TEKA_DEVICE", "ignored.local")
+            .env("TEKA_BOX", "ignored.local")
             .env("TEKA_PASSWORD", "shared-password")
             .args(["box", "select", &first, &second, &first])
             .output()
@@ -1244,7 +1373,7 @@ fn selected_devices_are_default_deployment_targets() {
         .all(|device| device["selected"] == true));
     let out = cli(d.path()).args(["system", "status"]).output().unwrap();
     assert_eq!(out.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("specify --device"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("specify --box"));
     let config = d.path().join("config/teka/config.json");
     let before = fs::read(&config).unwrap();
     let out = cli(d.path())
@@ -1260,8 +1389,11 @@ fn selected_devices_are_default_deployment_targets() {
         .unwrap()
         .values()
         .all(|report| report["auth"] == "disabled" && report.get("source").is_none()));
-    assert!(reports.get(canonical_url(&first).unwrap()).is_some());
-    assert!(reports.get(canonical_url(&second).unwrap()).is_some());
+    assert_eq!(reports[&first[7..]]["url"], canonical_url(&first).unwrap());
+    assert_eq!(
+        reports[&second[7..]]["url"],
+        canonical_url(&second).unwrap()
+    );
     assert_eq!(fs::read(config).unwrap(), before);
     success(
         &cli(d.path())
@@ -1389,7 +1521,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#); 4]);
     let one = format!("{url}/one/");
     let alias = format!("{url}/alias/");
-    let two = format!("{url}/two/");
+    let two = format!("{}/two/", url.replace("127.0.0.1", "localhost"));
     let metadata = BTreeMap::from([
         (
             one.clone(),
@@ -1410,7 +1542,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     fs::write(&config, &contents).unwrap();
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
-        .env("TEKA_DEVICE", "invalid?environment")
+        .env("TEKA_BOX", "invalid?environment")
         .args(["box", "status", "sn-a", "GTW-ONA", "--json"])
         .output()
         .unwrap();
@@ -1420,8 +1552,11 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     assert!(reports.values().all(|report| report["auth"] == "disabled"
         && report.get("source").is_none()
         && report.get("device").is_none()));
-    assert!(reports.contains_key(&alias));
-    assert!(reports.contains_key(&two));
+    assert_eq!(reports[&url[7..]]["url"], alias);
+    assert_eq!(
+        reports[&url[7..].replace("127.0.0.1", "localhost")]["url"],
+        two
+    );
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
         .args(["box", "status", "gtw-on"])
@@ -1431,7 +1566,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     let text = String::from_utf8(out.stdout).unwrap();
     assert_eq!(text.matches("Device: ").count(), 2);
     assert!(!text.contains("Source: "));
-    assert_eq!(text.matches("\n\nDevice: ").count(), 1);
+    assert_eq!(text.matches("\n\nDevice: ").count(), 2);
     assert_eq!(server.join().unwrap().len(), 4);
     let out = cli(d.path())
         .args(["box", "status", "sn-a", "missing"])
@@ -1443,25 +1578,78 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
 }
 
 #[test]
-fn device_status_json_is_keyed_by_canonical_url() {
+fn box_status_identifies_the_selection_source() {
+    let d = TempDir::new().unwrap();
+    let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#); 5]);
+    let config = d.path().join("config/teka/config.json");
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    fs::write(
+        &config,
+        serde_json::json!({"selected_devices": [format!("{url}/")]}).to_string(),
+    )
+    .unwrap();
+    for (flags, primary, legacy, source) in [
+        (
+            vec!["--box", &url, "--device", "ignored.local"],
+            Some("ignored.local"),
+            Some("ignored.local"),
+            "--box",
+        ),
+        (
+            vec!["--device", &url],
+            Some("ignored.local"),
+            Some("ignored.local"),
+            "--device",
+        ),
+        (
+            vec![],
+            Some(url.as_str()),
+            Some("ignored.local"),
+            "TEKA_BOX",
+        ),
+        (vec![], None, Some(url.as_str()), "TEKA_DEVICE"),
+        (vec![], None, None, "saved selection (teka box select)"),
+    ] {
+        let mut command = cli(d.path());
+        command
+            .env("TEKA_PASSWORD", "unused")
+            .args(["box", "status"])
+            .args(flags);
+        if let Some(value) = primary {
+            command.env("TEKA_BOX", value);
+        }
+        if let Some(value) = legacy {
+            command.env("TEKA_DEVICE", value);
+        }
+        let out = command.output().unwrap();
+        success(&out);
+        assert!(String::from_utf8_lossy(&out.stdout)
+            .contains("\nCredentials: env\nDNS: ok\nReachable: true\nAuth: disabled\nIPv4: "));
+        assert!(String::from_utf8_lossy(&out.stdout).starts_with(&format!(
+            "Device list: {source}\n\nDevice: {}\nURL: {url}/\n",
+            &url[7..]
+        )));
+    }
+    assert_eq!(server.join().unwrap().len(), 5);
+}
+
+#[test]
+fn device_status_json_is_keyed_by_hostname() {
     let d = TempDir::new().unwrap();
     let out = cli(d.path())
         .args(["box", "status", "--json"])
         .output()
         .unwrap();
-    success(&out);
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap(),
-        serde_json::json!({})
-    );
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#); 3]);
     for args in [
-        vec!["box", "status", "--device", &url, "--json"],
+        vec!["box", "status", "--box", &url, "--json"],
         vec!["box", "status", &url, "--json"],
     ] {
         let out = cli(d.path())
             .env("TEKA_PASSWORD", "unused")
-            .env("TEKA_DEVICE", "invalid?environment")
+            .env("TEKA_BOX", "invalid?environment")
             .args(args)
             .output()
             .unwrap();
@@ -1469,7 +1657,8 @@ fn device_status_json_is_keyed_by_canonical_url() {
         let reports: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(reports.len(), 1);
-        let report = &reports[&canonical_url(&url).unwrap()];
+        let report = &reports[&url[7..]];
+        assert_eq!(report["url"], canonical_url(&url).unwrap());
         assert!(report.get("device").is_none());
         assert!(report.get("source").is_none());
     }
@@ -1479,7 +1668,10 @@ fn device_status_json_is_keyed_by_canonical_url() {
         .output()
         .unwrap();
     success(&out);
-    assert!(String::from_utf8_lossy(&out.stdout).starts_with(&format!("Device: {url}/\n")));
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with(&format!(
+        "Device list: arguments\n\nDevice: {}\nURL: {url}/\n",
+        &url[7..]
+    )));
     assert_eq!(server.join().unwrap().len(), 3);
     assert!(!d.path().join("config/teka/config.json").exists());
 }
@@ -1501,7 +1693,7 @@ fn device_status_logs_out_and_never_sets_up() {
         let (url, server) = serve(replies);
         let out = cli(d.path())
             .env("TEKA_PASSWORD", "status-secret")
-            .env("TEKA_DEVICE", &url)
+            .env("TEKA_BOX", &url)
             .args(["box", "status", "--json"])
             .output()
             .unwrap();
@@ -1509,15 +1701,16 @@ fn device_status_logs_out_and_never_sets_up() {
         let mut reports: BTreeMap<String, serde_json::Value> =
             serde_json::from_slice(&out.stdout).unwrap();
         assert_eq!(reports.len(), 1);
-        let mut report = reports.remove(&canonical_url(&url).unwrap()).unwrap();
+        let mut report = reports.remove(&url[7..]).unwrap();
         let reverse = report["ipv4"][0].get_mut("reverse").unwrap();
         assert!(reverse.is_null() || reverse.is_string());
         *reverse = serde_json::Value::Null;
         assert_eq!(
             report,
             serde_json::json!({
-                "credential_source": "env",
-                "reachability": "reachable", "auth": expected, "system_resolution": "ok",
+                "url": canonical_url(&url).unwrap(),
+                "credentials": "env",
+                "reachable": true, "auth": expected, "dns": "ok",
                 "ipv4": [{"address": "127.0.0.1", "reverse": null}], "ipv6": [],
             })
         );
@@ -1567,8 +1760,8 @@ fn host_flag_overrides_environment() {
     ]);
     success(
         &cli(d.path())
-            .env("TEKA_DEVICE", "http://127.0.0.1:1")
-            .args(["app", "deploy", "hello-world", "--device", &url])
+            .env("TEKA_BOX", "http://127.0.0.1:1")
+            .args(["app", "deploy", "hello-world", "--box", &url])
             .output()
             .unwrap(),
     );
@@ -1620,9 +1813,9 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
             "--build",
             "--jobs",
             "2",
-            "--device",
+            "--box",
             &arm_url,
-            "--device",
+            "--box",
             &x86_url,
             "app",
             "hello-world",
@@ -1682,9 +1875,7 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
     ]);
     success(
         &cli(d.path())
-            .args([
-                "app", "deploy", "--device", &arm_url, "--device", &x86_url, "app",
-            ])
+            .args(["app", "deploy", "--box", &arm_url, "--box", &x86_url, "app"])
             .output()
             .unwrap(),
     );
@@ -1723,9 +1914,9 @@ fn deploy_reuses_one_build_for_same_architecture_hosts() {
             "app",
             "deploy",
             "--build",
-            "--device",
+            "--box",
             &first_url,
-            "--device",
+            "--box",
             &second_url,
             "app",
         ])
@@ -1760,9 +1951,7 @@ fn deploy_rejects_mixed_architectures_without_matching_build() {
         ("200 OK", r#"{"architecture":"x86_64"}"#),
     ]);
     let out = cli(d.path())
-        .args([
-            "app", "deploy", "--device", &arm_url, "--device", &x86_url, "app",
-        ])
+        .args(["app", "deploy", "--box", &arm_url, "--box", &x86_url, "app"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -1797,7 +1986,7 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
         (os, "requires an app component"),
     ] {
         let out = cli(d.path())
-            .args(["app", "deploy", "--device", "http://127.0.0.1:1"])
+            .args(["app", "deploy", "--box", "http://127.0.0.1:1"])
             .arg(&valid)
             .arg(&path)
             .output()
@@ -1812,7 +2001,7 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
     }
     for option in ["--build", "--remove"] {
         let out = cli(d.path())
-            .args(["app", "deploy", "--device", "http://127.0.0.1:1", option])
+            .args(["app", "deploy", "--box", "http://127.0.0.1:1", option])
             .arg(&valid)
             .output()
             .unwrap();
@@ -1836,7 +2025,7 @@ fn deploy_accepts_bare_package_filename_and_preserves_named_app_lookup() {
         ]);
         success(
             &cli(d.path())
-                .args(["app", "deploy", "--device", &url, input])
+                .args(["app", "deploy", "--box", &url, input])
                 .output()
                 .unwrap(),
         );
@@ -1867,7 +2056,7 @@ fn deploy_preflight_blocks_device_mutation() {
             "app",
             "deploy",
             "--remove",
-            "--device",
+            "--box",
             &url,
             "app",
             "hello-world",
@@ -1904,7 +2093,7 @@ fn deploy_preflight_blocks_device_mutation() {
             ("200 OK", "{}"),
         ]);
         let out = cli(d.path())
-            .args(["app", "deploy", "--remove", "--device", &url, "app"])
+            .args(["app", "deploy", "--remove", "--box", &url, "app"])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(1));
@@ -1935,8 +2124,7 @@ fn deploy_preflight_blocks_device_mutation() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--build", "--remove", "--device", &arm_url, "--device", &x86_url,
-            "app",
+            "app", "deploy", "--build", "--remove", "--box", &arm_url, "--box", &x86_url, "app",
         ])
         .output()
         .unwrap();
@@ -1974,18 +2162,18 @@ fn deploy_collects_failures_after_other_hosts_finish() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--device", &good_url, "--device", &bad_url, "app",
+            "app", "deploy", "--box", &good_url, "--box", &bad_url, "app",
         ])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains(&format!("{good_url}: deploy succeeded")),
+        stderr.contains(&format!("{good_url}/: deploy succeeded")),
         "{stderr}"
     );
     assert!(
-        stderr.contains(&format!("{bad_url}: device HTTP 500")),
+        stderr.contains(&format!("{bad_url}/: device HTTP 500")),
         "{stderr}"
     );
     assert_eq!(good_server.join().unwrap().len(), 4);
@@ -2296,7 +2484,7 @@ fn system_status_prints_json_and_update_streams() {
     ]);
     success(
         &cli(d.path())
-            .env("TEKA_DEVICE", "http://127.0.0.1:1")
+            .env("TEKA_BOX", "http://127.0.0.1:1")
             .args(["box", "select", &url])
             .output()
             .unwrap(),
@@ -2315,7 +2503,7 @@ fn system_status_prints_json_and_update_streams() {
             "system",
             "update",
             "--no-reboot",
-            "--device",
+            "--box",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2348,7 +2536,7 @@ fn system_update_login_and_http_errors() {
     success(
         &system_cli(d.path())
             .env("TEKA_PASSWORD", "secret")
-            .args(["system", "update", "--device", &url])
+            .args(["system", "update", "--box", &url])
             .arg(&image)
             .output()
             .unwrap(),
@@ -2362,7 +2550,7 @@ fn system_update_login_and_http_errors() {
     assert_eq!(requests[3].body, fs::read(&image).unwrap());
     let (url, server) = serve(vec![("401 Unauthorized", "nope")]);
     let out = system_cli(d.path())
-        .args(["system", "status", "--device", &url])
+        .args(["system", "status", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -2424,7 +2612,7 @@ fn system_update_wait_commits_after_reboot() {
             "system",
             "update",
             "--wait",
-            "--device",
+            "--box",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2471,7 +2659,7 @@ fn system_update_wait_aborts_on_unhealthy() {
             "system",
             "update",
             "--wait",
-            "--device",
+            "--box",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2510,7 +2698,7 @@ fn system_update_wait_detects_rollback() {
             "system",
             "update",
             "--wait",
-            "--device",
+            "--box",
             &url,
             image.to_str().unwrap(),
         ])
@@ -2555,7 +2743,7 @@ fn system_update_rejects_invalid_packages_before_contacting_device() {
         (uki_digest, "HashMismatch"),
     ] {
         let out = system_cli(d.path())
-            .args(["system", "update", "--device", "http://127.0.0.1:1"])
+            .args(["system", "update", "--box", "http://127.0.0.1:1"])
             .arg(&path)
             .output()
             .unwrap();
@@ -2579,7 +2767,7 @@ fn system_update_rejects_architecture_before_upload() {
         ("200 OK", "{}"),
     ]);
     let out = system_cli(d.path())
-        .args(["system", "update", "--device", &url])
+        .args(["system", "update", "--box", &url])
         .arg(&image)
         .output()
         .unwrap();
@@ -2612,7 +2800,7 @@ fn system_requires_host() {
     ] {
         fs::write(&config, contents).unwrap();
         let out = system_cli(d.path())
-            .args(["system", "status", "--device", "box"])
+            .args(["system", "status", "--box", "box"])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(1));
@@ -2648,7 +2836,7 @@ fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
         let out = cli(d.path())
             .env("TEKA_BUILD_VM", "always")
             .env("MOCK_SYSTEM", "aarch64-darwin")
-            .args(["app", "deploy", "--build", "app", "--device", &url])
+            .args(["app", "deploy", "--build", "app", "--box", &url])
             .output()
             .unwrap();
         success(&out);

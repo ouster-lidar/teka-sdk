@@ -20,6 +20,15 @@
 
 - Order unordered collections alphabetically unless order carries meaning.
 
+## Device identity
+
+- Prefer the lowercase device hostname without its domain component as the key for device-facing APIs, reports, and cross-tool references.
+- Treat IP addresses, DNS domains, and full connection URLs as network-dependent locators, not stable device keys; DHCP, centralized DNS, and mDNS discovery can change them between networks.
+- Keep the current connection URL and resolved addresses as explicit metadata, separate from the hostname key.
+- Match known hostnames before constructing a new connection URL; retain serial-number deduplication where available to identify aliases of the same physical device.
+- Reject ambiguous hostname keys rather than silently merging devices or overwriting reports; retain IP literals for targets without a known hostname and use explicit endpoints to disambiguate.
+- Preserve subsystem-specific persistence and credential-key formats unless a migration is explicitly part of the change.
+
 ## Rust
 
 - Forbid unsafe code in all repository Rust projects whenever possible, including examples, tests, build scripts, and standalone Rust files.

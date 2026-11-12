@@ -85,7 +85,7 @@ pub fn credentials(device: &str) -> Result<(Option<String>, &'static str)> {
 }
 
 pub fn required_device(flag: Option<&str>) -> Result<String> {
-    select_device(flag)?.ok_or_else(|| usage("need --device, TEKA_DEVICE or teka box select"))
+    select_device(flag)?.ok_or_else(|| usage("need --box, TEKA_BOX or teka box select"))
 }
 
 pub fn parse_device(device: &str) -> Result<String> {
@@ -101,22 +101,13 @@ pub(crate) fn short_hostname(url: &reqwest::Url) -> Result<&str> {
 }
 
 pub fn select_device(flag: Option<&str>) -> Result<Option<String>> {
-    if let Some(device) = flag {
-        device_store::connections()?;
-        return Ok(Some(parse_device(device)?));
-    }
-    let devices = selected_devices()?;
+    let devices = crate::target::resolve_boxes(
+        &flag.map(str::to_owned).into_iter().collect::<Vec<_>>(),
+        &[],
+    )?;
     match devices.len() {
         0 => Ok(None),
         1 => Ok(devices.into_iter().next()),
-        _ => Err(usage("multiple devices selected; specify --device")),
-    }
-}
-
-pub(crate) fn selected_devices() -> Result<Vec<String>> {
-    let config = device_store::connections()?;
-    match std::env::var("TEKA_DEVICE") {
-        Ok(device) => Ok(vec![parse_device(&device)?]),
-        _ => Ok(config.selected_devices.into_iter().collect()),
+        _ => Err(usage("multiple boxes selected; specify --box")),
     }
 }

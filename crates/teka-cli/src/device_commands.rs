@@ -1,7 +1,8 @@
 use crate::{
     build_check,
-    device::{credentials, parse_device, selected_devices, short_hostname, DeviceClient},
+    device::{credentials, parse_device, short_hostname, DeviceClient},
     device_store::{self, save_connection, Metadata},
+    target::BoxOptions,
 };
 use anyhow::{bail, Context, Result};
 use clap::Subcommand;
@@ -43,9 +44,10 @@ pub enum DeviceCommand {
     /// Report device selection, credentials, and connectivity
     Status {
         /// Match known devices by hostname, part number, or serial
+        #[arg(conflicts_with_all = ["boxes", "devices"])]
         patterns: Vec<String>,
-        #[arg(long, value_name = "URL", conflicts_with = "patterns")]
-        device: Option<String>,
+        #[command(flatten)]
+        target: BoxOptions,
         #[arg(long)]
         json: bool,
     },
@@ -201,20 +203,18 @@ pub fn run(command: DeviceCommand) -> Result<()> {
         }
         DeviceCommand::Status {
             patterns,
-            device,
+            target,
             json,
         } => {
             let config = device_store::connections()?;
             let mut candidates = known_devices(&config);
-            let targets = if let Some(device) = device {
-                vec![parse_device(&device)?]
-            } else if patterns.is_empty() {
-                selected_devices()?
+            let (targets, source) = if patterns.is_empty() {
+                target.required_with_source()?
             } else {
                 for pattern in patterns.iter().filter(|pattern| pattern.contains("://")) {
                     candidates.entry(parse_device(pattern)?).or_default();
                 }
-                resolve_patterns(&candidates, &patterns)?
+                (resolve_patterns(&candidates, &patterns)?, "arguments")
             };
             for url in &targets {
                 candidates.entry(url.clone()).or_default();
@@ -227,23 +227,22 @@ pub fn run(command: DeviceCommand) -> Result<()> {
                 })
                 .collect::<Result<BTreeMap<_, _>>>()?;
             if json {
-                println!("{}", json!(reports));
+                println!("{}", json!(status_json(reports)?));
             } else {
+                println!("Device list: {source}\n");
                 for (index, (device, report)) in reports.iter().enumerate() {
                     if index != 0 {
                         println!();
                     }
-                    println!("Device: {device}");
-                    for (label, key) in [
-                        ("Credentials", "credential_source"),
-                        ("System resolver", "system_resolution"),
-                        ("Reachability", "reachability"),
-                        ("Authentication", "auth"),
-                    ] {
+                    println!("Device: {}", device_label(device)?);
+                    println!("URL: {device}");
+                    for (label, key) in [("Credentials", "credentials"), ("DNS", "dns")] {
                         println!("{label}: {}", report[key].as_str().unwrap_or("none"));
                     }
+                    println!("Reachable: {}", report["reachability"] == "reachable");
+                    println!("Auth: {}", report["auth"].as_str().unwrap_or("unverified"));
                     print_addresses(report, color, "");
-                    let resolution = report["system_resolution"].as_str().unwrap();
+                    let resolution = report["dns"].as_str().unwrap();
                     if report["reachability"] == "reachable"
                         && matches!(resolution, "failed" | "timeout")
                     {
@@ -254,6 +253,24 @@ pub fn run(command: DeviceCommand) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn status_json(reports: BTreeMap<String, Value>) -> Result<BTreeMap<String, Value>> {
+    let mut output = BTreeMap::new();
+    for (url, mut report) in reports {
+        let hostname = device_label(&url)?;
+        report["url"] = json!(url);
+        let reachability = report
+            .as_object_mut()
+            .unwrap()
+            .remove("reachability")
+            .context("status report has no reachability")?;
+        report["reachable"] = json!(reachability == "reachable");
+        if output.insert(hostname.clone(), report).is_some() {
+            bail!("multiple device URLs share JSON key {hostname:?}; query them separately");
+        }
+    }
+    Ok(output)
 }
 
 fn known_devices(config: &device_store::Config) -> BTreeMap<String, Metadata> {
@@ -448,7 +465,7 @@ fn discovery_status(devices: Vec<DiscoveredDevice>) -> Vec<Value> {
             let mut report = serde_json::Map::new();
             report.append(json!(device).as_object_mut().unwrap());
             let mut resolution = lookup.map_or_else(
-                || json!({"system_resolution": "failed", "ipv4": [], "ipv6": []}),
+                || json!({"dns": "failed", "ipv4": [], "ipv6": []}),
                 |finish| finish(),
             );
             report.append(resolution.as_object_mut().unwrap());
@@ -645,7 +662,7 @@ fn system_resolution(device: &str) -> Result<impl FnOnce() -> Value> {
                 })
                 .collect::<Vec<_>>()
         };
-        json!({"system_resolution": state, "ipv4": family(true), "ipv6": family(false)})
+        json!({"dns": state, "ipv4": family(true), "ipv6": family(false)})
     });
     Ok(move || lookup.join().unwrap())
 }
@@ -678,11 +695,11 @@ fn print_addresses(report: &Value, color: bool, indent: &str) {
 }
 
 fn status(device: &str) -> Result<Value> {
-    let mut report = json!({"credential_source": "none",
+    let mut report = json!({"credentials": "none",
         "reachability": "unknown", "auth": "unverified",
-        "system_resolution": "not_checked", "ipv4": [], "ipv6": []});
+        "dns": "not_checked", "ipv4": [], "ipv6": []});
     let (password, credential_source) = credentials(device)?;
-    report["credential_source"] = json!(credential_source);
+    report["credentials"] = json!(credential_source);
     let client = DeviceClient::new(device)?;
     let lookup = system_resolution(device)?;
     let response = client
@@ -726,6 +743,61 @@ fn status(device: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_json_uses_short_hostnames_and_preserves_urls() {
+        let reports = BTreeMap::from([
+            (
+                "http://teka-one.local/".into(),
+                json!({"auth": "ok", "reachability": "reachable"}),
+            ),
+            (
+                "https://teka-two.example.com:8443/base/".into(),
+                json!({"auth": "disabled", "reachability": "reachable"}),
+            ),
+            (
+                "http://192.0.2.1/".into(),
+                json!({"auth": "unverified", "reachability": "unreachable"}),
+            ),
+            (
+                "http://[fd00::1]/".into(),
+                json!({"auth": "ok", "reachability": "reachable"}),
+            ),
+        ]);
+        let output = status_json(reports).unwrap();
+        assert_eq!(
+            output["teka-one"],
+            json!({"auth": "ok", "url": "http://teka-one.local/", "reachable": true})
+        );
+        assert_eq!(
+            output["teka-two:8443"]["url"],
+            "https://teka-two.example.com:8443/base/"
+        );
+        assert_eq!(output["192.0.2.1"]["url"], "http://192.0.2.1/");
+        assert_eq!(output["192.0.2.1"]["reachable"], false);
+        assert!(output
+            .values()
+            .all(|report| report.get("reachability").is_none()));
+        assert_eq!(output["[fd00::1]"]["url"], "http://[fd00::1]/");
+    }
+
+    #[test]
+    fn status_json_rejects_duplicate_hostname_keys() {
+        let reports = BTreeMap::from([
+            (
+                "http://teka-one.local/".into(),
+                json!({"reachability": "reachable"}),
+            ),
+            (
+                "http://teka-one.example.com/".into(),
+                json!({"reachability": "reachable"}),
+            ),
+        ]);
+        assert!(status_json(reports)
+            .unwrap_err()
+            .to_string()
+            .contains("multiple device URLs share JSON key"));
+    }
 
     #[test]
     fn device_labels_omit_domains_and_keep_nondefault_ports() {
@@ -859,7 +931,7 @@ mod tests {
     fn system_resolution_accepts_ip_literals() {
         for url in ["http://127.0.0.1/", "http://[::1]/"] {
             let report = system_resolution(url).unwrap()();
-            assert_eq!(report["system_resolution"], "ok");
+            assert_eq!(report["dns"], "ok");
         }
     }
 }

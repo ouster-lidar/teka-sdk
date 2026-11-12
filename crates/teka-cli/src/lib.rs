@@ -12,6 +12,7 @@ mod host;
 pub mod inspect;
 pub mod plugins;
 pub mod system;
+pub mod target;
 pub mod tpk;
 pub use tpk::TpkCommand;
 
@@ -80,7 +81,7 @@ pub enum AppCommand {
     List(build::ListOptions),
     /// Deploy apps to one or more devices
     #[command(
-        after_help = "Examples:\n  teka app deploy --device http://device.local my-app another-app\n  teka app deploy --device http://device.local ./my-app.tpk\n  teka app deploy --build --device http://box-1/ --device http://box-2/ my-app another-app"
+        after_help = "Examples:\n  teka app deploy --box http://device.local my-app another-app\n  teka app deploy --box http://device.local ./my-app.tpk\n  teka app deploy --build --box http://box-1/ --box http://box-2/ my-app another-app"
     )]
     Deploy(deploy::DeployOptions),
     #[command(external_subcommand)]

@@ -1,6 +1,7 @@
 use crate::{
     build::{self, BuildSource},
-    device::{parse_device, selected_devices, DeviceClient},
+    device::DeviceClient,
+    target::BoxOptions,
 };
 use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
@@ -17,9 +18,8 @@ const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Debug, Args)]
 pub struct DeployOptions {
-    /// URL of a Teka device; may be repeated
-    #[arg(long = "device", value_name = "URL")]
-    pub hosts: Vec<String>,
+    #[command(flatten)]
+    pub target: BoxOptions,
     /// App IDs from ./result, or prebuilt .tpk files (default: the project's only app)
     #[arg(value_name = "INPUT")]
     pub apps: Vec<String>,
@@ -287,17 +287,7 @@ fn deploy_targets(
 }
 
 pub fn run(mut args: DeployOptions) -> Result<()> {
-    if args.hosts.is_empty() {
-        args.hosts = selected_devices()?;
-        if args.hosts.is_empty() {
-            return Err(crate::plugins::usage(
-                "need --device, TEKA_DEVICE or teka box select",
-            ));
-        }
-    }
-    for device in &args.hosts {
-        parse_device(device)?;
-    }
+    let hosts = args.target.required()?;
     let has_files = args.apps.iter().any(|input| is_file_input(input));
     if has_files && (args.build || args.remove) {
         return Err(crate::plugins::usage(
@@ -323,7 +313,7 @@ pub fn run(mut args: DeployOptions) -> Result<()> {
         let manifest = teka::tpk::read_single(Path::new(input), teka::tpk::ComponentType::App)?;
         file_manifests.insert(input.clone(), manifest);
     }
-    let targets = prepare_targets(&args.hosts)?;
+    let targets = prepare_targets(&hosts)?;
     let target_arches = targets
         .iter()
         .map(|target| target.target.clone())
