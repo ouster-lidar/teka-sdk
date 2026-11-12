@@ -2,6 +2,7 @@
   nixpkgsRev,
   idleTimeout,
   networkSource,
+  cacheSettings,
 }:
 let
   nixpkgs = builtins.getFlake "github:NixOS/nixpkgs/${nixpkgsRev}";
@@ -61,6 +62,15 @@ let
   # Stage the private host key outside the store without rebuilding the cached guest.
   keys = "[Service]\nExecStartPost=${builder.nixosConfig.system.path}/bin/install -m 0600 /var/keys/ssh_host_ed25519_key /run/builder-keys/ssh_host_ed25519_key\nExecStartPost=${builder.nixosConfig.system.path}/bin/ln -sfn ${shellProfile} /etc/profile.local\nExecStartPost=${builder.nixosConfig.systemd.package}/bin/systemd-sysusers --inline \"m builder systemd-journal\"\n";
   hostKey = "[Service]\nBindReadOnlyPaths=/run/builder-keys/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key\nBindReadOnlyPaths=/run/builder-keys/ssh_host_ed25519_key.pub:/etc/ssh/ssh_host_ed25519_key.pub\n";
+  # Keep cache configuration in the runner so first setup can use the cached guest.
+  cacheEnvironment =
+    "NIX_CONFIG=build-dir = /nix/.rw-store/builds\n"
+    + lib.concatStringsSep "\n" (
+      lib.mapAttrsToList (
+        name: values: "extra-${name} = ${lib.concatStringsSep " " values}"
+      ) cacheSettings
+    );
+  caches = "[Service]\nEnvironment=${builtins.toJSON cacheEnvironment}\n";
   # These settings affect only the host runner, preserving the cached guest closure.
   # Logind can also start tty1 through the autovt alias.
   vzvm = pkgs.writeShellScriptBin "vzvm" ''
@@ -78,12 +88,13 @@ let
       --arg dhcp ${lib.escapeShellArg dhcp} \
       --arg keys ${lib.escapeShellArg keys} \
       --arg hostKey ${lib.escapeShellArg hostKey} \
+      --arg caches ${lib.escapeShellArg caches} \
       --arg swapDisk "$swap" \
       'if (.disks | length) != 2 then error("expected store and data disks before /dev/vdc swap") else . end
        | .cpuCount = $cpus
        | .memorySizeMiB = $memory
        | .disks += [{path: $swapDisk, readOnly: false}]
-       | .cmdline += " systemd.swap-extra=/dev/vdc:x-systemd.makefs systemd.mask=sshd.service systemd.mask=getty@tty1.service systemd.mask=autovt@tty1.service systemd.mask=serial-getty@hvc0.service systemd.setenv=\"NIX_CONFIG=build-dir = /nix/.rw-store/builds\" systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock.socket:\($dropin | @base64) systemd.set_credential_binary=systemd.unit-dropin.dhcpcd.service:\($dhcp | @base64) systemd.set_credential_binary=systemd.unit-dropin.copy-builder-keys.service:\($keys | @base64) systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock@.service:\($hostKey | @base64)"' \
+       | .cmdline += " systemd.swap-extra=/dev/vdc:x-systemd.makefs systemd.mask=sshd.service systemd.mask=getty@tty1.service systemd.mask=autovt@tty1.service systemd.mask=serial-getty@hvc0.service systemd.setenv=\"NIX_CONFIG=build-dir = /nix/.rw-store/builds\" systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock.socket:\($dropin | @base64) systemd.set_credential_binary=systemd.unit-dropin.dhcpcd.service:\($dhcp | @base64) systemd.set_credential_binary=systemd.unit-dropin.copy-builder-keys.service:\($keys | @base64) systemd.set_credential_binary=systemd.unit-dropin.sshd-vsock@.service:\($hostKey | @base64) systemd.set_credential_binary=systemd.unit-dropin.nix-daemon.service:\($caches | @base64)"' \
       "$config" > "$config.tmp"
     mv "$config.tmp" "$config"
     exec ${lib.getExe monitor} "$config"

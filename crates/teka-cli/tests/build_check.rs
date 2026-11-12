@@ -33,10 +33,12 @@ case "$1" in
   config)
     if [ -f "$MOCK_CALLS.registration" ]; then
       IFS= read -r registration < "$MOCK_CALLS.registration"
-      printf '%s\n' "$registration"
     else
-      printf '%s\n' "${MOCK_BUILDERS_JSON-}"
+      registration=${MOCK_BUILDERS_JSON-'{}'}
     fi
+    registration=${registration#\{}
+    if [ "$registration" = '}' ]; then registration='"teka-cache-probe":true}'; fi
+    printf '{"substituters":{"value":["https://teka.cachix.org","https://nix-community.cachix.org"]},"trusted-public-keys":{"value":["teka.cachix.org-1:DNrDCrbBoY22jnfsEpF+dADxj+3dkl+Re70Xyk/HSwc=","nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="]},%s\n' "$registration"
     exit 0 ;;
   store)
     echo 'mock store diagnostic' >&2
@@ -352,14 +354,20 @@ fn init_installs_portable_binaries_and_leaves_nix_packages_managed() {
             assert_eq!(stderr.matches("✓ teka").count(), 1);
             host.missing(&[".local/bin/teka"]);
         }
-        assert_eq!(host.read("calls"), PREREQUISITES.repeat(3));
+        assert_eq!(
+            host.read("calls"),
+            format!("{PREREQUISITES}config show --json\n").repeat(3)
+        );
     } else {
         contains(&stderr, "teka completion --help");
         let inode = fs::metadata(&destination).unwrap().ino();
         let stderr = host.binary(&destination).args(["build", "init"]).report(0);
         assert_eq!(stderr.matches("✓ teka").count(), 1);
         assert_eq!(fs::metadata(&destination).unwrap().ino(), inode);
-        assert_eq!(host.read("calls"), PREREQUISITES.repeat(2));
+        assert_eq!(
+            host.read("calls"),
+            format!("{PREREQUISITES}config show --json\n").repeat(2)
+        );
     }
     host.missing(&["result"]);
 }

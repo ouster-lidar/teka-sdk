@@ -30,9 +30,10 @@ pub fn runtime_expression(idle_timeout: u32) -> Result<String> {
         idle_timeout.to_string()
     };
     Ok(format!(
-        "({}) {{ nixpkgsRev = \"{revision}\"; idleTimeout = {idle_timeout}; networkSource = ''\n{}\n''; }}",
+        "({}) {{ nixpkgsRev = \"{revision}\"; idleTimeout = {idle_timeout}; networkSource = ''\n{}\n''; cacheSettings = builtins.fromJSON ''{}''; }}",
         include_str!("build_vm.nix"),
-        include_str!("build_vm_network.swift")
+        include_str!("build_vm_network.swift"),
+        crate::build_init::cache::SETTINGS,
     ))
 }
 

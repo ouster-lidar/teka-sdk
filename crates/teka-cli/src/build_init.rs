@@ -18,6 +18,8 @@ use std::{
 const NIX_PROFILE: &str = "/nix/var/nix/profiles/default/bin/nix";
 const INSTALLER: &str = "https://install.determinate.systems/nix";
 
+pub(crate) mod cache;
+
 fn find_nix() -> Option<PathBuf> {
     on_path("nix").or_else(|| Path::new(NIX_PROFILE).exists().then(|| NIX_PROFILE.into()))
 }
@@ -234,6 +236,7 @@ fn initialize() -> Result<()> {
         build_check::nix_checks(&nix, true, installed).is_ok(),
         build_check::BuildFailed("build initialization failed")
     );
+    cache::configure(&nix).context("configure public Nix caches")?;
 
     let source = std::env::current_exe()
         .context("locate running teka")?

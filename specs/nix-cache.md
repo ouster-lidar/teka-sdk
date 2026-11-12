@@ -2,6 +2,9 @@
 
 ## Configuration
 
+- `teka build init` configures public caches and signing keys for the host and managed build VM, preserving existing settings.
+- Cache URLs and keys live in [`build_caches.json`](../crates/teka-cli/src/build_caches.json); downloads require no credentials.
+- Declaratively managed hosts should apply those values through `nix.settings.substituters` and `nix.settings.trusted-public-keys`.
 - Configure the publisher's upstream caches in Cachix so paths already available there are not uploaded.
 
 ## Publishing

@@ -64,4 +64,4 @@ On macOS, `teka app build` selects a Linux build system and uses a configured Li
 | Issue | Fix |
 |-------|-----|
 | Missing Nix features | Run `teka build init` for an installed CLI, or enable `nix-command flakes` in Nix configuration before bootstrapping. |
-| Slow builds after cache miss | Expected without extra binary caches; add substituters to `/etc/nix/nix.custom.conf` if needed. |
+| Slow builds after cache miss | Run `teka build init` to configure public caches; changed or uncached dependencies still need building. |
