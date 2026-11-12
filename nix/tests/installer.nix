@@ -1,4 +1,5 @@
 {
+  lib,
   fetchurl,
   writeShellApplication,
   qemu,
@@ -7,6 +8,7 @@
   gnugrep,
   gnused,
   dist,
+  published ? false,
 }:
 let
   image = fetchurl {
@@ -15,7 +17,7 @@ let
   };
 in
 writeShellApplication {
-  name = "test-build-init";
+  name = if published then "test-published-install" else "test-build-init";
   runtimeInputs = [
     qemu
     cdrkit
@@ -24,6 +26,12 @@ writeShellApplication {
     gnused
   ];
   text = ''
+    ${lib.optionalString published ''
+      if (( $# > 1 )) || [[ -n "''${1:-}" && ! "$1" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]; then
+        echo 'Usage: test-published-install [RELEASE_TAG]' >&2
+        exit 1
+      fi
+    ''}
     work=$(mktemp -d)
     log=$(mktemp --tmpdir --suffix=.log teka-installer.XXXXXX)
     cleanup() {
@@ -40,7 +48,11 @@ writeShellApplication {
 
     qemu-img create -q -f qcow2 -F qcow2 -b ${image} disk.qcow2
     qemu-img resize -q disk.qcow2 16G
-    cp ${dist}/teka-x86_64-linux teka
+    ${lib.optionalString published ''
+      cp ${../../install.sh} install.sh
+      printf '%s\n' "''${1:-}" > release-tag
+    ''}
+    ${lib.optionalString (!published) "cp ${dist}/teka-x86_64-linux teka"}
     echo 'instance-id: teka-installer' > meta-data
     cat > user-data <<EOF
     #cloud-config
@@ -50,18 +62,32 @@ writeShellApplication {
       - [su, --login, root, --command, 'bash /mnt/test/test.sh > /dev/ttyS1 2>&1']
     EOF
     cat > test.sh <<'EOF'
-    set -eu
+    set -euo pipefail
     trap 'poweroff' EXIT
     test ! -e /nix
     test -z "$(command -v nix)"
-    install -m755 /mnt/test/teka /teka
-    NIX_INSTALLER_NO_CONFIRM=true /teka build init
-    rm /teka
+    ${
+      if published then
+        ''
+          release_tag=$(cat /mnt/test/release-tag)
+          if [ -n "$release_tag" ]; then
+            cat /mnt/test/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh -s -- "$release_tag"
+          else
+            curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh
+          fi
+        ''
+      else
+        ''
+          install -m755 /mnt/test/teka /teka
+          NIX_INSTALLER_NO_CONFIRM=true /teka build init
+          rm /teka
+        ''
+    }
     bash -lec 'set -eu; teka --version; teka build init; teka build check --full --verbose'
     echo TEKA_INSTALLER_TEST_PASSED
     EOF
     genisoimage -quiet -output seed.iso -volid cidata -joliet -rock \
-      user-data meta-data test.sh teka
+      user-data meta-data test.sh ${if published then "install.sh release-tag" else "teka"}
 
     echo "Testing installation on Ubuntu 24.04 (log: $log)"
     run_vm() {

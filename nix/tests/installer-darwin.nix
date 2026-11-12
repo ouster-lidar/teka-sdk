@@ -1,4 +1,5 @@
 {
+  lib,
   writeShellApplication,
   writeShellScript,
   tart,
@@ -8,9 +9,10 @@
   gnused,
   dist,
   nixpkgsRev,
+  published ? false,
 }:
 writeShellApplication {
-  name = "test-build-init";
+  name = if published then "test-published-install" else "test-build-init";
   runtimeInputs = [
     tart
     openssh
@@ -25,9 +27,15 @@ writeShellApplication {
     SSH_ASKPASS_REQUIRE = "force";
   };
   text = ''
+    ${lib.optionalString published ''
+      if (( $# > 1 )) || [[ -n "''${1:-}" && ! "$1" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]; then
+        echo 'Usage: test-published-install [RELEASE_TAG]' >&2
+        exit 1
+      fi
+    ''}
     work=$(mktemp -d)
     log=$(mktemp --tmpdir --suffix=.log teka-installer.XXXXXX)
-    vm="teka-build-init-$(basename "$work")"
+    vm="${if published then "teka-published-install" else "teka-build-init"}-$(basename "$work")"
     vm_pid=
     cleanup() {
       result=$?
@@ -90,17 +98,31 @@ writeShellApplication {
     done
 
     cat > "$work/test.sh" <<'EOF'
-    set -eu
+    set -euo pipefail
     test "$(uname -s)" = Darwin
     test "$(uname -m)" = arm64
     test ! -e /nix
     test -z "$(command -v nix)"
     sudo -n true
     sudo install -d -o "$(id -u)" -g "$(id -g)" /usr/local/bin
-    chmod 755 /tmp/teka-build-init/teka
-    NIX_INSTALLER_NO_CONFIRM=true /tmp/teka-build-init/teka build init
-    /tmp/teka-build-init/teka build vm stop
-    rm /tmp/teka-build-init/teka
+    ${
+      if published then
+        ''
+          release_tag=$(cat /tmp/teka-build-init/release-tag)
+          if [ -n "$release_tag" ]; then
+            cat /tmp/teka-build-init/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh -s -- "$release_tag"
+          else
+            curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh
+          fi
+        ''
+      else
+        ''
+          chmod 755 /tmp/teka-build-init/teka
+          NIX_INSTALLER_NO_CONFIRM=true /tmp/teka-build-init/teka build init
+          /tmp/teka-build-init/teka build vm stop
+          rm /tmp/teka-build-init/teka
+        ''
+    }
     # Nix's macOS PATH hook in /etc/zshrc requires an interactive shell.
     /usr/bin/env -i HOME="$HOME" USER="$USER" LOGNAME="$LOGNAME" SHELL=/bin/zsh \
       PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/zsh -leic '
@@ -155,11 +177,17 @@ writeShellApplication {
     cat > "$work/builder-tcg.nix" <<'EOF'
     ${builtins.readFile ./builder-tcg.nix}
     EOF
-    cp ${dist}/teka-aarch64-darwin "$work/teka"
+    ${lib.optionalString (!published) ''cp ${dist}/teka-aarch64-darwin "$work/teka"''}
+    ${lib.optionalString published ''
+      cp ${../../install.sh} "$work/install.sh"
+      printf '%s\n' "''${1:-}" > "$work/release-tag"
+    ''}
     run_test() {
       guest 'mkdir -p /tmp/teka-build-init'
       scp "''${ssh_options[@]}" \
-        "$work/teka" "$work/test.sh" "$work/builder-tcg.nix" "admin@$ip:/tmp/teka-build-init/"
+        ${
+          if published then ''"$work/install.sh" "$work/release-tag"'' else ''"$work/teka"''
+        } "$work/test.sh" "$work/builder-tcg.nix" "admin@$ip:/tmp/teka-build-init/"
       guest "/bin/zsh -l /tmp/teka-build-init/test.sh"
     }
     run_test 2>&1 | sed -u 's/^/[macos26] /; s/] \[/][/g' | tee "$log"

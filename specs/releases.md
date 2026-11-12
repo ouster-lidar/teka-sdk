@@ -78,6 +78,8 @@ gh release edit v0.1.0 --repo ouster-lidar/teka-sdk --draft=false
 
 Download the published assets and verify their checksums. On each platform, make the downloaded binary executable and check `--version` and `--help`. The stable asset names allow links such as `https://github.com/ouster-lidar/teka-sdk/releases/download/v0.1.0/teka-aarch64-darwin`; users can run `./teka-<system> build init` to install it as described in the [installation guide](../crates/teka-cli/README.md#install).
 
+Once `install.sh` is on GitHub's `main` branch, run `nix run .#test-published-install` on both builders to validate the public installer and latest release in fresh VMs. See the [installer test procedure](installer-test.md).
+
 ## Follow-up automation
 
 A future GitHub Actions workflow can trigger on `v*` tags, require the tag to equal `v` plus the Cargo workspace version, build and check both platforms, merge checksums, and upload all assets to a draft release. Keep publication as a review step initially. This repository does not currently have a GitHub release workflow.

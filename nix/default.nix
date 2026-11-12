@@ -84,6 +84,20 @@ rec {
           ({ inherit (teka) dist; } // lib.optionalAttrs stdenv.hostPlatform.isDarwin { inherit nixpkgsRev; })
       );
     };
+    test-published-install = {
+      type = "app";
+      program = lib.getExe (
+        pkgs.callPackage
+          (if stdenv.hostPlatform.isDarwin then ./tests/installer-darwin.nix else ./tests/installer.nix)
+          (
+            {
+              inherit (teka) dist;
+              published = true;
+            }
+            // lib.optionalAttrs stdenv.hostPlatform.isDarwin { inherit nixpkgsRev; }
+          )
+      );
+    };
   };
 
   checks = {

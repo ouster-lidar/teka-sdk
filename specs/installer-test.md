@@ -4,6 +4,12 @@ Run `nix run .#test-build-init` on x86_64 Linux or Apple Silicon macOS. Both run
 
 Both runners start a fresh guest without Nix, install the portable Teka distribution with `build init`, delete the source executable, and verify installation from a fresh login shell without manually sourcing Nix's profile. They rerun initialization and compile a unique AArch64 Linux hello-world with `build check --full`, including ELF validation.
 
+Run `nix run .#test-published-install` on each platform to test the public download path instead. It uses the same VM runners, fetching `install.sh` from GitHub's `main` branch and piping it to `sh` inside the guest. The installer downloads the latest published release and verifies its checksum before initializing the host. No locally built Teka binary is copied into the guest. The fresh-shell, repeated initialization, and full compilation checks remain the same. Pipeline failures must fail the test even if `sh` receives an empty script.
+
+The published test requires `install.sh` on GitHub's `main` branch and a stable release containing both platform binaries and the combined `SHA256SUMS`. It tests the published version, which may differ from the checkout. Both tests are explicit flake apps because they require live network access and host virtualization; their results must not be cached as successful Nix builds.
+
+Before merging the installer, run `nix run .#test-published-install -- v0.1.0-rc.1` on each platform. Supplying a tag pipes the checkout's `install.sh` into `sh` in the guest and downloads assets from that specific published release, including prereleases. This mode requires no installer on GitHub's `main` branch. The tag must identify the source used to build the uploaded binaries. Run without arguments after the final release to validate the public script and latest-stable selection as well.
+
 ## Platforms
 
 - [Linux runner](../nix/tests/installer.nix): pinned Ubuntu 24.04 cloud image, disposable qcow2 overlay, NoCloud seed ISO, and separate boot/test serial ports. Runs QEMU as the invoking user with user networking, preferring KVM and falling back to TCG. Installation runs as guest root; no host root, Docker, libvirt, TAP interface, or shared Nix store is required.
