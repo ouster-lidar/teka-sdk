@@ -13,7 +13,7 @@ Before merging the installer, run `nix run .#test-published-install -- v0.1.0-rc
 ## Platforms
 
 - [Linux runner](../nix/tests/installer.nix): pinned Ubuntu 24.04 cloud image, disposable qcow2 overlay, NoCloud seed ISO, and separate boot/test serial ports. Runs QEMU as the invoking user with user networking, preferring KVM and falling back to TCG. Installation runs as guest root; no host root, Docker, libvirt, TAP interface, or shared Nix store is required.
-- [macOS runner](../nix/tests/installer-darwin.nix): pinned Cirrus Labs macOS 26 Tahoe vanilla image through Tart, with passwordless sudo for the guest administrator. Requires working Apple virtualization, an unlocked login keychain, and SSH routing to the guest; see [Tart prerequisites](https://tart.run/faq/). The first image download is approximately 24 GB; the base stays cached while disposable clones are deleted. Uses unique VM names, random MAC addresses, private known-hosts files, and disables automatic pruning of unrelated images.
+- [macOS runner](../nix/tests/installer-darwin.nix): pinned Cirrus Labs macOS 26 Tahoe vanilla image through Tart 2.41.1, with passwordless sudo for the guest administrator. Requires working Apple virtualization and an unlocked login keychain; see [Tart prerequisites](https://tart.run/faq/). The first image download is approximately 24 GB; the base stays cached while disposable clones are deleted. Uses unique VM names, random MAC addresses, private known-hosts files, and disables automatic pruning of unrelated images. Each test uses a separate gvproxy userspace network over a private Unix socket, reserves the guest's DHCP address, and forwards guest SSH to a temporary localhost port.
 - Authenticate macOS guest SSH/SCP through OpenSSH's forced askpass helper, without a controlling terminal or sshpass pseudo-terminal. Keep the private known-hosts file and existing host-key checks.
 
 macOS initialization installs the production VM plugin and registers the system builder. Since the nested guest cannot use hardware virtualization, the runner stops the production monitor and starts the [test-only TCG Linux builder](../nix/tests/builder-tcg.nix). It runs the full check as untrusted `nobody` through the registered daemon builder, verifies daemon trust is false, and leaves trust and signature settings intact. Production uses Apple's Virtualization.framework.
@@ -28,7 +28,7 @@ Guest output is prefixed with `[macos26]` or `[ubuntu24.04]`; nested labels are 
 
 Write the TCG console log to an absolute path in the test's working directory so failure cleanup can print it before deleting the guest.
 
-If macOS stalls before guest output begins, inspect the reported IP and SSH error. A VPN may route the guest subnet (usually `192.168.64.0/24`) through a tunnel: check `route -n get <guest-ip>`, then disconnect the VPN or exclude that subnet. If vmnet routing is stale, stop idle VZ/Tart VMs and retry; use `teka build vm stop` for Teka's builder.
+If macOS stalls before guest output begins, inspect the reported localhost port, SSH error, and boot log, which also contains gvproxy output. Guest networking does not create a host subnet route or use Apple's vmnet bridge; TCP/UDP and DNS use host connections through gvproxy. The VM and network proxy are stopped on exit.
 
 ## Precedent
 

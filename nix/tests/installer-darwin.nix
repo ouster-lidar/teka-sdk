@@ -2,7 +2,10 @@
   lib,
   writeShellApplication,
   writeShellScript,
+  fetchurl,
   tart,
+  gvproxy,
+  python3,
   openssh,
   coreutils,
   gnugrep,
@@ -11,10 +14,25 @@
   nixpkgsRev,
   published ? false,
 }:
+let
+  # FIXME: Drop this override once Nixpkgs has Tart with --net-fd,
+  # which gvproxy needs to avoid VPN-sensitive vmnet routing.
+  networkTart = tart.overrideAttrs (
+    final: _: {
+      version = "2.41.1";
+      src = fetchurl {
+        url = "https://github.com/openai/tart/releases/download/${final.version}/tart.tar.gz";
+        hash = "sha256-5oCnNP68z859TpEMH38T/DsA8ZoYHJReLXRt4yFMMsI=";
+      };
+    }
+  );
+in
 writeShellApplication {
   name = if published then "test-published-install" else "test-build-init";
   runtimeInputs = [
-    tart
+    networkTart
+    gvproxy
+    python3
     openssh
     coreutils
     gnugrep
@@ -33,16 +51,22 @@ writeShellApplication {
         exit 1
       fi
     ''}
-    work=$(mktemp -d)
+    # Keep Unix socket paths below Darwin's 104-byte limit.
+    work=$(mktemp -d /tmp/teka-installer.XXXXXX)
     log=$(mktemp --tmpdir --suffix=.log teka-installer.XXXXXX)
     vm="${if published then "teka-published-install" else "teka-build-init"}-$(basename "$work")"
     vm_pid=
+    network_pid=
     cleanup() {
       result=$?
       if [[ -n "$vm_pid" ]]; then
         tart stop --timeout 10 "$vm" >> "$log.boot" 2>&1 || true
         kill "$vm_pid" 2>/dev/null || true
         wait "$vm_pid" 2>/dev/null || true
+      fi
+      if [[ -n "$network_pid" ]]; then
+        kill "$network_pid" 2>/dev/null || true
+        wait "$network_pid" 2>/dev/null || true
       fi
       tart delete "$vm" >> "$log.boot" 2>&1 || true
       rm -rf "$work"
@@ -59,13 +83,34 @@ writeShellApplication {
     timeout --foreground --kill-after=10s 60m tart clone --concurrency 16 \
       ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:eeec54bfe1f076e27786c5d92b89187a05b1d109b5071eb2dcdf02d596e34640 \
       "$vm" > "$log.boot" 2>&1
-    tart set "$vm" --cpu 4 --memory 8192 --random-mac >> "$log.boot" 2>&1
+    read -r ssh_port mac < <(python3 - "$work" <<'PY'
+    import json
+    import secrets
+    import socket
+    import sys
+    mac = "02:" + ":".join(f"{byte:02x}" for byte in secrets.token_bytes(5))
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    with open(f"{sys.argv[1]}/proxy.json", "w") as config:
+        json.dump({"stack": {
+            "dhcpStaticLeases": {"192.168.127.2": mac},
+            "forwards": {f"127.0.0.1:{port}": "192.168.127.2:22"},
+        }}, config)
+    print(port, mac)
+    PY
+    )
+    tart set "$vm" --cpu 4 --memory 8192 --mac "$mac" >> "$log.boot" 2>&1
+    gvproxy -config "$work/proxy.json" -listen-vfkit "unixgram://$work/proxy.sock" >> "$log.boot" 2>&1 &
+    network_pid=$!
     timeout --foreground --kill-after=10s 30m \
+      python3 ${./tart-network.py} "$work" \
       tart run --no-graphics --no-audio --no-clipboard "$vm" >> "$log.boot" 2>&1 &
     vm_pid=$!
 
     ssh_options=(
       -F /dev/null
+      -o "Port=$ssh_port"
       -o "UserKnownHostsFile=$work/known_hosts"
       -o StrictHostKeyChecking=accept-new
       -o PubkeyAuthentication=no
@@ -76,22 +121,21 @@ writeShellApplication {
     )
     guest() {
       timeout --foreground --kill-after=10s "''${ssh_timeout:-25m}" \
-        ssh -n "''${ssh_options[@]}" "admin@$ip" "$@"
+        ssh -n "''${ssh_options[@]}" admin@127.0.0.1 "$@"
     }
     deadline=$((SECONDS + 300))
     while true; do
-      if ! kill -0 "$vm_pid" 2>/dev/null; then
-        echo "macOS VM exited before SSH became ready" >&2
+      if ! kill -0 "$vm_pid" "$network_pid" 2>/dev/null; then
+        echo "macOS VM or gvproxy exited before SSH became ready" >&2
+        tail -n 20 "$log.boot" >&2
         exit 1
       fi
-      if ip=$(tart ip "$vm" 2> "$log") && ssh_timeout=15s guest true > "$log" 2>&1; then
+      if ssh_timeout=15s guest true > "$log" 2>&1; then
         break
       fi
       if (( SECONDS >= deadline )); then
-        echo "Timed out waiting for macOS guest SSH (''${ip:-no IP address})" >&2
+        echo "Timed out waiting for macOS guest SSH (127.0.0.1:$ssh_port via gvproxy)" >&2
         cat "$log" >&2
-        echo "A VPN may be routing the guest subnet through its tunnel. Disconnect it or exclude the guest subnet (usually 192.168.64.0/24), then retry." >&2
-        echo "If vmnet routing is stale, stop idle VZ/Tart VMs and retry." >&2
         exit 1
       fi
       sleep 2
@@ -187,7 +231,7 @@ writeShellApplication {
       scp "''${ssh_options[@]}" \
         ${
           if published then ''"$work/install.sh" "$work/release-tag"'' else ''"$work/teka"''
-        } "$work/test.sh" "$work/builder-tcg.nix" "admin@$ip:/tmp/teka-build-init/"
+        } "$work/test.sh" "$work/builder-tcg.nix" "admin@127.0.0.1:/tmp/teka-build-init/"
       guest "/bin/zsh -l /tmp/teka-build-init/test.sh"
     }
     run_test 2>&1 | sed -u 's/^/[macos26] /; s/] \[/][/g' | tee "$log"
