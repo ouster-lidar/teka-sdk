@@ -12,7 +12,7 @@ mod support;
 use support::{contains, excludes, executable, script, CommandExt, Host};
 
 const PREREQUISITES: &str =
-    "--version\neval --json --expr builtins ? getFlake\nstore ping --json\n";
+    "--version\neval --json --expr builtins ? getFlake\nstore info --json\n";
 
 const NIX: &str = r#"printf '%s\n' "$*" >> "$MOCK_CALLS"
 case "$1" in

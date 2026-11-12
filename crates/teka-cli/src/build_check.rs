@@ -84,7 +84,7 @@ pub fn check_configuration(nix: &Path) -> Result<()> {
 }
 
 pub fn check_store(nix: &Path) -> Result<()> {
-    checked_output(Command::new(nix).args(["store", "ping", "--json"])).context(
+    checked_output(Command::new(nix).args(["store", "info", "--json"])).context(
         "cannot access the Nix store; check your store setting, daemon and user permissions",
     )?;
     Ok(())

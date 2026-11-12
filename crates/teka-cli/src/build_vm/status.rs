@@ -344,7 +344,7 @@ impl Vm {
                     "Guest Nix daemon",
                     checked_output(
                         self.ssh()
-                            .arg("nix --extra-experimental-features nix-command store ping --json")
+                            .arg("nix --extra-experimental-features nix-command store info --json")
                             .stdin(Stdio::null()),
                     ),
                     |_| "available".into(),

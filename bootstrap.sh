@@ -73,7 +73,7 @@ result '✓' "Nix: $version"
 features=$("$nix" eval --json --expr 'builtins ? getFlake') || fail 'Nix config: evaluation failed' 'Enable nix-command and flakes in your Nix configuration and rerun bootstrap'
 [ "$features" = true ] || fail 'Nix config: flakes unavailable' 'Enable nix-command and flakes in your Nix configuration and rerun bootstrap'
 result '✓' 'Nix config: valid (flakes)'
-"$nix" store ping --json >/dev/null || fail 'Nix store: unreachable' 'Check your store setting, daemon and user permissions'
+"$nix" store info --json >/dev/null || fail 'Nix store: unreachable' 'Check your store setting, daemon and user permissions'
 
 result '✓' 'Nix store: reachable'
 runtime_root="${XDG_DATA_HOME:-$HOME/.local/share}/teka"
