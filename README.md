@@ -32,7 +32,7 @@ Browse [all examples](apps/examples/); each app has its own README.
 **If you have a device**, select it and build and deploy your app:
 
 ```sh
-teka device select
+teka box select
 teka app deploy --build
 ```
 

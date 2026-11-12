@@ -71,11 +71,11 @@ Replace `hello-ouster-terminal` with another app id as needed.
 2. From the repository root, select the device and deploy:
 
    ```bash
-   teka device select http://teka-$SN.local/
+   teka box select http://teka-$SN.local/
    teka app deploy --build hello-ouster-terminal
    ```
 
-Selection prompts for the device password and saves it in the OS credential store. Use `teka device select` without arguments to discover and select devices interactively. For automation, supply `--device URL` and set `TEKA_PASSWORD`.
+Selection prompts for the device password and saves it in the OS credential store. Use `teka box select` without arguments to discover and select devices interactively. For automation, supply `--device URL` and set `TEKA_PASSWORD`.
 
 Use the device's actual hostname or IP address.
 `--build` selects its architecture, builds the package, uploads it, and checks startup logs.

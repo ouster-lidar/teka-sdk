@@ -1052,12 +1052,12 @@ fn tpk_stream_rejects_corruption_in_selected_archive_group_before_output() {
 fn cli_rejects_invalid_usage() {
     let d = TempDir::new().unwrap();
     for args in [
-        vec!["device", "select", "http://user:SENSITIVE@box"],
-        vec!["device", "discover"],
-        vec!["device", "connect"],
-        vec!["device", "disconnect"],
-        vec!["device", "list", "--timeout", "1"],
-        vec!["device", "status", "box", "--device", "http://box/"],
+        vec!["box", "select", "http://user:SENSITIVE@box"],
+        vec!["box", "discover"],
+        vec!["box", "connect"],
+        vec!["box", "disconnect"],
+        vec!["box", "list", "--timeout", "1"],
+        vec!["box", "status", "box", "--device", "http://box/"],
         vec!["app", "deploy", "--host", "device.local", "app"],
         vec!["app", "deploy", "-H", "device.local", "app"],
         vec!["system", "status", "--host", "device.local"],
@@ -1102,13 +1102,40 @@ fn deploy_requires_host() {
 }
 
 #[test]
+fn box_keeps_device_as_a_hidden_alias() {
+    let d = TempDir::new().unwrap();
+    let help = cli(d.path())
+        .env("PATH", "")
+        .arg("--help")
+        .output()
+        .unwrap();
+    success(&help);
+    let text = String::from_utf8_lossy(&help.stdout);
+    assert!(text.lines().any(|line| line.starts_with("  box ")));
+    assert!(!text.lines().any(|line| line.starts_with("  device ")));
+
+    let expected = cli(d.path())
+        .args(["box", "list", "--json"])
+        .output()
+        .unwrap();
+    success(&expected);
+    let alias = cli(d.path())
+        .args(["device", "list", "--json"])
+        .output()
+        .unwrap();
+    success(&alias);
+    assert_eq!(alias.stdout, expected.stdout);
+    assert_eq!(alias.stderr, expected.stderr);
+}
+
+#[test]
 fn device_list_retains_connections_without_credentials() {
     let d = TempDir::new().unwrap();
     let list = || {
         cli(d.path())
             .env("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent")
             .env("TEKA_DEVICE", "ignored.local")
-            .args(["device", "list"])
+            .args(["box", "list"])
             .output()
             .unwrap()
     };
@@ -1128,7 +1155,7 @@ fn device_list_retains_connections_without_credentials() {
     for _ in 0..2 {
         success(
             &cli(d.path())
-                .args(["device", "select", &url])
+                .args(["box", "select", &url])
                 .output()
                 .unwrap(),
         );
@@ -1157,7 +1184,7 @@ fn device_select_without_patterns_requires_a_terminal() {
     let d = TempDir::new().unwrap();
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
-        .args(["device", "select"])
+        .args(["box", "select"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -1199,12 +1226,12 @@ fn selected_devices_are_default_deployment_targets() {
         &cli(d.path())
             .env("TEKA_DEVICE", "ignored.local")
             .env("TEKA_PASSWORD", "shared-password")
-            .args(["device", "select", &first, &second, &first])
+            .args(["box", "select", &first, &second, &first])
             .output()
             .unwrap(),
     );
     let out = cli(d.path())
-        .args(["device", "list", "--json"])
+        .args(["box", "list", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1222,7 +1249,7 @@ fn selected_devices_are_default_deployment_targets() {
     let before = fs::read(&config).unwrap();
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "status-password")
-        .args(["device", "status", "--json"])
+        .args(["box", "status", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1256,7 +1283,7 @@ fn empty_environment_password_prompts_without_attempting_login() {
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "")
         .args([
-            "device",
+            "box",
             "select",
             &format!("{url}/one"),
             &format!("{url}/two"),
@@ -1286,7 +1313,7 @@ fn environment_password_failures_do_not_prompt_or_expose_response_bodies() {
         ]);
         let out = cli(d.path())
             .env("TEKA_PASSWORD", "SENSITIVE password")
-            .args(["device", "select", &url])
+            .args(["box", "select", &url])
             .output()
             .unwrap();
         assert_eq!(out.status.code(), Some(1));
@@ -1309,13 +1336,13 @@ fn failed_batch_selection_preserves_previous_targets() {
     fs::write(&config, r#"{"default_device":"http://previous.local/"}"#).unwrap();
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#)]);
     let out = cli(d.path())
-        .args(["device", "select", &url, "http://localhost:1"])
+        .args(["box", "select", &url, "http://localhost:1"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
     server.join().unwrap();
     let out = cli(d.path())
-        .args(["device", "list", "--json"])
+        .args(["box", "list", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1339,7 +1366,7 @@ fn known_device_patterns_work_offline_and_forget_preflights_all_patterns() {
     let contents = r#"{"devices":["http://one.local/","http://two.local/"],"selected_devices":["http://one.local/","http://two.local/"],"metadata":{"http://one.local/":{"pn":"OS1","sn":"ABC123"}}}"#;
     fs::write(&config, contents).unwrap();
     let out = cli(d.path())
-        .args(["device", "list", "abc123", "--json"])
+        .args(["box", "list", "abc123", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1348,7 +1375,7 @@ fn known_device_patterns_work_offline_and_forget_preflights_all_patterns() {
     assert_eq!(devices[0]["url"], "http://one.local/");
     let out = cli(d.path())
         .env("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent")
-        .args(["device", "forget", "abc123", "no-such-device"])
+        .args(["box", "forget", "abc123", "no-such-device"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -1384,7 +1411,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
         .env("TEKA_DEVICE", "invalid?environment")
-        .args(["device", "status", "sn-a", "GTW-ONA", "--json"])
+        .args(["box", "status", "sn-a", "GTW-ONA", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1397,7 +1424,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     assert!(reports.contains_key(&two));
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
-        .args(["device", "status", "gtw-on"])
+        .args(["box", "status", "gtw-on"])
         .output()
         .unwrap();
     success(&out);
@@ -1407,7 +1434,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
     assert_eq!(text.matches("\n\nDevice: ").count(), 1);
     assert_eq!(server.join().unwrap().len(), 4);
     let out = cli(d.path())
-        .args(["device", "status", "sn-a", "missing"])
+        .args(["box", "status", "sn-a", "missing"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -1419,7 +1446,7 @@ fn device_status_matches_multiple_known_devices_and_serial_aliases() {
 fn device_status_json_is_keyed_by_canonical_url() {
     let d = TempDir::new().unwrap();
     let out = cli(d.path())
-        .args(["device", "status", "--json"])
+        .args(["box", "status", "--json"])
         .output()
         .unwrap();
     success(&out);
@@ -1429,8 +1456,8 @@ fn device_status_json_is_keyed_by_canonical_url() {
     );
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#); 3]);
     for args in [
-        vec!["device", "status", "--device", &url, "--json"],
-        vec!["device", "status", &url, "--json"],
+        vec!["box", "status", "--device", &url, "--json"],
+        vec!["box", "status", &url, "--json"],
     ] {
         let out = cli(d.path())
             .env("TEKA_PASSWORD", "unused")
@@ -1448,7 +1475,7 @@ fn device_status_json_is_keyed_by_canonical_url() {
     }
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "unused")
-        .args(["device", "status", &url])
+        .args(["box", "status", &url])
         .output()
         .unwrap();
     success(&out);
@@ -1475,7 +1502,7 @@ fn device_status_logs_out_and_never_sets_up() {
         let out = cli(d.path())
             .env("TEKA_PASSWORD", "status-secret")
             .env("TEKA_DEVICE", &url)
-            .args(["device", "status", "--json"])
+            .args(["box", "status", "--json"])
             .output()
             .unwrap();
         success(&out);
@@ -1977,7 +2004,7 @@ fn plugins_dispatch_with_builtin_precedence() {
     fs::create_dir(&bin).unwrap();
     fs::create_dir(&shadow).unwrap();
     for (parents, name, builtins) in [
-        (&[][..], "foo", &["system", "app", "device", "help"][..]),
+        (&[][..], "foo", &["system", "app", "box", "help"][..]),
         (
             &["app"][..],
             "test",
@@ -2270,7 +2297,7 @@ fn system_status_prints_json_and_update_streams() {
     success(
         &cli(d.path())
             .env("TEKA_DEVICE", "http://127.0.0.1:1")
-            .args(["device", "select", &url])
+            .args(["box", "select", &url])
             .output()
             .unwrap(),
     );

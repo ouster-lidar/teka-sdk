@@ -291,7 +291,7 @@ pub fn run(mut args: DeployOptions) -> Result<()> {
         args.hosts = selected_devices()?;
         if args.hosts.is_empty() {
             return Err(crate::plugins::usage(
-                "need --device, TEKA_DEVICE or teka device select",
+                "need --device, TEKA_DEVICE or teka box select",
             ));
         }
     }

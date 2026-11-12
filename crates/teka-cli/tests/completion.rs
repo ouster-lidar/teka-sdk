@@ -53,7 +53,7 @@ fn composes_plugins_without_changing_dispatch() {
         "tpk",
         "help",
         "completion",
-        "device",
+        "box",
         "not-executable",
     ] {
         plugin(dir.path(), name);
@@ -84,7 +84,7 @@ fn composes_plugins_without_changing_dispatch() {
             "inspect",
             "private-key",
             "certificate",
-            "device",
+            "box",
             "discover",
             "select",
             "forget",

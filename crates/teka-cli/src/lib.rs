@@ -56,6 +56,7 @@ Reload after updating Teka or plugins."#)]
         command: AppCommand,
     },
     /// Discover and select Teka devices
+    #[command(name = "box", alias = "device")]
     Device {
         #[command(subcommand)]
         command: device_commands::DeviceCommand,

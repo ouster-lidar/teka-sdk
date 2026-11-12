@@ -79,7 +79,7 @@ pub fn run(command: DeviceCommand) -> Result<()> {
                     build_check::note(if devices.is_empty() {
                         "Check that your device is on the same network."
                     } else {
-                        "Select: teka device select <PATTERN>"
+                        "Select: teka box select <PATTERN>"
                     });
                 }
             } else {
@@ -398,7 +398,7 @@ fn choose_devices(
 ) -> Result<Vec<String>> {
     require_terminal()?;
     if devices.is_empty() {
-        bail!("no devices available; use teka device list --discover to check the network");
+        bail!("no devices available; use teka box list --discover to check the network");
     }
     let mut urls = devices.keys().cloned().collect();
     if deduplicate {

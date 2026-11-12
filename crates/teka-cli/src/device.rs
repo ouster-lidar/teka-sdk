@@ -31,7 +31,7 @@ impl DeviceClient {
         }
         let (password, _) = credentials(&self.endpoint("")?)?;
         let password = password
-            .context("device requires a session; set TEKA_PASSWORD or run teka device select")?;
+            .context("device requires a session; set TEKA_PASSWORD or run teka box select")?;
         self.authenticate_password(&status, &password)?;
         Ok(Some(password))
     }
@@ -50,7 +50,7 @@ impl DeviceClient {
 pub(crate) fn authentication<T>(result: Result<T>) -> Result<T> {
     result.map_err(|error| {
         if error.is::<teka::client::PasswordRequired>() {
-            error.context("device requires a session; set TEKA_PASSWORD or run teka device select")
+            error.context("device requires a session; set TEKA_PASSWORD or run teka box select")
         } else {
             error
         }
@@ -85,7 +85,7 @@ pub fn credentials(device: &str) -> Result<(Option<String>, &'static str)> {
 }
 
 pub fn required_device(flag: Option<&str>) -> Result<String> {
-    select_device(flag)?.ok_or_else(|| usage("need --device, TEKA_DEVICE or teka device select"))
+    select_device(flag)?.ok_or_else(|| usage("need --device, TEKA_DEVICE or teka box select"))
 }
 
 pub fn parse_device(device: &str) -> Result<String> {
