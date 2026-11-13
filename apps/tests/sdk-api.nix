@@ -21,6 +21,7 @@ assert
   builtins.attrNames sdk.packages.${system} == [
     "default"
     "portable"
+    "publish-cache"
     "teka"
     "teka-runner"
     "teka-src"
