@@ -1,4 +1,4 @@
-//! Browser JPEG capture: zwlr_screencopy wl_shm → nvvidconv/nvjpegenc → WS.
+//! Browser JPEG capture: zwlr_screencopy wl_shm → GStreamer JPEG → WS.
 
 use std::fs::{File, OpenOptions};
 use std::os::fd::AsFd;
@@ -220,36 +220,34 @@ impl EncodePipeline {
             .build()?
             .downcast::<AppSrc>()
             .unwrap();
-        tracing::debug!("gst: creating nvvidconv");
-        let nvvidconv = gstreamer::ElementFactory::make("nvvidconv")
-            .name("screencopy_nvvidconv")
+        let jetson = gstreamer::ElementFactory::find("nvvidconv").is_some()
+            && gstreamer::ElementFactory::find("nvjpegenc").is_some();
+        let converter_name = if jetson { "nvvidconv" } else { "videoconvert" };
+        let encoder_name = if jetson { "nvjpegenc" } else { "jpegenc" };
+        tracing::info!(converter_name, encoder_name, "gst: JPEG encoding backend");
+        let converter = gstreamer::ElementFactory::make(converter_name)
+            .name("screencopy_convert")
             .build()
-            .context("nvvidconv missing (Jetson L4T GStreamer plugins required)")?;
+            .context("JPEG color converter missing")?;
         tracing::debug!("gst: creating jpeg encoder");
-        let encoder = gstreamer::ElementFactory::make("nvjpegenc")
+        let encoder = gstreamer::ElementFactory::make(encoder_name)
             .name("screencopy_jpegenc")
             .build()
-            .or_else(|_| {
-                tracing::warn!("nvjpegenc missing; falling back to jpegenc");
-                gstreamer::ElementFactory::make("jpegenc")
-                    .name("screencopy_jpegenc")
-                    .build()
-            })
-            .context("nvjpegenc/jpegenc missing")?;
+            .context("JPEG encoder missing")?;
         tracing::debug!("gst: creating capsfilter/appsink");
-        let nv12 = gstreamer::ElementFactory::make("capsfilter")
-            .name("screencopy_nv12")
+        let raw_caps = gstreamer::ElementFactory::make("capsfilter")
+            .name("screencopy_raw")
             .build()?;
         let appsink = gstreamer::ElementFactory::make("appsink")
             .name("screencopy_sink")
             .build()?
             .downcast::<AppSink>()
             .unwrap();
-        nv12.set_property(
+        raw_caps.set_property(
             "caps",
             Caps::builder("video/x-raw")
-                .features(["memory:NVMM"])
-                .field("format", "NV12")
+                .features(jetson.then_some("memory:NVMM"))
+                .field("format", if jetson { "NV12" } else { "I420" })
                 // Full-range BT.601 (JFIF); limited range shows black as 16 in browsers.
                 .field("colorimetry", "1:4:0:0")
                 .build(),
@@ -258,20 +256,20 @@ impl EncodePipeline {
 
         let even_w = width - (width % 2);
         let even_h = height - (height % 2);
-        if width != even_w {
-            set_element_prop_if_exists(&nvvidconv, "right", 1u32);
+        if jetson && width != even_w {
+            set_element_prop_if_exists(&converter, "right", 1u32);
         }
-        if height != even_h {
-            set_element_prop_if_exists(&nvvidconv, "bottom", 1u32);
+        if jetson && height != even_h {
+            set_element_prop_if_exists(&converter, "bottom", 1u32);
         }
 
         set_element_prop_if_exists(&encoder, "quality", 80i32);
-        if nvvidconv.find_property("compute-hw").is_some() {
+        if jetson && converter.find_property("compute-hw").is_some() {
             // GPU conversion intermittently produces green JPEG frames on Orin.
-            nvvidconv.set_property_from_str("compute-hw", "VIC");
+            converter.set_property_from_str("compute-hw", "VIC");
         }
 
-        tracing::debug!("gst: appsrc/appsink caps (system memory BGRx → NVMM JPEG)");
+        tracing::debug!("gst: appsrc/appsink caps (system memory → JPEG)");
         appsrc.set_property("format", gstreamer::Format::Time);
         appsrc.set_property("is-live", true);
         appsrc.set_property("do-timestamp", true);
@@ -295,15 +293,15 @@ impl EncodePipeline {
         tracing::debug!("gst: adding and linking encode elements");
         pipeline.add_many([
             appsrc.upcast_ref(),
-            &nvvidconv,
-            &nv12,
+            &converter,
+            &raw_caps,
             &encoder,
             appsink.upcast_ref(),
         ])?;
         gstreamer::Element::link_many([
             appsrc.upcast_ref(),
-            &nvvidconv,
-            &nv12,
+            &converter,
+            &raw_caps,
             &encoder,
             appsink.upcast_ref(),
         ])?;
@@ -869,7 +867,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                 Ok(w) => {
                     wl = Some(w);
                     if !logged_ready {
-                        tracing::info!("screencopy using zwlr_screencopy wl_shm + nvjpegenc");
+                        tracing::info!("screencopy using zwlr_screencopy wl_shm + JPEG");
                         logged_ready = true;
                     }
                 }
@@ -900,9 +898,7 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
                             tracing::warn!(?e, "screencopy pipeline play failed");
                             last_err_log = Instant::now();
                         }
-                        display.set_error(Some(format!(
-                            "JPEG pipeline failed (need host L4T GStreamer plugins): {e}"
-                        )));
+                        display.set_error(Some(format!("JPEG pipeline failed: {e}")));
                         retry_after = Instant::now() + Duration::from_secs(5);
                         continue;
                     }
@@ -978,6 +974,21 @@ fn run_capture_loop(display: DisplayState) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn screencopy_encodes_a_jpeg_frame() {
+        gstreamer::init().unwrap();
+        let display = DisplayState::new(false, true);
+        let mut frames = display.inner.frame_tx.subscribe();
+        let pipeline = EncodePipeline::new(&display, 16, 16, 10, DrmFourcc::Xrgb8888).unwrap();
+        pipeline.set_playing().unwrap();
+        pipeline.push_sysmem(vec![0; 16 * 16 * 4]).unwrap();
+        let frame = tokio::time::timeout(Duration::from_secs(5), frames.recv()).await;
+        pipeline.set_null();
+        let frame = frame.unwrap().unwrap();
+        assert!(frame.starts_with(&[0xff, 0xd8]));
+        assert!(frame.ends_with(&[0xff, 0xd9]));
+    }
 
     #[test]
     fn shm_frames_are_owned_snapshots_read_from_offset_zero() {

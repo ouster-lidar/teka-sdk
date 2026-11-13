@@ -53,7 +53,7 @@
       # DDI GStreamer. nvvidconv/nvjpegenc are L4T; NVIDIA userspace comes from
       # X-Teka-PortableGPU (not BindReadOnlyPaths of host /usr).
       gstPluginSystemPath = lib.concatStringsSep ":" [
-        "${pkgs.gst_all_1.gstreamer}/lib/gstreamer-1.0"
+        "${lib.getLib pkgs.gst_all_1.gstreamer}/lib/gstreamer-1.0"
         "${pkgs.gst_all_1.gst-plugins-base}/lib/gstreamer-1.0"
         "${pkgs.gst_all_1.gst-plugins-good}/lib/gstreamer-1.0"
         "${pkgs.gst_all_1.gst-plugins-bad}/lib/gstreamer-1.0"
@@ -69,6 +69,7 @@
           buildInputs = with pkgs; [
             gst_all_1.gstreamer
             gst_all_1.gst-plugins-base
+            gst_all_1.gst-plugins-good
             glib
             wayland
           ];

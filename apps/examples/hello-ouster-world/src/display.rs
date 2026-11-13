@@ -1,4 +1,4 @@
-//! Display stream: nvjpegenc JPEG → WS, HDMI toggle, remote input.
+//! Display stream: JPEG → WS, HDMI toggle, remote input.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
