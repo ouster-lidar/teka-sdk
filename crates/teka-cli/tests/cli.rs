@@ -2169,11 +2169,21 @@ fn deploy_collects_failures_after_other_hosts_finish() {
     assert_eq!(out.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains(&format!("{good_url}/: deploy succeeded")),
+        stderr.contains(&format!(
+            "{}: deploy succeeded",
+            good_url.trim_start_matches("http://")
+        )),
         "{stderr}"
     );
     assert!(
-        stderr.contains(&format!("{bad_url}/: device HTTP 500")),
+        stderr.contains(&format!(
+            "{}: device HTTP 500",
+            bad_url.trim_start_matches("http://")
+        )),
+        "{stderr}"
+    );
+    assert!(
+        !stderr.contains(&good_url) && !stderr.contains(&bad_url),
         "{stderr}"
     );
     assert_eq!(good_server.join().unwrap().len(), 4);

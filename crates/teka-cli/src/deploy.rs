@@ -1,6 +1,7 @@
 use crate::{
     build::{self, BuildSource},
     device::DeviceClient,
+    device_commands::device_label,
     target::BoxOptions,
 };
 use anyhow::{bail, ensure, Context, Result};
@@ -108,7 +109,7 @@ fn prepare_targets(hosts: &[String]) -> Result<Vec<DeployTarget>> {
                 .with_context(|| format!("read architecture from {host}"))?
         );
         targets.push(DeployTarget {
-            host: host.clone(),
+            host: device_label(host)?,
             target,
             client,
         });

@@ -398,7 +398,7 @@ fn require_terminal() -> Result<()> {
     Ok(())
 }
 
-fn device_label(device: &str) -> Result<String> {
+pub(crate) fn device_label(device: &str) -> Result<String> {
     let url = reqwest::Url::parse(device)?;
     let hostname = short_hostname(&url)?;
     Ok(match url.port() {
