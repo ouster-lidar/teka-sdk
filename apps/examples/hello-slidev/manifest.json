@@ -29,7 +29,7 @@
     "health_path": "/api/v1/guest-access"
   },
   "auth": {
-    "scheme": "ojs-proxy-identity",
+    "scheme": "teka-proxy-identity",
     "version": "0.1.0"
   }
 }

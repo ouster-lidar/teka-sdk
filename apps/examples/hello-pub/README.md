@@ -19,7 +19,7 @@ Companion consumer: [hello-sub](https://github.com/ouster-lidar/teka-sdk/blob/ma
 | `MC_RUNTIME_URL` | From host / `http://localhost` |
 | `APP_ID` | `hello-pub` |
 
-Startup: `declare_app_runtime!("hello-pub")`, activate/bind loopback, serve `/api/v1/…`, `sd_notify(READY=1)`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/state`, `card_stream_path: /api/v1/cards/stream`. Auth: `ojs-proxy-identity` / `0.1.0`.
+Startup: `declare_app_runtime!("hello-pub")`, activate/bind loopback, serve `/api/v1/…`, `sd_notify(READY=1)`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/state`, `card_stream_path: /api/v1/cards/stream`. Auth: `teka-proxy-identity` / `0.1.0`.
 
 ## Event schema
 

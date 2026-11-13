@@ -45,7 +45,7 @@
     }
   ],
   "auth": {
-    "scheme": "ojs-proxy-identity",
+    "scheme": "teka-proxy-identity",
     "version": "0.1.0"
   },
   "ports": [

@@ -38,7 +38,7 @@ URL normalization (Apply and env/file load), per URL:
 
 Operators change the list at runtime via `POST /api/v1/peer-config` (UI). Added URLs start new sessions; removed URLs are aborted; unchanged URLs keep running. An empty list disconnects everything. Persisted to `{StateDirectory}/peer-config.json` as `publisher_urls`.
 
-Startup: `declare_app_runtime!("hello-sub")`, activate/bind, serve `/api/v1/…`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/status`, `card_stream_path: /api/v1/cards/stream`. Auth: `ojs-proxy-identity` / `0.1.0`.
+Startup: `declare_app_runtime!("hello-sub")`, activate/bind, serve `/api/v1/…`. Manifest `backend.mode: proxy`, `runtime_listen: true`, `health_path: /api/v1/status`, `card_stream_path: /api/v1/cards/stream`. Auth: `teka-proxy-identity` / `0.1.0`.
 
 ## Local feed
 
