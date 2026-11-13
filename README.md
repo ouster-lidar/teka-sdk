@@ -7,7 +7,9 @@ Develop apps with the Rust SDK and `teka` CLI, start from an example without clo
 - **Recommended demo:** [`hello-ouster-world`](apps/examples/hello-ouster-world/README.md) opens OSF files or a live sensor with the Ouster SDK, and supports browser display and recording.
 - [`hello-world`](apps/examples/hello-world/README.md) is a minimal oneshot smoke test.
 - [`hello-webui`](apps/examples/hello-webui/README.md) is a static web UI with no backend.
+- [`hello-gpio`](apps/examples/hello-gpio/README.md) toggles GPIO lines at 1 Hz from Python or C++.
 
+`teka app init --example NAME` starts from `hello-world`, `hello-webui`, or `hello-ouster-world`.
 Browse [all examples](apps/examples/); each app has its own README.
 
 ## Quick start
@@ -23,7 +25,7 @@ Browse [all examples](apps/examples/); each app has its own README.
 
    ```sh
    teka app list --examples
-   teka app init --example hello-webui my-first-app
+   teka app init --example hello-world my-first-app
    cd my-first-app
    ```
 
@@ -54,6 +56,10 @@ See the [installation guide](crates/teka-cli/README.md#install) for other instal
 
 | Guide                                        | Contents                                         |
 | -------------------------------------------- | ------------------------------------------------ |
+| [Getting Started](docs/01_getting-started/01_zed-box-with-tekaos.md) | Set up a ZED Box with TekaOS and deploy your first app |
+| [Teka Apps](docs/02_teka-apps/00_README.md)  | Start your own app, templates, and packaging     |
+| [TekaOS](docs/03_tekaos/00_README.md)        | CLI, system apps, updates, and release notes     |
+| [Edge compute & accessories](docs/04_edge_compute_&_accessories/00_README.md) | ZED Box ports, GPIOs, reset, and troubleshooting |
 | [Developer Guide](docs/developer-guide.md)   | Build, deploy, and auth workflows                |
 | [Linux host setup](docs/linux.md)            | Packages and Nix                                 |
 | [WSL 2 host setup](docs/wsl2.md)             | Windows development host, networking             |
