@@ -1,13 +1,13 @@
 # Secondary nixpkgs eval for firefox-bin (unfree + optional cross). Shared by
 # hello-firefox and hello-firefox-kiosk. Uses the same PipeWire cross overlay as
-# the shared cross overlay (see nix/apps/overlays/pipewire-cross-no-modemmanager-overlay.nix).
+# the shared cross overlay (see nix/apps/overlays/cross.nix).
 {
   lib,
   stdenv,
   path,
 }:
 let
-  pipewireCrossNoModemmanagerOverlay = import ../overlays/pipewire-cross-no-modemmanager-overlay.nix;
+  crossOverlay = import ../overlays/cross.nix;
 
   mozillaBinUnfreePredicate =
     pkg:
@@ -27,7 +27,7 @@ let
       crossSystem = {
         system = stdenv.hostPlatform.system;
       };
-      overlays = [ pipewireCrossNoModemmanagerOverlay ];
+      overlays = [ crossOverlay ];
     }
   );
 in
