@@ -26,7 +26,7 @@ let
   inherit (version) appArtifactRawName imageVersion buildId;
   appNames = lib.attrNames apps;
   waylandOverlay = import ./overlays/wayland-compositors-overlay.nix;
-  crossOverlay = import ./overlays/cross.nix { inherit nixpkgs; };
+  crossOverlay = import ./overlays/cross.nix;
 
   packageFor =
     id: buildSystem: targetSystem:

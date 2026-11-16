@@ -1,4 +1,3 @@
-{ nixpkgs }:
 final: prev:
 (import ./pipewire-cross-no-modemmanager-overlay.nix) final prev
 // {
@@ -25,17 +24,4 @@ final: prev:
       prev.openblas.override { dynamicArch = false; }
     else
       prev.openblas;
-  # FIXME: Remove when the pin includes https://github.com/NixOS/nixpkgs/pull/577654.
-  # Legacy GCC 16 omits the existing libgomp UID buffer fix and fails with -Werror=format-truncation.
-  gfortran =
-    if prev.stdenv.hostPlatform.system != prev.stdenv.buildPlatform.system then
-      prev.wrapCC (
-        prev.gfortran.cc.overrideAttrs (old: {
-          patches = old.patches ++ [
-            (nixpkgs + "/pkgs/development/compilers/gcc/ng/16/libgomp/uid-buffer-size.patch")
-          ];
-        })
-      )
-    else
-      prev.gfortran;
 }
