@@ -3,7 +3,6 @@
   craneLib,
   version,
   advisoryDb ? null,
-  ousterSdkSrc ? null,
   tekaSrc ? null,
 }:
 let
@@ -17,13 +16,7 @@ let
 
   hostGpuChecks = pkgs.callPackage ./wayland/host-gpu-checks.nix { };
 
-  ousterSdk =
-    if ousterSdkSrc != null then
-      pkgs.callPackage ./ouster/ouster-sdk.nix {
-        src = ousterSdkSrc;
-      }
-    else
-      null;
+  ousterSdk = pkgs.python3Packages.ouster-sdk;
 
   etcHostsStub = writeText "teka-portable-etc-hosts" "127.0.0.1 localhost\n::1 localhost\n";
 

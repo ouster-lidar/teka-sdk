@@ -21,7 +21,7 @@
       libdecor,
       wtype,
       dejavu_fonts,
-      python312Packages,
+      python3Packages,
       replaceVarsWith,
       runtimeShell,
     }:
@@ -33,7 +33,7 @@
 
       ouster-sdk = ps.ousterSdk;
 
-      pythonEnv = python312Packages.python.withPackages (_: [
+      pythonEnv = python3Packages.python.withPackages (_: [
         ouster-sdk
       ]);
 

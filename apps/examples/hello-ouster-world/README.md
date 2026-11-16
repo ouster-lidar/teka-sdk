@@ -56,7 +56,7 @@ The display fits its width and height to the available viewport while preserving
 
 Hover over the browser display to take control. Press **?** (**Shift+/**) to open the browser help dialog. Its smaller, grouped key list follows the loaded source: replay and advanced controls appear for recordings, sensor keys match the loaded sensor count, and object/zone controls require matching data. Exit, device screenshot, and disabled map/accumulation commands are blocked by the remote input bridge and omitted from browser help. A local USB keyboard still uses the SDK's original help and controls.
 
-The bindings below come from the pinned Ouster SDK 1.0.1 [viewer](https://github.com/ouster-lidar/ouster-sdk/blob/46b7bceee7995914e2f3f3facf4d78418335b2d7/python/src/ouster/sdk/viz/core.py) and [camera controls](https://github.com/ouster-lidar/ouster-sdk/blob/46b7bceee7995914e2f3f3facf4d78418335b2d7/ouster_viz/src/point_viz.cpp). Letters are unshifted unless stated; Shift reverses cycles where listed.
+The bindings below come from the Ouster SDK [viewer](https://github.com/ouster-lidar/ouster-sdk/blob/46b7bceee7995914e2f3f3facf4d78418335b2d7/python/src/ouster/sdk/viz/core.py) and [camera controls](https://github.com/ouster-lidar/ouster-sdk/blob/46b7bceee7995914e2f3f3facf4d78418335b2d7/ouster_viz/src/point_viz.cpp). Letters are unshifted unless stated; Shift reverses cycles where listed.
 
 | Keys | Action |
 | --- | --- |
@@ -142,4 +142,4 @@ flowchart LR
     VIZ -->|optional recording| REC[/srv/recordings]
 ```
 
-The app builds against the public Ouster SDK supplied by the pinned Teka SDK. It uses SDK `open_source` directly for sensor and OSF input.
+The app uses SDK `open_source` directly for sensor and OSF input.

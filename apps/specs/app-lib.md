@@ -28,7 +28,7 @@ teka-sdk.lib.mkAppOutputs {
 }
 ```
 
-`apps` contains app definitions with an `image` function. `self` provides version metadata. Optional `systems`, `version`, `overlays`, `ousterSdkSrc`, and `tekaSrc` configure actual build inputs. `advisoryDb` enables Cargo audit checks; omitting it disables them.
+`apps` contains app definitions with an `image` function. `self` provides version metadata. Optional `systems`, `version`, `overlays`, and `tekaSrc` configure actual build inputs. `advisoryDb` enables Cargo audit checks; omitting it disables them.
 
 `systems` defaults to `x86_64-linux` and `aarch64-linux`; only those Linux systems are supported. `mkAppOutputs` exports artifacts under `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>` and checks under `checks.<LinuxBuildSystem>`. App artifacts stay in this registry; root `packages` remains dedicated to SDK and CLI outputs.
 

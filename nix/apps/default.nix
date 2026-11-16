@@ -1,7 +1,6 @@
 {
   nixpkgs,
   crane,
-  ouster-sdk,
   tekaFor,
 }:
 
@@ -17,7 +16,6 @@
     inherit (nixpkgs) lib;
   },
   advisoryDb ? null,
-  ousterSdkSrc ? ouster-sdk,
   tekaSrc ? null,
   overlays ? [ ],
   simpleCrossApps ? [ ],
@@ -37,10 +35,9 @@ let
       pkgs = import nixpkgs (
         {
           config.allowUnfree = true;
-          overlays =
-            overlays
-            ++ [ waylandOverlay ]
-            ++ lib.optional (isCross && !(lib.elem id simpleCrossApps)) crossOverlay;
+          overlays = overlays
+          ++ [ waylandOverlay ]
+          ++ lib.optional (isCross && !(lib.elem id simpleCrossApps)) crossOverlay;
         }
         // (
           if isCross then
@@ -56,7 +53,6 @@ let
         inherit
           version
           advisoryDb
-          ousterSdkSrc
           tekaSrc
           ;
         craneLib = crane.mkLib pkgs;

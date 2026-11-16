@@ -11,11 +11,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    ouster-sdk = {
-      url = "github:ouster-lidar/ouster-sdk/v1.0.1";
-      flake = false;
-    };
-
     rustsecAdvisoryDb = {
       url = "github:RustSec/advisory-db";
       flake = false;
@@ -28,7 +23,6 @@
       nixpkgs,
       crane,
       jetpack,
-      ouster-sdk,
       rustsecAdvisoryDb,
     }:
     let
@@ -69,11 +63,7 @@
           coreVersionValidate = ./nix/apps/core-version-validate.nix;
         };
         mkAppOutputs = import ./nix/apps {
-          inherit
-            nixpkgs
-            crane
-            ouster-sdk
-            ;
+          inherit nixpkgs crane;
           tekaFor = system: self.packages.${system}.teka;
         };
       };

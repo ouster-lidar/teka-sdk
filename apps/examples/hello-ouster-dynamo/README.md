@@ -44,7 +44,7 @@ Selection is persisted in `/var/lib/hello-ouster-dynamo/source-config.json` and 
 
 ## Ouster SDK
 
-Uses the pinned Teka SDK’s `ps.ousterSdk` for Python 3.12 and SimpleViz.
+Uses `ps.ousterSdk` to view and interact with LiDAR point clouds and objects using SimpleViz.
 
 Runtime: `GLFW_PLATFORM=wayland`, Sway built without Xwayland. SimpleViz is a native Wayland GLFW client.
 
