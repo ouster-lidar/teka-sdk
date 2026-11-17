@@ -1,6 +1,6 @@
 # Developer Guide
 
-Build the examples in `apps/` from the repository root and deploy them to a Teka device.
+Build the examples in `apps/` from the repository root and deploy them to a Teka box.
 
 ## Workflows
 
@@ -8,10 +8,9 @@ Build the examples in `apps/` from the repository root and deploy them to a Teka
 flowchart TD
     subgraph setup [1. One-time install]
         A[Linux or Apple Silicon macOS host]
-        B[Clone repository]
-        C[Run ./bootstrap.sh]
+        B[Install teka]
         K[teka build check]
-        A --> B --> C --> K
+        A --> B --> K
     end
 
     subgraph manual [2. Manual build + web UI install]
@@ -24,7 +23,7 @@ flowchart TD
 
     subgraph auto [3. teka app deploy auto flow]
         H[Confirm Teka web UI loads]
-        I[teka app deploy --build --box http://device.local/ hello-ouster-terminal]
+        I[teka app deploy --build --box http://box.local/ hello-ouster-terminal]
         J[Open app and verify]
         H --> I --> J
     end
@@ -38,15 +37,14 @@ The first workflow is required once. Choose either manual web UI installation or
 ## Workflow 1: One-time install
 
 1. Use a Linux x86_64/AArch64 or Apple Silicon macOS host. On Windows, complete the [WSL 2 setup](wsl2.md) first.
-2. Clone this repository. See [Linux host setup](linux.md) for distribution packages.
-3. Run `./bootstrap.sh` from the repository root. See the [CLI installation guide](../crates/teka-cli/README.md#install) for alternatives and macOS builder setup.
-4. Run commands from the repository root, which contains `flake.nix`:
+2. Install the latest teka release. See [Linux host setup](linux.md) for distribution packages.
 
    ```bash
-   cd teka-sdk
+   curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | sh
    ```
 
-5. List available app ids:
+   The installer sets up the CLI and Nix if needed. On Arm Linux, the installer isn't available. From a checkout of this repository, run `./bootstrap.sh` instead. See the [CLI installation guide](../crates/teka-cli/README.md#install) for other options.
+3. The build and deploy workflows below run from a checkout of this repository, in the folder that contains `flake.nix`. List available app ids:
 
    ```bash
    teka app list
@@ -67,30 +65,30 @@ Replace `hello-ouster-terminal` with another app id as needed.
 
 ## Workflow 3: `teka app deploy` auto flow
 
-1. Open the Teka device web interface in a browser and confirm it loads.
-2. From the repository root, select the device and deploy:
+1. Open the Teka box web interface in a browser and confirm it loads.
+2. From the repository root, select the box and deploy:
 
    ```bash
    teka box select http://teka-$SN.local/
    teka app deploy --build hello-ouster-terminal
    ```
 
-Selection prompts for the device password and saves it in the OS credential store. Use `teka box select` without arguments to discover and select devices interactively. For automation, supply `--box URL` and set `TEKA_PASSWORD`.
+Selection prompts for the box password and saves it in the OS credential store. Use `teka box select` without arguments to discover and select boxes interactively. For automation, supply `--box URL` and set `TEKA_PASSWORD`.
 
-Use the device's actual hostname or IP address.
+Use the box's actual hostname or IP address.
 `--build` selects its architecture, builds the package, uploads it, and checks startup logs.
-You can set `TEKA_BOX` instead of passing `--box`, or repeat `--box` to deploy to several devices.
+You can set `TEKA_BOX` instead of passing `--box`, or repeat `--box` to deploy to several boxes.
 
 ## Create a standalone app
 
-List examples, then initialize a project from one:
+List the starter examples (hello-world, hello-webui, and hello-ouster-world), then initialize a project from one:
 
 ```sh
 teka app list --examples
 teka app init --example hello-world my-app
 cd my-app
 teka app build
-teka app deploy --build --box http://device.local/
+teka app deploy --build --box http://box.local/
 ```
 
 Initialization pins the SDK revision and stages the generated files in Git without committing them.
@@ -101,7 +99,7 @@ App names can be omitted when the project contains exactly one app.
 
 After deploy:
 
-- Open the device app UI or manager for the installed app.
+- Open the box app UI or manager for the installed app.
 - Read app-specific behavior and checks in the README in that app's directory under `apps/examples/`.
 - Rerun the same `teka app deploy` command from the repository root to rebuild and replace an existing install.
 
@@ -109,5 +107,5 @@ After deploy:
 
 | Symptom                                    | See                |
 | ------------------------------------------ | ------------------ |
-| Device unreachable or WSL networking issue | [wsl2.md](wsl2.md) |
+| Box unreachable or WSL networking issue | [wsl2.md](wsl2.md) |
 | Flakes disabled, cache misses              | [nix.md](nix.md)   |

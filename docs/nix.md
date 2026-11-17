@@ -4,11 +4,17 @@ This repository uses Nix as the **build system** for app images and assumes a mu
 
 ## Install
 
-From a source checkout, run `./bootstrap.sh` at the repository root.
-It installs Nix interactively if needed, checks its configuration and store, builds the portable CLI, and runs `teka build init` to install it.
-For other installation methods, see the [CLI installation guide](../crates/teka-cli/README.md#install).
+Install the latest teka release:
 
-Existing Nix installations need `nix-command` and `flakes` enabled before bootstrap can build the CLI.
+```sh
+curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | sh
+```
+
+The installer sets up the CLI and Nix if needed. It runs `teka build init`. On Arm Linux, the installer isn't available. From a checkout of this repository, run `./bootstrap.sh` instead.
+
+See the [CLI installation guide](../crates/teka-cli/README.md#install) for other options.
+
+Existing Nix installations need `nix-command` and `flakes` enabled before teka can build.
 For declaratively managed installations, enable them through your system's Nix options.
 
 ## Verify
@@ -45,7 +51,7 @@ Workspace package definitions live under `nix/packages/`, reusable app builders 
 
 App artifacts live at `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>`. Root `packages` contains SDK and CLI outputs; app builds use the registry directly. Run the following commands from the repository root.
 
-**Cross-build** (x86_64-linux host → aarch64-linux device):
+**Cross-build** (x86_64-linux host → aarch64-linux box):
 
 ```bash
 teka app build --arch aarch64 hello-world

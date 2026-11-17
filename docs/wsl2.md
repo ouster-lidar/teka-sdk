@@ -1,6 +1,6 @@
 # WSL 2 Host Setup
 
-WSL 2 can provide an **x86_64-linux** development host on Windows. Complete this guide first, then follow [Linux host setup](linux.md) for packages and Nix. Clone and build steps are in the [Developer Guide](developer-guide.md).
+WSL 2 can provide an **x86_64-linux** development host on Windows. Complete this guide first, then follow [Linux host setup](linux.md) for packages and teka. Build and deploy steps are in the [Developer Guide](developer-guide.md).
 
 ## Tested configuration
 
@@ -13,7 +13,7 @@ WSL 2 can provide an **x86_64-linux** development host on Windows. Complete this
 
 ### Network config
 
-To use hostnames ending in `.local`, set the Windows network connection to **Private** so Windows queries and listens for mDNS from local devices.
+To use hostnames ending in `.local`, set the Windows network connection to **Private** so Windows queries and listens for mDNS from local boxes.
 
 ### Install WSL
 
@@ -40,10 +40,10 @@ wsl --shutdown
 
 ## Next steps
 
-Follow [linux.md](linux.md) for packages and Nix, then the [Developer Guide](developer-guide.md) to clone, build, and deploy.
+Follow [linux.md](linux.md) for packages and teka, then the [Developer Guide](developer-guide.md) to build and deploy.
 
 ## Additional notes
 
-Clone and build inside the WSL filesystem (for example `~/src/...`), not under `/mnt/c/`, for reasonable I/O and Unix permissions.
+If you work from a checkout, keep it inside the WSL filesystem (for example `~/src`), not under `/mnt/c/`, for reasonable I/O and Unix permissions.
 
 When deploying, pass an explicit routable `--box` URL to `teka app deploy`.

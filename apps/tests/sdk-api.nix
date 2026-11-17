@@ -20,6 +20,7 @@ assert
 assert
   builtins.attrNames sdk.packages.${system} == [
     "default"
+    "fern"
     "portable"
     "publish-cache"
     "teka"

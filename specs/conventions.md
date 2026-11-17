@@ -11,9 +11,10 @@
 
 - Do not maintain file indexes when the directory structure is sufficient for discovery.
 - Do not hard-wrap prose. Let the viewer soft-wrap.
-- Keep each prose sentence on one line. Less diff churn.
-- Prefer bulleted lists over standalone sentences for related points.
-- Apply sentence-per-line rules to prose, not tables or code.
+- Public pages follow [public-docs.md](public-docs.md).
+- For specs and `AGENTS.md`, keep each prose sentence on one line. Less diff churn.
+- For specs and `AGENTS.md`, prefer bulleted lists over standalone sentences for related points.
+- Apply sentence-per-line rules to prose in specs and `AGENTS.md`, not to tables or code, and not to public pages.
 - Keep headings, lists, tables, code fences, and shell blocks structurally formatted.
 
 ## Ordering
