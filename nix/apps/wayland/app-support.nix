@@ -149,6 +149,8 @@ let
       extraUnit ? "",
       extraService ? "",
       user ? "root",
+      # User=root plus DynamicUser=yes reuses the static root account. Omit User=.
+      dynamicUser ? false,
     }:
     writeText "${name}.service" ''
       [Unit]
@@ -161,7 +163,7 @@ let
 
       [Service]
       Type=${serviceType}
-      User=${user}
+      ${if dynamicUser then "DynamicUser=yes" else "User=${user}"}
       ${jp.serviceFragment}
       ExecStart=${execStart}
       SyslogIdentifier=${name}

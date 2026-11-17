@@ -184,7 +184,6 @@
       ddiRootBashrc = replaceVars ./config/root-bashrc.sh.in {
         inherit ddiBinPathExport;
       };
-      ddiJsBashrc = writeText "${name}-js-bashrc" ddiBinPathExport;
 
       innerRun = replaceVars ./run-wayland.sh.in {
         bash = "${bash}";
@@ -236,10 +235,6 @@
             path = "root/.bashrc";
             source = ddiRootBashrc;
           }
-          {
-            path = "home/js/.bashrc";
-            source = ddiJsBashrc;
-          }
         ];
       unit = ps.mkGpuWaylandUnit {
         inherit name jp;
@@ -249,13 +244,14 @@
         runtimeDirectory = name;
         useTty = true;
         bindHostEtc = true;
-        user = "js";
+        dynamicUser = true;
         extraUnit = ''
           After=mission-control.service
           Wants=mission-control.service
         '';
         extraService = ''
-          SupplementaryGroups=tty seat
+          # Root bypasses device node checks. The dynamic user needs the groups.
+          SupplementaryGroups=tty seat video render
           TimeoutStartSec=90
           RuntimeDirectoryMode=0700
         '';
