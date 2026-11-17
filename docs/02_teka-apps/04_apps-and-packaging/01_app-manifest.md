@@ -4,7 +4,7 @@ The manifest puts your app in the TekaOS web interface. It adds a sidebar entry,
 
 ## Add a manifest
 
-Put it in your image at `usr/lib/teka/mission-control/manifest.json`. Static web files go in `usr/lib/teka/mission-control/web/`.
+Add a `manifest.json` file to your app folder, and pass it to the build as `appManifest` in `default.nix`. Put static web files in a `web/` folder, and list each one in `webFiles`.
 
 ```json
 {
