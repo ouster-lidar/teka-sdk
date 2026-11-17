@@ -10,7 +10,7 @@ Time Sync makes your box the clock for your Ouster sensors, so every sensor agre
 
 The status table shows your box as the leader and each sensor as a follower, with how far off its clock is.
 
-> [!note]
+> **Note:**
 > Turn on PTP on each sensor too.
 
 ## Settings

@@ -22,7 +22,7 @@ Connect the supplied power supply to the power input. The ZED Box turns on by it
 
 ![01. Power on the ZED Box](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/power-on.png)
 
-> [!note]
+> **Note:**
 > You don't need a display, keyboard, or mouse.
 
 ## 02. Connect to your network
@@ -42,7 +42,7 @@ On a network, TekaOS gets its IP address over DHCP, so there's nothing to config
 
 ![03. Optional Connect your Ouster lidar](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/connect-lidar-zed-box.png)
 
-> [!note]
+> **Note:**
 > Your lidar needs power. Use a PoE switch, or power the sensor through the interface box that came with it.
 
 ## 04. [Optional] Connect a display
@@ -69,7 +69,7 @@ http://teka-<serial>.local
 
 (For example, if your serial number is GTW-ONX2-X11XXXXX you would type http://teka-gtw-onx2-x11xxxxx.local. Capital letters work too.)
 
-> [!note]
+> **Note:**
 > Page doesn't load? First check your ethernet connectors are pushed in until they click. If that doesn’t work, then try waiting 2 minutes and trying again. If it still doesn’t load, look up the box's IP address in your router's list of connected devices and go to `http://<ip-address>` instead. On Linux, install libnss-mdns so your computer can find .local names.
 
 ## 06. Configure your hostname and password
@@ -106,7 +106,7 @@ If you connected a lidar in step 03, open Sensors in the sidebar. Your lidar’s
 
 ![07. Discover your sensors](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/sensor-discovery.png)
 
-> [!note]
+> **Note:**
 > Don't see your lidar listed in Sensor Discovery? Make sure your sensor is powered on, give it a minute to boot up, and then refresh the Sensors page. Check that the lidar’s Ethernet link light is on, and that it's on the same network as the ZED Box (the same switch, or the ZED Box 2's second port). TekaOS finds sensors by their .local names, which don't pass through routers or between VLANs. To check the sensor itself, open `http://os-<sensor-serial>.local` in your browser.
 
 ## 08. Visualize your sensors
@@ -122,10 +122,10 @@ The hello-ouster-world app shows live point clouds from your lidar in your brows
 
 The point cloud appears in a few seconds. If you connected a display in step 04, it shows there too. To save the data, turn on Record before you click Apply.
 
-> [!tip]
+> **Tip:**
 > Hover over the 3D viewer, then drag with your mouse to rotate it and scroll to zoom. Click ? in the viewer to see the keyboard shortcuts.
 
-> [!note]
+> **Note:**
 > Don't see hello-ouster-world under Installed apps? Set up your computer as a development host first. See [Deploy your first App](03_deploy-your-first-app.md). Then, from your computer, run teka app init --example hello-ouster-world, then cd hello-ouster-world, then teka app deploy.
 
 ## Next steps

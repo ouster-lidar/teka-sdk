@@ -2,14 +2,14 @@
 
 Now that your ZED Box is set up, build an app on your computer and run it on the box with the teka command-line tool.
 
-> [!note]
+> **Note:**
 > Finish Setup first. You'll need your box's hostname and the admin password you created previously.
 
 ## 01. Set up your development computer
 
 You can build on Ubuntu or Debian (Intel/AMD or Arm), Windows 11 with WSL 2, or a Mac with Apple silicon. Intel Macs aren't supported.
 
-> [!note]
+> **Note:**
 > Running Windows? [Set up WSL 2](#windows-only-set-up-wsl-2) first, then come back here.
 
 ### Install teka CLI
@@ -102,7 +102,7 @@ teka builds the app for the box, uploads it, and checks its log for a clean star
 
 ![03. Deploy your first app](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/hello-world-logs.png)
 
-> [!note]
+> **Note:**
 > After you modify the app, run `teka app deploy --build` again to rebuild and redeploy your changes to the box.
 
 ### Prefer to install from your browser?

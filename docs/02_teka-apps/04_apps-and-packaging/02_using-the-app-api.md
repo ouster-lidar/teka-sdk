@@ -1,6 +1,6 @@
 # Using the App API
 
-Every TekaOS box has an HTTP API at http://teka-\<serial>.local/api/v1. Anything you can do on the Apps page, you can do from a script.
+Every TekaOS box has an HTTP API at `http://teka-<serial>.local/api/v1`. Anything you can do on the Apps page, you can do from a script.
 
 ## Sign in
 

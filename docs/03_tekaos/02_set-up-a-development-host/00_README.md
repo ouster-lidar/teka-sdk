@@ -2,14 +2,14 @@
 
 Now that your box is set up, build an app on your computer and run it on the box with the Teka CLI.
 
-> [!note]
+> **Note:**
 > **Before you start:** Finish [Connect to your ZED Box](../../01_getting-started/02_connect-your-zed-box.md) first. You'll need your box's hostname and the admin password you created.
 
 ## 01. Set up your development computer
 
 You can build on Ubuntu or Debian (Intel/AMD and Arm), Windows 11 with WSL 2, or a Mac with Apple silicon. Intel Macs aren't supported.
 
-> [!note]
+> **Note:**
 > **Running Windows?** Set up [Windows (WSL 2)](02_windows-wsl-2.md) first, then come back here.
 
 ### Install the Teka CLI

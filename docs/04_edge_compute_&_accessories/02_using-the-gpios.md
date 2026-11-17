@@ -100,5 +100,5 @@ std::cout << (req.get_value(line) == gpiod::line::value::ACTIVE) << std::endl;
 
 For everything else, see the libgpiod [Python API](https://libgpiod.readthedocs.io/en/master/python_api.html) and [C++ API](https://libgpiod.readthedocs.io/en/master/cpp_api.html) guides.
 
-> [!note]
+> **Note:**
 > TekaOS doesn't support the CAN and UART pins on this header yet.

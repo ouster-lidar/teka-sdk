@@ -2,7 +2,7 @@
 
 A factory reset erases your settings and apps, so your ZED Box starts up like it did out of the box. TekaOS stays installed, at the version you're running now.
 
-> [!warning]
+> **Warning:**
 > You can't undo a factory reset. Copy anything you want to keep off the box first.
 
 ## What a reset erases
@@ -40,5 +40,5 @@ teka box select teka-<serial>
 
 Then reinstall your apps with `teka app deploy --build`. See [Deploy your first App](../01_getting-started/03_deploy-your-first-app.md).
 
-> [!note]
+> **Note:**
 > TekaOS 0.1 doesn't put the system apps back after a reset. Contact Ouster support to reinstall them.

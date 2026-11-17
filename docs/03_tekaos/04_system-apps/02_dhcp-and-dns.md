@@ -22,7 +22,7 @@ Need a laptop in the field? Turn on the hotspot. The box is at 10.41.0.1 on that
 
 To join a network you already have, turn on **Client**, scan, pick the network, and join it. That disconnects the hotspot. **Forget** drops the saved network and leaves the hotspot off.
 
-> [!note]
+> **Note:**
 > LTE is coming soon.
 
 ## DHCP
@@ -40,7 +40,7 @@ The **DHCP** card hands addresses to the sensors on a port. It can do that all t
 
 Your sensors get addresses from 10.42.0.100 to 10.42.0.200. You'll see each one in the lease list.
 
-If a sensor sends its hostname, you can reach it from the box at \<hostname>.jet.
+If a sensor sends its hostname, you can reach it from the box at `<hostname>.jet`.
 
 ## Use the API
 

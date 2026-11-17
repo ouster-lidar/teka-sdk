@@ -32,5 +32,5 @@ SimpleViz(source.sensor_info).run(source)
 
 Readers always get the newest frame. If a reader falls behind, it skips frames instead of lagging.
 
-> [!note]
+> **Note:**
 > You'll find `osf_socket.py` in the app examples. Add it to your app until the Ouster SDK supports sockets on its own.

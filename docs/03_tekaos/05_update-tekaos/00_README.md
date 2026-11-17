@@ -2,12 +2,12 @@
 
 Update TekaOS from your computer with the Teka CLI. TekaOS replaces the whole system and keeps your settings and apps. If the new version doesn't start cleanly, the box goes back to the previous one.
 
-> [!note]
+> **Note:**
 > **Before you start:** Install the Teka CLI. See [Set Up a Development Host](../02_set-up-a-development-host/00_README.md).
 
 ## 01. Download the update
 
-Download the update file for your box: \<box>-sysupdate-v\<version>.tpk. [TBD: download link.]
+Download the update file for your box: `<box>-sysupdate-v<version>.tpk`. [TBD: download link.]
 
 ## 02. Select your box
 

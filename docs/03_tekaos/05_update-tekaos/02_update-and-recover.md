@@ -23,7 +23,7 @@ Press Space while the box starts, then pick the older version from the boot menu
 
 A factory reset erases your settings, custom hostname, admin password, logs, and apps. TekaOS itself stays. Start it from **General**. For the full steps, see [Reset to factory settings](../../04_edge_compute_&_accessories/05_reset-to-factory-settings.md).
 
-> [!warning]
+> **Warning:**
 > You can't undo a factory reset. It also removes the system apps, like Sensors.
 
 ## If something goes wrong

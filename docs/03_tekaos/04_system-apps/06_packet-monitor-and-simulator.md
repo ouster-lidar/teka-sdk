@@ -14,7 +14,7 @@ This app helps you test sensor networks. **Monitor** shows the sensor traffic co
 2. Set a destination, like 192.168.1.20:7502, and a data rate.
 3. Start the stream. Click **Stop all** when you're done.
 
-> [!note]
+> **Note:**
 > The simulator sends real traffic. Keep it off production networks.
 
 ## Use the API

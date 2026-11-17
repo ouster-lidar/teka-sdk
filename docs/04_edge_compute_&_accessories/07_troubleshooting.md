@@ -21,7 +21,7 @@ Start with the section that matches what you see. If you're still stuck, contact
 2. Press Space while it starts and pick an older version from the boot menu.
 3. If nothing works, reinstall TekaOS. See [Reset and Update](05_reset-to-factory-settings.md).
 
-> [!tip]
+> **Tip:**
 > Shut down from System Update before you unplug the power. Pulling the power while TekaOS runs can damage your data.
 
 ## I can't open the web interface
@@ -54,7 +54,7 @@ If a service fails after an update, System Update lists the failed services. Ope
 
 If the clock is wrong after the box has been unplugged for a few days with no internet, the clock battery is flat. TekaOS sets the time from the internet whenever it can reach it. To replace the battery, you'll need a CR1220 3 V coin cell, a Torx T6 screwdriver, and a small flat tool.
 
-> [!note]
+> **Note:**
 > For more detailed instructions including photos of this process, refer to the stereolabs documentation page [[link]](https://docs.stereolabs.com/docs/products/embedded/zed-box-series/zed-box-mini/troubleshooting)
 
 ## The screen stays blank

@@ -2,7 +2,7 @@
 
 Want to remove TekaOS from your ZED Box and install Stereolabs' Ubuntu-based JetPack image instead? Flash the box from an Ubuntu computer with Stereolabs' script.
 
-> [!warning]
+> **Warning:**
 > Flashing erases the internal disk, including your apps, settings, and admin password. Copy anything you want to keep off the box first.
 
 ## Before you start
@@ -82,7 +82,7 @@ sudo apt update
 sudo apt install nvidia-jetpack
 ```
 
-> [!note]
+> **Note:**
 > Don't run sudo apt upgrade yet. A newer kernel can break the ZED X camera driver.
 
 To use ZED X cameras, install the Stereolabs GMSL2 driver, hold the kernel packages, and install the ZED SDK for your JetPack version. Stereolabs' [post-flash steps](https://docs.stereolabs.com/docs/products/embedded/zed-box-mini/reset-update) walk you through each one.

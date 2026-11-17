@@ -30,5 +30,5 @@ Put it in your image at `usr/lib/teka/mission-control/manifest.json`. Static web
 | auth | Set to ojs-proxy-identity to see who's calling. Learn more in [Box Resources and Firewall](03_box-resources-and-firewall.md). |
 | app_cards | Optional status cards. The web interface does not show them. |
 
-> [!note]
+> **Note:**
 > Bundle your fonts and scripts with the app. Boxes are often offline.

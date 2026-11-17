@@ -50,7 +50,7 @@ DC 10.5 V to 13.5 V, 60 W max. Use the supplied 12 V, 60 W power supply or a reg
 
 Connector type: TBP01P1W-508-02GR. For battery power, use a 4S lithium or lithium polymer battery with a 60 W, 12 V DC-DC converter so the voltage stays stable.
 
-> [!warning]
+> **Warning:**
 > Check the voltage before you connect power. More than 16 V can damage the box.
 
 ## ethernet
@@ -76,7 +76,7 @@ TekaOS gets an IP address over DHCP by default. To set a static address, or to p
 
 ZED Boxes with TekaOS pre-installed also are all wifi-enabled by default with the Intel AX210 module, with Wi-Fi in TekaOS with no setup. The module sits in the M.2 Key-E 2230 socket and uses two 2.4/5 GHz antennas.
 
-> [!note]
+> **Note:**
 > TekaOS doesn't support bluetooth yet, but support is coming soon.
 
 Need to connect a laptop in the field? Open Network, turn on the Wi-Fi access point, and pick a network name and a password of at least 8 characters. The box is at 10.41.0.1 on that network. The access point doesn't hand out addresses, so give your laptop a static address such as 10.41.0.2.
@@ -100,7 +100,7 @@ A 10-pin header with two GPIOs, CAN, UART, 5 V, 3.3 V, and ground. To use the GP
 - Pin 09: UART_RXD (CMOS 3.3 V)
 - Pin 10: UART_TXD (CMOS 3.3 V)
 
-> [!warning]
+> **Warning:**
 > Every signal on this header is 3.3 V CMOS. Signals outside the spec can damage the box, and that damage isn't covered by the warranty.
 
 The CAN pins connect straight to the Jetson module. To use them as a CAN bus, add a transceiver such as the [Waveshare SN65HVD230](https://www.waveshare.com/sn65hvd230-can-board.htm). TekaOS doesn't set up the CAN or UART pins yet.
@@ -134,7 +134,7 @@ Use this port with the recovery button to reflash the firmware. See [Reset and U
 
 The ZED Box Mini has two GMSL2 FAKRA connectors for Stereolabs ZED X cameras, plus SYNC-IN and SYNC-OUT terminal blocks for triggering cameras across several boxes.
 
-> [!note]
+> **Note:**
 > TekaOS doesn't support GMSL2 cameras or the sync ports yet, but support is coming soon.
 
 ### Sync pinouts
