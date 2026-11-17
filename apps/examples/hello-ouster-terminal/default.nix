@@ -208,17 +208,25 @@
       appManifest = replaceVars ./manifest.json {
         imageVersion = ps.imageVersion;
       };
+
+      webTree = ps.appCrate.appWebTree {
+        inherit name;
+        webSrc = ./web;
+        webFiles = [
+          "display.html"
+          "display.js"
+        ];
+      };
     in
     ps.makeAppImage {
       inherit name rootInteractiveBin;
       copyFiles =
         ps.mkPasswdGroupStubCopyFiles "hot"
         ++ ps.waylandAppBaseCopyFiles
+        ++ ps.appCrate.appManifestCopyFiles {
+          inherit name appManifest webTree;
+        }
         ++ [
-          {
-            path = "usr/lib/teka/mission-control/manifest.json";
-            source = appManifest;
-          }
           {
             path = "usr/lib/extension-release.d/extension-release.hello-ouster-terminal";
             source = ./config/extension-release;

@@ -4,13 +4,26 @@
   "display_name": "Hello Ouster Terminal",
   "nav": {
     "label": "Hello Ouster Terminal",
-    "path": "/app/hello-ouster-terminal"
+    "path": "/app/hello-ouster-terminal",
+    "section": "apps",
+    "panels": [
+      {
+        "label": "Display",
+        "panel": "display"
+      }
+    ]
   },
   "ui": {
-    "mode": "external"
+    "mode": "static",
+    "title": "Hello Ouster Terminal",
+    "template": "display.html"
   },
   "backend": {
     "mode": "none"
+  },
+  "auth": {
+    "scheme": "teka-proxy-identity",
+    "version": "0.1.0"
   },
   "portable": {
     "displayService": true,
