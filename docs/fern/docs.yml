@@ -145,9 +145,6 @@ navigation:
       - page: Using the GPIOs
         path: "../04_edge_compute_&_accessories/02_using-the-gpios.md"
         slug: using-the-gpios
-      - page: Real-time kernel
-        path: "../04_edge_compute_&_accessories/04_real-time-kernel.md"
-        slug: real-time-kernel
       - page: Reset to factory settings
         path: "../04_edge_compute_&_accessories/05_reset-to-factory-settings.md"
         slug: reset-to-factory-settings
@@ -176,6 +173,8 @@ redirects:
     destination: /getting-started
   - source: /first-boot
     destination: /network-defaults
+  - source: /real-time-kernel
+    destination: /edge-compute
   - source: /connect-zed-box
     destination: /connect-your-zed-box
   - source: /zed-box-mini

@@ -31,7 +31,6 @@ An SSD 256GB mounted on an M.2 Key-M 2242 socket is included with all the config
 
 - [ZED Box Mini connectivity](01_zed-box-mini-connectivity.md)
 - [Using the GPIOs](02_using-the-gpios.md)
-- [Real-time kernel](04_real-time-kernel.md)
 - [Reset to factory settings](05_reset-to-factory-settings.md)
 - [Uninstall TekaOS](06_uninstall-tekaos.md)
 - [Troubleshooting](07_troubleshooting.md)
