@@ -126,14 +126,6 @@ navigation:
           - page: ZED Box 2
             path: ../03_tekaos/05_update-tekaos/03_zed-box-2.md
             slug: zed-box-2
-      - section: Release notes
-        contents:
-          - page: Overview
-            path: ../03_tekaos/06_release-notes/00_README.md
-            slug: release-notes
-          - page: TekaOS 0.1
-            path: ../03_tekaos/06_release-notes/01_tekaos-0-1.md
-            slug: tekaos-0-1
   - section: "Edge compute & accessories"
     contents:
       - page: Overview

@@ -58,7 +58,7 @@ See the [installation guide](crates/teka-cli/README.md#install) for other instal
 | -------------------------------------------- | ------------------------------------------------ |
 | [Getting Started](docs/01_getting-started/01_zed-box-with-tekaos.md) | Set up a ZED Box with TekaOS and deploy your first app |
 | [Teka Apps](docs/02_teka-apps/00_README.md)  | Start your own app, templates, and packaging     |
-| [TekaOS](docs/03_tekaos/00_README.md)        | CLI, system apps, updates, and release notes     |
+| [TekaOS](docs/03_tekaos/00_README.md)        | CLI, system apps, and updates                    |
 | [Edge compute & accessories](docs/04_edge_compute_&_accessories/00_README.md) | ZED Box ports, GPIOs, reset, and troubleshooting |
 | [Developer Guide](docs/developer-guide.md)   | Build, deploy, and auth workflows                |
 | [Linux host setup](docs/linux.md)            | Packages and Nix                                 |
