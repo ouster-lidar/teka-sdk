@@ -60,6 +60,9 @@ let
       "signed app images require a Linux builder; use teka app build to select one";
     runCommand "${name}-${system}"
       {
+        __structuredAttrs = true;
+        # Runtime closures are embedded in the signed filesystem image.
+        unsafeDiscardReferences.out = true;
         # Avoid shipping large .raw DDIs to/from remote x86 builders when inputs are already local.
         preferLocalBuild = true;
         nativeBuildInputs = [
@@ -70,7 +73,7 @@ let
           util-linux
         ];
         SOURCE_DATE_EPOCH = 0;
-        SYSTEMD_REPART_MKFS_OPTIONS_EROFS = lib.concatStringsSep " " erofs.args;
+        env.SYSTEMD_REPART_MKFS_OPTIONS_EROFS = lib.concatStringsSep " " erofs.args;
         passthru = { inherit cargoChecks; };
       }
       ''

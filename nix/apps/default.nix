@@ -57,13 +57,16 @@ let
           ;
         craneLib = crane.mkLib pkgs;
       };
-      image = pkgs.callPackage apps.${id}.image { inherit ps; };
+      image = (pkgs.newScope { dbus = pkgs.dbus-session; }) apps.${id}.image { inherit ps; };
       artifact = appArtifactRawName id targetSystem;
       basename = lib.removeSuffix ".raw" artifact;
       arch = lib.removeSuffix "-linux" targetSystem;
     in
     pkgs.buildPackages.runCommand "${id}-${targetSystem}-tpk"
       {
+        __structuredAttrs = true;
+        # Package members contain the signed image and its complete runtime closure.
+        unsafeDiscardReferences.out = true;
         nativeBuildInputs = [
           pkgs.buildPackages.jq
           (tekaFor buildSystem)
@@ -97,7 +100,7 @@ let
       root_offset=$(${pkgs.util-linux}/bin/sfdisk --json "$raw" | ${pkgs.jq}/bin/jq -er '.partitiontable | .sectorsize as $sector | .partitions[] | select((.type | ascii_downcase) == "4f68bce3-e8cd-4db1-96e7-fbcaf984b709" or (.type | ascii_downcase) == "b921b045-1df0-41c3-af44-4c6f280d3fae") | .start * $sector')
       ${pkgs.erofs-utils}/bin/fsck.erofs --offset="$root_offset" "$raw" >/dev/null
       ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=etc/os-release "$raw" >os-release
-      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --path=usr/lib/systemd/system/${serviceName}.service "$raw" >/dev/null
+      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=usr/lib/systemd/system/${serviceName}.service "$raw" | ${pkgs.gnugrep}/bin/grep . >/dev/null
       expect_line() {
         ${pkgs.gnugrep}/bin/grep -qxF "$1" os-release || {
           echo "app image check ${serviceName}: missing os-release line: $1" >&2

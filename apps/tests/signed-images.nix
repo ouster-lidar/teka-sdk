@@ -29,6 +29,7 @@ pkgs.runCommand "signed-app-images-check"
       done
       test "$(stat -c %s part-1)" = 16384
       fsck.erofs part-2
+      dump.erofs -s part-2 | grep -E '^Filesystem incompatible features:.*big_pcluster.*fragments'
       tr -d '\000' <part-1 >signature.json
       jq -ej '.rootHash | select(test("^[0-9a-f]{64}$"))' signature.json >rootHash
       test "$(cat rootHash)" = "$(cat "$1"/*.roothash)"
