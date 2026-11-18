@@ -257,9 +257,10 @@ pub fn list(args: ListOptions) -> Result<()> {
 pub fn run(args: BuildOptions) -> Result<()> {
     let arch = normalize_arch(&args.arch)?;
     let (flake, apps) = resolve_apps(&args.source, &args.apps)?;
-    build_targets(&flake, &apps, &[format!("{arch}-linux")])?;
-    for app in apps {
-        println!("{RESULT}/{app}");
+    let target = format!("{arch}-linux");
+    let packages = build_targets(&flake, &apps, std::slice::from_ref(&target))?;
+    for path in &packages[&target] {
+        println!("{}", path.display());
     }
     Ok(())
 }
@@ -432,5 +433,5 @@ pub fn single_package(output: &Path) -> Result<PathBuf> {
             files.len()
         );
     }
-    Ok(files.remove(0).canonicalize()?)
+    Ok(files.remove(0))
 }

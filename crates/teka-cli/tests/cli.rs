@@ -680,7 +680,7 @@ fn initialized_apps_build_without_names_or_flake_flags() {
                 .output()
                 .unwrap();
             success(&output);
-            assert_eq!(output.stdout, b"result/hello-world\n");
+            assert_eq!(output.stdout, b"result/hello-world/app.tpk\n");
             assert!(cwd.join("result/hello-world/app.tpk").is_file());
             let calls = fs::read_to_string(cwd.join("calls")).unwrap();
             let dir = if enclosing_repository {
@@ -769,7 +769,7 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
         success(&out);
         assert_eq!(
             String::from_utf8(out.stdout).unwrap().trim(),
-            "result/hello-world"
+            "result/hello-world/app.tpk"
         );
     }
     let mut file = fs::File::open(d.path().join("result/hello-world/app.tpk")).unwrap();
@@ -789,6 +789,56 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     let out = cli(d.path()).args(["app", "list"]).output().unwrap();
     success(&out);
     assert_eq!(out.stdout, b"app\nhello-world\n");
+}
+
+#[test]
+fn deploy_installs_a_copied_build_without_nix_or_a_project() {
+    let project = TempDir::new().unwrap();
+    apps_flake(project.path());
+    let build = cli(project.path())
+        .args(["app", "build", "hello-world", "app"])
+        .output()
+        .unwrap();
+    success(&build);
+    let stdout = String::from_utf8(build.stdout).unwrap();
+    let paths = stdout.lines().collect::<Vec<_>>();
+    assert_eq!(paths, ["result/hello-world/app.tpk", "result/app/app.tpk"]);
+
+    let outside = TempDir::new().unwrap();
+    for (path, name) in paths.iter().zip(["hello-world.tpk", "app.tpk"]) {
+        fs::copy(project.path().join(path), outside.path().join(name)).unwrap();
+    }
+    drop(project);
+
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+        ("200 OK", "healthy"),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "healthy"),
+    ]);
+    success(
+        &cli(outside.path())
+            .env("PATH", outside.path())
+            .args([
+                "app",
+                "deploy",
+                "--box",
+                &url,
+                "./hello-world.tpk",
+                "app.tpk",
+            ])
+            .output()
+            .unwrap(),
+    );
+    let requests = server.join().unwrap();
+    for (index, name) in [(2, "hello-world.tpk"), (4, "app.tpk")] {
+        assert_eq!(
+            requests[index].body,
+            fs::read(outside.path().join(name)).unwrap()
+        );
+    }
 }
 
 #[test]
