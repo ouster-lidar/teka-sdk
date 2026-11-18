@@ -5,7 +5,7 @@
 ## Build and deploy
 
 ```sh
-teka app deploy --build hello-ouster-world
+teka app deploy hello-ouster-world
 ```
 
 Open `http://HOST/app/hello-ouster-world` to control the display. The measured Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).

@@ -7,7 +7,7 @@ Requires a Teka device with GPU integration and `seatd`. The SDK supplies the co
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 Verify that the browser opens the configured page and that local keyboard and mouse input work.

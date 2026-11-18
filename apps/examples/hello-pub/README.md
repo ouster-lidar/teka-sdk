@@ -128,7 +128,7 @@ Static panel under `/app/hello-pub`:
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 Open `/app/hello-pub`. Pair with `hello-sub` for the subscriber demo.

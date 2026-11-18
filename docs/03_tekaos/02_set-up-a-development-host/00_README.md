@@ -78,8 +78,8 @@ Follow [Starting your own app](../../02_teka-apps/01_starting-your-own-app.md) t
 | `teka box forget [PATTERN…]` | Removes boxes and their saved passwords. |
 | `teka app init [DIR]` | Creates a new app in a folder, or in the current folder. Add `--example NAME` to start from a specific starter example. |
 | `teka app list` | Lists the apps in the current folder's project. Add `--examples` to list the starter examples. |
-| `teka app build [APP…]` | Builds app packages into `./result`. With no name, builds the project's only app. |
-| `teka app deploy [APP…]` | Installs apps on your selected boxes. Add `--build` to build them first. Add `--box URL` to pick another box. |
+| `teka app build [APP…]` | Builds app packages and prints their file paths. Omit the name for a project with one app. |
+| `teka app deploy [INPUT…]` | Builds and deploys named apps or installs package files. Add `--box URL` to pick another box. |
 | `teka system status` | Shows the box's TekaOS version and update state. |
 | `teka system update FILE --wait` | Installs a TekaOS update and waits for it to finish. |
 | `teka --help` | Shows every command and option. |

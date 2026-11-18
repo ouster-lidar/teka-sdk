@@ -65,7 +65,7 @@ Put your own logic in either file. Both read the chip and lines from HELLO_GPIO_
 From the hello-gpio folder, with your box selected as in step 02 of [Deploy your first App](../01_getting-started/03_deploy-your-first-app.md):
 
 ```bash
-teka app deploy --build
+teka app deploy
 ```
 
 Connect an LED or a multimeter to the pin, and you'll see it switch every second. Open Apps in the web interface and click Logs next to hello-gpio. You'll see value=active and value=inactive twice a second.

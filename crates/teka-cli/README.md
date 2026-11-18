@@ -67,8 +67,8 @@ teka box list
 teka box status --json
 teka app list
 teka app build hello-world
-teka app deploy --box http://device.local hello-world
-teka app deploy --box http://device.local --build hello-world hello-pub
+teka app deploy --box http://device.local hello-world hello-pub
+teka app deploy --box http://device.local ./hello-world.tpk
 teka tpk pack --manifest manifest.json --member hello-world.raw=hello-world.raw --private-key apps.key --certificate apps.pem --output hello-world.tpk
 teka tpk verify hello-world.tpk --trust ./trust
 teka tpk inspect hello-world.tpk --verify --trust ./trust
@@ -78,7 +78,9 @@ teka system update ./image.tpk --wait --box http://device.local
 teka box forget
 ```
 
-App names can be omitted when the project contains exactly one app. `build` links packages under `./result/<app>` and prints their paths. `deploy` uploads packages from `./result`; `--build` builds for the device architectures first. Select devices with `--box`, `TEKA_BOX`, or the saved selection, in that order. Deployment uses all selected devices; for example, `teka app deploy --build hello-world` deploys to the saved selection. System commands accept one device; use `--box` or `TEKA_BOX` to override multiple saved targets. Repeat `--box` for multiple deployment targets.
+Omit the app name in a project with exactly one app. Deploy by name to build for the selected box architectures. Nix substitutes cached outputs when available and builds on a cache miss. To distribute an app, copy the `.tpk` path printed by `app build` and deploy the copy from any directory or machine with teka and access to a matching box. Build defaults to `aarch64`. Use `--arch x86_64` for an x86_64 box. Pass app names or package paths in separate invocations.
+
+Select boxes with `--box`, `TEKA_BOX`, or the saved selection, in that order. Repeat `--box` for multiple deployment targets. System commands accept one box.
 
 - `tpk pack` zstd-encodes every payload and signs the manifest with the image signing key and certificate.
 - `tpk verify` emits JSON and requires `apps.pem` / `os.pem` certificates under the trust directory.

@@ -8,7 +8,7 @@ The manifest uses `backend.mode = none`; the host must support resource-only act
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 ## Host

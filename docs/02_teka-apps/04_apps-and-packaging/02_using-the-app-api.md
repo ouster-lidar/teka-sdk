@@ -12,10 +12,14 @@ curl -c cookies.txt -X POST -H "Content-Type: application/json" -d '{"password":
 
 ## Install an app
 
-Use the `.raw` file in the `result/hello-world` folder that `teka app build` printed. That folder holds one image.
+Upload the signed `.tpk` printed by `teka app build`. The `.raw` image is a member inside the package. Copy the whole `.tpk` if you need to upload it from another machine.
 
 ```bash
-curl -b cookies.txt -X POST --data-binary @result/hello-world/*.raw "http://teka-<serial>.local/api/v1/manager/install?profile=trusted"
+package=$(teka app build hello-world)
+```
+
+```bash
+curl -b cookies.txt -H "Content-Type: application/octet-stream" --data-binary "@$package" "http://teka-<serial>.local/api/v1/manager/install?profile=trusted"
 ```
 
 You'll get back:

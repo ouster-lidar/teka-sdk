@@ -19,7 +19,7 @@ teka box list --discover
 teka box select teka-<serial>
 teka app init my-app
 cd my-app
-teka app deploy --build
+teka app deploy
 ```
 
 ## Commands
@@ -32,8 +32,8 @@ teka app deploy --build
 | `teka box forget [PATTERN…]` | Removes boxes and their saved passwords. |
 | `teka app init [DIR]` | Creates a new app in a folder, or in the current folder. Add `--example NAME` to start from a specific starter example. |
 | `teka app list` | Lists the apps in the current folder's project. Add `--examples` to list the starter examples. |
-| `teka app build [APP…]` | Builds app packages into `./result`. With no name, builds the project's only app. |
-| `teka app deploy [APP…]` | Installs apps on your selected boxes. Add `--build` to build them first. Add `--box URL` to pick another box. |
+| `teka app build [APP…]` | Builds app packages and prints their file paths. Omit the name for a project with one app. |
+| `teka app deploy [INPUT…]` | Builds and deploys named apps or installs package files. Add `--box URL` to pick another box. |
 | `teka system status` | Shows the box's TekaOS version and update state. |
 | `teka system update FILE` | Installs a TekaOS update. |
 | `teka build check` | Checks that your computer can build apps. |
@@ -86,7 +86,7 @@ teka app init my-app --example hello-gpio
 
 If the example name is unknown, teka stops before it writes any files. List the starter examples with `teka app list --examples`.
 
-`teka app list`, `teka app build`, and `teka app deploy` read the project in your current folder. teka walks up from there to the nearest `flake.nix` that defines `teka.apps`, and stops at the Git root. Working from another folder? Pass `--flake` with its path.
+`teka app list`, `teka app build`, and deploy by app name read the project in your current folder. teka walks up from there to the nearest `flake.nix` that defines `teka.apps`, and stops at the Git root. Working from another folder? Pass `--flake` with its path.
 
 ### list
 
@@ -102,7 +102,7 @@ Lists the apps in the current project. From the teka-sdk repository root, it lis
 teka app build hello-world
 ```
 
-Builds app packages and links them in `./result`, one folder per app. teka prints each path. Use this when you want to install the package yourself. With no name, it builds the project's only app.
+Builds app packages and prints one `.tpk` path per app under `result/<app>/`. Copy the file to distribute it or upload it in the web UI. Omit the name for a project with one app.
 
 | Option | What it does |
 | --- | --- |
@@ -112,16 +112,23 @@ Builds app packages and links them in `./result`, one folder per app. teka print
 ### deploy
 
 ```bash
-teka app deploy --build
+teka app deploy
 ```
 
-Builds the app for each box, installs it, and checks its logs to make sure it started. Without `--build`, teka installs what's already in `./result`, or a `.tpk` file you name. Run it again to replace an app with a new version. Its data stays.
+Omit the app name for a project with one app, or pass one or more app names. teka selects the architecture for each box. Nix substitutes available outputs from its configured caches and builds on a cache miss. teka logs the Nix store path of each package as it uploads it and then checks startup logs.
+
+To deploy a package you copied, pass its path. The box architecture must match the package.
+
+```bash
+teka app deploy ./hello-world.tpk
+```
+
+Use this command from any directory or machine with the package, teka, and access to the box. Pass app names or package paths in separate invocations. Deploying again replaces the installed app and keeps its data.
 
 | Option | What it does |
 | --- | --- |
-| `--build` | Builds the apps for each box first. |
 | `--box` | A box to deploy to. Repeat it for more boxes. |
-| `--remove` | Removes the old app before installing, instead of replacing it in place. |
+| `--remove` | Removes the old app before installing. Available for named apps. |
 | `--jobs` | How many boxes to deploy to at once. The default is 4. |
 | `--profile` | The security profile to install with. The default is trusted. |
 | `--flake` | The project folder to use, if you're not inside it. |
@@ -169,7 +176,7 @@ App deploy uses every selected box. System commands need exactly one, so pass `-
 When TEKA_PASSWORD is set, teka uses it instead of the saved password, and never falls back to the saved one. In a script or CI job, set TEKA_PASSWORD and pass `--box`:
 
 ```bash
-TEKA_PASSWORD='<password>' teka app deploy --build --box teka-<serial>.local
+TEKA_PASSWORD='<password>' teka app deploy --box teka-<serial>.local
 ```
 
 teka keeps sessions in memory and never sends one box's password to another.

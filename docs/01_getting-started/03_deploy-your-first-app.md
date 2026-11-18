@@ -93,32 +93,37 @@ ls
 You'll see `default.nix`, `flake.nix`, `hello-world.rs`, `hello-world.service`, and `README.md`. From this folder, build the app and deploy it to your selected box:
 
 ```bash
-teka app deploy --build
+teka app deploy
 ```
 
-teka builds the app for the box, uploads it, and checks its log for a clean start. To see your app in the web interface, open Apps. You'll find hello-world under Installed apps. Click Logs to see `hello world`.
+teka selects a package for your box architecture, uploads it, and checks its log for a clean start. Nix downloads cached outputs when available and builds on a cache miss. To see your app in the web interface, open Apps. You'll find hello-world under Installed apps. Click Logs to see `hello world`.
 
 ![03. Deploy your first app](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/hello-world-installed.png)
 
 ![03. Deploy your first app](https://storage.googleapis.com/docs-ouster-com/teka-docs/0.1.0/images/hello-world-logs.png)
 
 > **Note:**
-> After you modify the app, run `teka app deploy --build` again to rebuild and redeploy your changes to the box.
+> After you modify the app, run `teka app deploy` again to rebuild and redeploy your changes to the box.
 
-### Prefer to install from your browser?
+### Build a package to share
 
-Build the app image without deploying it:
+Build a package for `aarch64`, the default for Jetson boxes. Add `--arch x86_64` to build for an x86_64 box.
 
 ```bash
-teka app build
+package=$(teka app build)
 ```
 
-teka prints the path of the package under `result/hello-world`. Then do the following:
+Copy the package using the printed path.
 
-1. Find the Apps tab in your box's browser session.
-2. Choose the .tpk file from that folder under Install App.
-3. Keep the Trusted (default) security profile.
-4. Click Install.
+```bash
+cp "$package" ./hello-world.tpk
+```
+
+You can move the copy to any directory or machine. To install it in your browser, open **Apps**, select the file under **Install App**, keep the **Trusted** profile, and click **Install**. To install with teka, run this from the directory holding the copy.
+
+```bash
+teka app deploy ./hello-world.tpk
+```
 
 ### Start your own app
 
@@ -132,7 +137,7 @@ cd my-app
 The app keeps the hello-world ID until you change it. Edit the program and `default.nix`, then build and deploy from the folder:
 
 ```bash
-teka app deploy --build
+teka app deploy
 ```
 
 Run the same command after each change. teka replaces the app and keeps its data. See [Starting your own app](../02_teka-apps/01_starting-your-own-app.md) for what each file does.
@@ -145,8 +150,8 @@ Run the same command after each change. teka replaces the app and keeps its data
 - `teka box forget [PATTERN]`: remove a saved box and its password.
 - `teka app init [DIR]`: create a new app in a folder, or in the current folder. Add `--example NAME` to start from a specific starter example.
 - `teka app list`: list the apps in the current folder's project. Add `--examples` to list the starter examples.
-- `teka app build [APP…]`: build app packages into `./result`. With no name, builds the app in the current folder.
-- `teka app deploy [APP…]`: install apps on your selected boxes. Add `--build` to build them first. Add `--box URL` to pick another box.
+- `teka app build [APP…]` builds packages and prints their file paths. Omit the name for a project with one app.
+- `teka app deploy [INPUT…]` builds and deploys named apps or installs package files. Add `--box URL` to pick another box.
 - `teka system status`: show the box's TekaOS version and update state.
 - `teka system update FILE --wait`: install a TekaOS update and wait for it to finish.
 - `teka --help`: see every command and flag.

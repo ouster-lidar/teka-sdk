@@ -7,7 +7,7 @@ Portable **Sway** compositor with **`vkcube --wsi wayland`** and **`glmark2-wayl
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 ## Host

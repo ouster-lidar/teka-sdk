@@ -191,13 +191,18 @@ layout: default
 
 # Build & Deploy
 
-```bash
-cd teka-sdk
-teka app build hello-slidev
-```
+From the SDK root, deploy for the selected boxes. Nix fetches cached outputs when available.
 
 ```bash
-teka app deploy --build hello-slidev
+teka app deploy hello-slidev
+```
+
+To share a package, copy it. Build defaults to `aarch64`. Use `--arch x86_64` for an x86_64 box.
+
+```bash
+package=$(teka app build hello-slidev)
+cp "$package" ./hello-slidev.tpk
+teka app deploy ./hello-slidev.tpk
 ```
 
 | Step | Command |

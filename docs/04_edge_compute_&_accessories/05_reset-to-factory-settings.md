@@ -38,7 +38,7 @@ Your box now has no password, so you'll set it up like a new one:
 teka box select teka-<serial>
 ```
 
-Then reinstall your apps with `teka app deploy --build`. See [Deploy your first App](../01_getting-started/03_deploy-your-first-app.md).
+Then reinstall your apps with `teka app deploy`. See [Deploy your first App](../01_getting-started/03_deploy-your-first-app.md).
 
 > **Note:**
 > TekaOS 0.1 doesn't put the system apps back after a reset. Contact Ouster support to reinstall them.

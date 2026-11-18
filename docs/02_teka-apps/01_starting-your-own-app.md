@@ -46,17 +46,17 @@ Then rebuild and check that the app still starts.
 Select your box once with `teka box select`, if you haven't already. Then list, build, and deploy from your app's folder:
 
 ```bash
-teka app deploy --build
+teka app deploy
 ```
 
-`teka app deploy --build` builds the app for the box, installs it on every selected box, and checks its logs to make sure it started. Your app starts right away and again on every boot. Open **Apps** in the web interface and you'll find it under **Installed apps**.
+`teka app deploy` selects packages for each box architecture, installs them, and checks startup logs. Nix downloads cached outputs when available and builds on a cache miss. Your app starts right away and again on every boot. Open **Apps** in the web interface and you'll find it under **Installed apps**.
 
 Change your code, then run the same command again. teka replaces the app and keeps its data.
 
 To deploy to specific boxes instead of your selection, repeat `--box`:
 
 ```bash
-teka app deploy --box teka-box-1.local --box teka-box-2.local --build
+teka app deploy --box teka-box-1.local --box teka-box-2.local
 ```
 
 ## Next steps

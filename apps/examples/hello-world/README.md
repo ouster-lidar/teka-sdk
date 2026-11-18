@@ -5,7 +5,7 @@ A minimal Rust app that prints `hello world`. `default.nix` builds the program a
 ## Build and deploy
 
 ```sh
-teka app deploy --build hello-world
+teka app deploy hello-world
 ```
 
 Verify that `journalctl -u hello-world.service` contains `hello world`.
