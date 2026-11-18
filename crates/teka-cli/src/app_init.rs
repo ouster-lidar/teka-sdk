@@ -167,7 +167,7 @@ pub fn run(options: InitOptions) -> Result<()> {
     let directory = format!("{prefix}{path}");
     eprintln!();
     eprintln!("⚒\u{fe0e} Build:  cd {directory} && teka app build");
-    eprintln!("✈\u{fe0e} Deploy: cd {directory} && teka app deploy --build");
+    eprintln!("✈\u{fe0e} Deploy: cd {directory} && teka app deploy");
     eprintln!();
     Ok(())
 }

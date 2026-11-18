@@ -87,9 +87,9 @@ pub(crate) fn resolve_apps(source: &BuildSource, apps: &[String]) -> Result<(Str
 pub(crate) fn build_targets(
     flake: &str,
     apps: &[String],
-    targets: &[String],
+    targets: BTreeSet<String>,
+    out_link: &Path,
 ) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    let targets = targets.iter().cloned().collect::<BTreeSet<_>>();
     if targets.is_empty() {
         bail!("no device targets to build");
     }
@@ -98,7 +98,8 @@ pub(crate) fn build_targets(
     let use_nom = std::io::stderr().is_terminal() && nom_available();
     let mut command = Command::new(if use_nom { "nom" } else { "nix" });
     command
-        .args(["build", "--file", "-", "-L", "--out-link", RESULT])
+        .args(["build", "--file", "-", "-L", "--out-link"])
+        .arg(out_link)
         .args(["--no-write-lock-file", "--argstr", "flake"])
         .arg(flake);
     let expr = if !multi_target {
@@ -112,9 +113,9 @@ pub(crate) fn build_targets(
         .into_iter()
         .map(|target| {
             let root = if multi_target {
-                PathBuf::from(RESULT).join(&target)
+                out_link.join(&target)
             } else {
-                PathBuf::from(RESULT)
+                out_link.to_owned()
             };
             package_paths_at(apps, &root).map(|paths| (target, paths))
         })
@@ -258,8 +259,8 @@ pub fn run(args: BuildOptions) -> Result<()> {
     let arch = normalize_arch(&args.arch)?;
     let (flake, apps) = resolve_apps(&args.source, &args.apps)?;
     let target = format!("{arch}-linux");
-    let packages = build_targets(&flake, &apps, std::slice::from_ref(&target))?;
-    for path in &packages[&target] {
+    let packages = build_targets(&flake, &apps, BTreeSet::from([target]), Path::new(RESULT))?;
+    for path in packages.into_values().flatten() {
         println!("{}", path.display());
     }
     Ok(())

@@ -75,13 +75,13 @@ Reload after updating Teka or plugins."#)]
 pub enum AppCommand {
     /// Create a new Teka app project
     Init(app_init::InitOptions),
-    /// Build app images
+    /// Build app packages and print their paths
     Build(build::BuildOptions),
     /// List available apps
     List(build::ListOptions),
-    /// Deploy apps to one or more devices
+    /// Build and deploy project apps or install prebuilt .tpk files
     #[command(
-        after_help = "Examples:\n  teka app deploy --box http://device.local my-app another-app\n  teka app deploy --box http://device.local ./my-app.tpk\n  teka app deploy --build --box http://box-1/ --box http://box-2/ my-app another-app"
+        after_help = "Pass app IDs or package paths in separate invocations.\n\nExamples:\n  teka app deploy --box http://device.local my-app another-app\n  teka app deploy --box http://device.local ./my-app.tpk\n  teka app deploy --box http://box-1/ --box http://box-2/ my-app another-app"
     )]
     Deploy(deploy::DeployOptions),
     #[command(external_subcommand)]

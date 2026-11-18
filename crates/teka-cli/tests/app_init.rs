@@ -196,7 +196,7 @@ fn copied_binary_initializes_selected_example_outside_checkout() {
         assert_eq!(
             String::from_utf8(output.stdout).unwrap(),
             format!(
-                "{}\napp build\n{}\napp deploy --build\n",
+                "{}\napp build\n{}\napp deploy\n",
                 app.display(),
                 app.display()
             ),
