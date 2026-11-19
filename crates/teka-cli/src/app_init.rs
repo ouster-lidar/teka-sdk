@@ -81,12 +81,27 @@ pub fn run(options: InitOptions) -> Result<()> {
                 .args(["rev-parse", "--is-inside-work-tree"])
                 .output()
                 .context("run Git; install Git and add it to PATH")?;
-            if probe.status.success() {
+            let needs_repo = if probe.status.success() {
                 ensure!(
                     probe.stdout == b"true\n",
                     "destination is not in a Git worktree"
                 );
+                let ignored = Command::new("git")
+                    .arg("-C")
+                    .arg(directory)
+                    .args(["check-ignore", "--quiet", "--", "./"])
+                    .output()
+                    .context("run git check-ignore")?;
+                ensure!(
+                    matches!(ignored.status.code(), Some(0 | 1)),
+                    "git check-ignore failed: {}",
+                    String::from_utf8_lossy(&ignored.stderr)
+                );
+                ignored.status.success()
             } else {
+                true
+            };
+            if needs_repo {
                 build_check::run_command(
                     Command::new("git").arg("-C").arg(directory).arg("init"),
                     "git init",

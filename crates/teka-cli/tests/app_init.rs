@@ -400,6 +400,23 @@ fn reuses_enclosing_repository() {
 }
 
 #[test]
+fn initializes_repository_inside_ignored_directory() {
+    let repo = TempDir::new().unwrap();
+    git(repo.path(), &["init"]);
+    fs::write(repo.path().join(".gitignore"), "/tmp/\n").unwrap();
+    git(repo.path(), &["add", ".gitignore"]);
+    let tmp = repo.path().join("tmp");
+    fs::create_dir(&tmp).unwrap();
+
+    success(init(&tmp, &["my-app"]).0.output().unwrap());
+
+    let app = tmp.join("my-app");
+    assert!(app.join(".git").is_dir());
+    assert_eq!(git(&app, &["ls-files"]), FILES.join("\n") + "\n");
+    assert_eq!(git(repo.path(), &["ls-files"]), ".gitignore\n");
+}
+
+#[test]
 fn refuses_existing_lock_without_updating_or_staging_it() {
     let repo = TempDir::new().unwrap();
     git(repo.path(), &["init"]);
