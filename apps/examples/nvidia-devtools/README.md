@@ -21,5 +21,5 @@ sudo nsys profile --pid <PID> --duration 30
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```

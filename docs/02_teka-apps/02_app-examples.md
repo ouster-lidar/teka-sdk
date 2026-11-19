@@ -13,7 +13,7 @@ teka app init my-app --example hello-ouster-world
 Then build and deploy it from the new folder:
 
 ```bash
-cd my-app && teka app deploy --build
+cd my-app && teka app deploy
 ```
 
 Run `teka app list --examples` to see the examples. Every example folder is a complete project with its own `flake.nix`. Learn more about the [Teka CLI](../03_tekaos/03_teka-cli.md).
@@ -27,7 +27,7 @@ Run `teka app list --examples` to see the examples. Every example folder is a co
 | `hello-webui` | A static web page with simulated graphs. No sensor and no backend. |
 | `hello-gpio` | Turns GPIO lines on and off once a second. |
 
-The teka-sdk repository has more examples under `apps/examples/`, such as hello-http and resource-monitor. Build them from the repository root with `teka app deploy --build NAME`.
+The teka-sdk repository has more examples under `apps/examples/`, such as hello-http and resource-monitor. Build them from the repository root with `teka app deploy NAME`.
 
 ## `hello-world`
 

@@ -7,7 +7,7 @@ An optional advanced companion to `hello-ouster-world`, illustrating multiple ca
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 The Ouster viewer image sizes are listed in [`apps/specs/erofs-ddi.md`](https://github.com/ouster-lidar/teka-sdk/blob/main/apps/specs/erofs-ddi.md).

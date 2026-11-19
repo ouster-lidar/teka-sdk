@@ -180,7 +180,7 @@ Static panel under `/app/hello-sub`:
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 Open `/app/hello-sub` while hello-pub is running.

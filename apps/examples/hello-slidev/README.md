@@ -20,7 +20,7 @@ Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slide
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the app image ships the `dist/` tree under `usr/lib/hello-slidev/deck/`. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`teka.apps.hello-slidev.packages.x86_64-linux.aarch64-linux`) do not compile Node on the target architecture.

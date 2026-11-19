@@ -39,6 +39,6 @@ App binaries and the runner use target packages and their Crane library. Source 
 
 ## Distribution filenames
 
-Each app derivation contains one `$out/<id>-<targetSystem>-v<compose>.tpk` file (see [naming.md](naming.md)). `teka app build` links requested apps under `result/<id>`; deployments for multiple architectures use `result/<target>/<id>`.
+Each app derivation contains one `$out/<id>-<targetSystem>-v<compose>.tpk` file (see [naming.md](naming.md)). `teka app build` links requested apps under `result/<id>` and prints each `.tpk` path. Deploy by name to build for the selected box architectures, or pass a copied `.tpk` path to deploy it to matching boxes.
 
 Image checks retain native names under `checks.<buildSystem>.<id>` and cross names under `checks.<buildSystem>.<id>-cross-<targetSystem>`.

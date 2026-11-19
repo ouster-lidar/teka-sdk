@@ -309,6 +309,8 @@ _teka teka te app
             "fish" => {
                 r#"
 source before.fish
+complete -C 'teka app deploy --b' | string match -qr '^--box(\t|$)'; or exit 1
+complete -C 'teka app deploy --b' | string match -qr '^--build(\t|$)'; and exit 1
 test (complete -C 'teka example --format j') = json; or exit 1
 test (complete -C 'teka example vm start --boot-disk n') = nvme; or exit 1
 test -z (complete -C 'teka app-t' | string collect); or exit 1

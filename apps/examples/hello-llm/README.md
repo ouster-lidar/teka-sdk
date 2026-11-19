@@ -55,7 +55,7 @@ The erofs image does **not** embed model weights. Space trims:
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 ## App UI

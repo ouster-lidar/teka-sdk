@@ -42,7 +42,7 @@ If you can't open the web interface, contact Ouster support. See [Contact suppor
 - Set an administrator password before installing: set a password first. See [step 06 in Installation](../01_getting-started/02_connect-your-zed-box.md#06b-create-an-admin-password).
 - teka can't sign in: run `teka box select teka-<serial>` again to replace the saved password. If TEKA_PASSWORD is set, teka uses it instead of the saved password, so check that it's current.
 - teka asks for a box: run `teka box select` first, or add `--box http://teka-<serial>.local/` to the command. System commands need one box, so pass `--box` when you've selected several.
-- invalid_image: the app was built for another box type. Deploy with --build, which builds for the box you're deploying to. If you use teka app build, add --arch aarch64.
+- `invalid_image` can indicate an architecture mismatch. Deploy by app name to select the box architecture automatically. If you distribute a package, use `teka app build --arch` with the box architecture.
 - teka app list doesn't show your app: run it from your app's folder. To see the starter examples, run `teka app list --examples`.
 - teka: command not found: open a new terminal. If that doesn't help, run the install command from step 01 of [Deploy your first App](../01_getting-started/03_deploy-your-first-app.md) again.
 

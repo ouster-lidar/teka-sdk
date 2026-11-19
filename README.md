@@ -35,20 +35,22 @@ Browse [all examples](apps/examples/); each app has its own README.
 
 ```sh
 teka box select
-teka app deploy --build
+teka app deploy
 ```
 
-Selection discovers devices, prompts for the administrator password, and saves your deployment targets and credentials. `--build` builds for the selected devices before uploading.
+Selection discovers devices, prompts for the administrator password, and saves your deployment targets and credentials. Deploy selects the box architectures and installs the packages. Nix substitutes cached outputs and builds on a cache miss.
 
 View the deployed app at `http://<teka-device>.local` or your device's IP address.
 
-**If you don't have a device**, build a package:
+To distribute a package, build for the box architecture and copy the printed `.tpk`. Build defaults to `aarch64`. Use `--arch x86_64` for an x86_64 box.
 
 ```sh
-teka app build
+package=$(teka app build)
+cp "$package" ./my-app.tpk
+teka app deploy ./my-app.tpk
 ```
 
-Builds create packages under `result/<app>/` for later web UI upload or distribution.
+You can deploy the copy from any directory or machine with teka and access to the box, or upload it in the web UI.
 
 See the [installation guide](crates/teka-cli/README.md#install) for other installation options and the [Developer Guide](docs/developer-guide.md) for full build, deploy, and auth procedures.
 

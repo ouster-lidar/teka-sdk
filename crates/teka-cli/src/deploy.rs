@@ -7,12 +7,13 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     num::NonZeroUsize,
-    path::{Path, PathBuf},
+    path::PathBuf,
     thread,
     time::Duration,
 };
+use teka::tpk::{self, Architecture, ComponentType};
 
 /// Pause after remove before install; the device needs a moment to tear down the unit.
 const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
@@ -21,16 +22,13 @@ const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 pub struct DeployOptions {
     #[command(flatten)]
     pub target: BoxOptions,
-    /// App IDs from ./result, or prebuilt .tpk files (default: the project's only app)
-    #[arg(value_name = "INPUT")]
+    /// App IDs to build, or paths to prebuilt .tpk files (default: the project's only app)
+    #[arg(value_name = "INPUT", value_hint = clap::ValueHint::AnyPath)]
     pub apps: Vec<String>,
-    /// Build apps for the device before deploying
-    #[arg(long)]
-    pub build: bool,
     /// App installation profile
     #[arg(long, default_value = "trusted")]
     pub profile: String,
-    /// Remove existing apps before install instead of replacing in place
+    /// Remove existing apps before install (app IDs only)
     #[arg(long)]
     pub remove: bool,
     /// Maximum number of devices to deploy to concurrently
@@ -117,43 +115,6 @@ fn prepare_targets(hosts: &[String]) -> Result<Vec<DeployTarget>> {
     Ok(targets)
 }
 
-fn result_farm() -> Option<String> {
-    let path = std::fs::read_link(build::RESULT).ok()?;
-    let name = path.file_name()?.to_string_lossy();
-    name.split_once("-teka-").map(|(_, built)| built.to_owned())
-}
-
-fn result_paths(
-    apps: &[String],
-    targets: &BTreeSet<String>,
-) -> Result<BTreeMap<String, Vec<PathBuf>>> {
-    let farm = result_farm();
-    if targets.len() > 1 && farm.as_deref() != Some("multi") {
-        bail!("mixed-architecture deploy needs a multi-target result; rerun with --build");
-    }
-
-    targets
-        .iter()
-        .map(|target| {
-            let root = if farm.as_deref() == Some("multi") {
-                let root = PathBuf::from(build::RESULT).join(target);
-                if !root.is_dir() {
-                    bail!("result has no images for {target}; rebuild with --build");
-                }
-                root
-            } else {
-                if let Some(built) = farm.as_deref() {
-                    if built != target {
-                        bail!("result is for {built}; device is {target}. Rebuild with --build");
-                    }
-                }
-                PathBuf::from(build::RESULT)
-            };
-            build::package_paths_at(apps, &root).map(|paths| (target.clone(), paths))
-        })
-        .collect()
-}
-
 fn deploy_target(
     target: &DeployTarget,
     deployments: &[Deployment],
@@ -180,78 +141,62 @@ struct Deployment {
     input: String,
     app: String,
     path: PathBuf,
+    arch: Architecture,
+}
+
+impl Deployment {
+    fn read(path: PathBuf, expected_app: Option<&str>) -> Result<Self> {
+        let manifest = tpk::read_single(&path, ComponentType::App)?;
+        let app = &manifest.components[0].id;
+        let input = if let Some(expected) = expected_app {
+            ensure!(
+                app == expected,
+                "{} has app ID {app}, expected {expected}",
+                path.display()
+            );
+            expected.to_owned()
+        } else {
+            path.display().to_string()
+        };
+        Ok(Self {
+            input,
+            app: app.clone(),
+            path,
+            arch: manifest.arch,
+        })
+    }
 }
 
 fn is_file_input(input: &str) -> bool {
-    input.contains('/') || Path::new(input).extension().is_some()
+    input.ends_with(".tpk") || input.contains('/')
 }
 
-fn prepare_deployments(
-    inputs: &[String],
-    named_paths: &[PathBuf],
-    target: &str,
-    file_manifests: &BTreeMap<String, teka::tpk::Manifest>,
-) -> Result<Vec<Deployment>> {
-    let arch = target
-        .strip_suffix("-linux")
-        .context("invalid device target")?;
-    let mut named_paths = named_paths.iter();
-    inputs
-        .iter()
-        .map(|input| {
-            let file_input = is_file_input(input);
-            let path = if file_input {
-                PathBuf::from(input)
-            } else {
-                named_paths
-                    .next()
-                    .context("missing package for named app")?
-                    .clone()
-            };
-            let named_manifest;
-            let manifest = if file_input {
-                file_manifests
-                    .get(input)
-                    .context("missing file preflight")?
-            } else {
-                named_manifest = teka::tpk::read_single(&path, teka::tpk::ComponentType::App)?;
-                &named_manifest
-            };
-            ensure!(
-                manifest.arch.as_str() == arch,
-                "{} is for {}; device is {arch}",
-                path.display(),
-                manifest.arch.as_str()
-            );
-            let app = &manifest.components[0].id;
-            ensure!(
-                file_input || app == input,
-                "{} has app ID {app}, expected {input}",
-                path.display()
-            );
-            Ok(Deployment {
-                input: input.clone(),
-                app: app.clone(),
-                path,
-            })
-        })
-        .collect()
-}
-
-fn deploy_targets(
+fn deploy_targets<'a>(
     targets: &[DeployTarget],
-    deployments: &BTreeMap<String, Vec<Deployment>>,
+    deployments: impl Fn(&str) -> &'a [Deployment],
     profile: &str,
     remove: bool,
     jobs: usize,
 ) -> Result<()> {
+    for target in targets {
+        let arch = target.target.trim_end_matches("-linux");
+        for deployment in deployments(&target.target) {
+            ensure!(
+                deployment.arch.as_str() == arch,
+                "{} is for {}; device is {arch}",
+                deployment.path.display(),
+                deployment.arch.as_str()
+            );
+        }
+    }
+
     let mut failures = Vec::new();
     for batch in targets.chunks(jobs) {
         let results = thread::scope(|scope| {
             let handles = batch
                 .iter()
                 .map(|target| {
-                    let target_deployments = &deployments[&target.target];
+                    let target_deployments = deployments(&target.target);
                     scope.spawn(move || deploy_target(target, target_deployments, profile, remove))
                 })
                 .collect::<Vec<_>>();
@@ -287,63 +232,70 @@ fn deploy_targets(
     }
 }
 
-pub fn run(mut args: DeployOptions) -> Result<()> {
-    let hosts = args.target.required()?;
-    let has_files = args.apps.iter().any(|input| is_file_input(input));
-    if has_files && (args.build || args.remove) {
-        return Err(crate::plugins::usage(
-            "file inputs cannot be used with --build or --remove",
-        ));
-    }
-    let flake = if args.apps.is_empty() {
-        let (flake, apps) = build::resolve_apps(&args.source, &args.apps)?;
-        args.apps = apps;
-        Some(flake)
-    } else {
-        None
-    };
-    let apps = args
+pub fn run(args: DeployOptions) -> Result<()> {
+    let file_count = args
         .apps
         .iter()
-        .filter(|input| !is_file_input(input))
-        .cloned()
-        .collect::<Vec<_>>();
-    build::validate_apps(&apps)?;
-    let mut file_manifests = BTreeMap::new();
-    for input in args.apps.iter().filter(|input| is_file_input(input)) {
-        let manifest = teka::tpk::read_single(Path::new(input), teka::tpk::ComponentType::App)?;
-        file_manifests.insert(input.clone(), manifest);
+        .filter(|input| is_file_input(input))
+        .count();
+    if file_count > 0 && file_count != args.apps.len() {
+        return Err(crate::plugins::usage(
+            "deploy app names and package paths in separate invocations",
+        ));
     }
+    if file_count > 0 && args.remove {
+        return Err(crate::plugins::usage(
+            "file inputs cannot be used with --remove",
+        ));
+    }
+
+    let hosts = args.target.required()?;
+    if file_count > 0 {
+        let deployments = args
+            .apps
+            .into_iter()
+            .map(|input| Deployment::read(input.into(), None))
+            .collect::<Result<Vec<_>>>()?;
+        let targets = prepare_targets(&hosts)?;
+        return deploy_targets(
+            &targets,
+            |_| &deployments,
+            &args.profile,
+            false,
+            args.jobs.get(),
+        );
+    }
+
+    let (flake, apps) = build::resolve_apps(&args.source, &args.apps)?;
     let targets = prepare_targets(&hosts)?;
-    let target_arches = targets
-        .iter()
-        .map(|target| target.target.clone())
-        .collect::<BTreeSet<_>>();
-    let files = if args.build {
-        let architectures = target_arches.iter().cloned().collect::<Vec<_>>();
-        let flake = match flake {
-            Some(flake) => flake,
-            None => build::resolve_apps(&args.source, &apps)?.0,
-        };
-        build::build_targets(&flake, &apps, &architectures)?
-    } else if apps.is_empty() {
-        target_arches
-            .iter()
-            .map(|target| (target.clone(), Vec::new()))
-            .collect()
-    } else {
-        result_paths(&apps, &target_arches)?
-    };
-    let deployments = target_arches
-        .iter()
-        .map(|target| {
-            prepare_deployments(&args.apps, &files[target], target, &file_manifests)
-                .map(|deployments| (target.clone(), deployments))
+    let architectures = targets.iter().map(|target| target.target.clone()).collect();
+    // Keep the Nix GC root alive until the last upload completes.
+    let output = tempfile::tempdir().context("create deployment build directory")?;
+    let packages = build::build_targets(
+        &flake,
+        &apps,
+        architectures,
+        &output.path().join("packages"),
+    )?;
+    let deployments = packages
+        .into_iter()
+        .map(|(target, paths)| {
+            paths
+                .into_iter()
+                .zip(&apps)
+                .map(|(path, app)| {
+                    let path = path
+                        .canonicalize()
+                        .with_context(|| format!("resolve package {}", path.display()))?;
+                    Deployment::read(path, Some(app))
+                })
+                .collect::<Result<Vec<_>>>()
+                .map(|deployments| (target, deployments))
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
     deploy_targets(
         &targets,
-        &deployments,
+        |target| &deployments[target],
         &args.profile,
         args.remove,
         args.jobs.get(),

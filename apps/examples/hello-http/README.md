@@ -8,7 +8,7 @@ Teka proxies directly to this fixed listener and manages its TCP 8000 lease thro
 ## Build and deploy
 
 ```sh
-teka app deploy --build
+teka app deploy
 ```
 
 ## Verify

@@ -112,11 +112,6 @@ fn os_package(dir: &Path, name: &str, arch: Architecture) -> std::path::PathBuf 
     path
 }
 
-fn prebuilt_app(dir: &Path, app: &str, arch: Architecture) -> std::path::PathBuf {
-    let output = dir.join("result").join(app);
-    app_package(&output, "app.tpk", arch, &[app])
-}
-
 fn corrupt_package(path: &Path, member: usize) {
     let mut file = fs::File::open(path).unwrap();
     let package = teka::tpk::read(&mut file).unwrap();
@@ -157,7 +152,7 @@ if [ "$1" = build ]; then
         exit 1
     fi
     if printf '%s\n' "$expr" | grep -q 'pkgs.linkFarm "teka-multi"'; then
-        store="${out}-store-teka-multi"
+        store="$TEKA_MOCK_PACKAGES/teka-multi"
         rm -rf "$out" "$store"
         mkdir -p "$store"
         farm=
@@ -348,7 +343,7 @@ fn device_urls_default_scheme_and_preserve_port_and_base_path() {
 fn authenticated_install_streams_with_cookie_and_profile() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
-    let package = prebuilt_app(d.path(), "app", Architecture::X86_64);
+    let package = d.path().join("packages/x86_64-linux/app.tpk");
     let (url, server) = serve(vec![
         ("200 OK", r#"{"enforcement":true}"#),
         ("200 OK", "{}"),
@@ -404,7 +399,7 @@ fn deploy_stops_when_removal_fails() {
         ("500 Internal Server Error", "removal failed"),
     ]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--box", &url, "--remove"])
+        .args(["app", "deploy", "app", "--box", &url, "--remove"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -416,7 +411,7 @@ fn deploy_stops_when_removal_fails() {
 fn setup_sends_password() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
-    let package = prebuilt_app(d.path(), "app", Architecture::X86_64);
+    let package = d.path().join("packages/x86_64-linux/app.tpk");
     let (url, server) = serve(vec![
         ("200 OK", r#"{"needs_setup":true}"#),
         ("200 OK", "{}"),
@@ -447,9 +442,10 @@ fn setup_sends_password() {
 #[test]
 fn errors_without_password_and_rejects_login_redirect() {
     let d = TempDir::new().unwrap();
+    apps_flake(d.path());
     let (url, server) = serve(vec![("200 OK", r#"{"enforcement":true}"#)]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--box", &url])
+        .args(["app", "deploy", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -458,7 +454,7 @@ fn errors_without_password_and_rejects_login_redirect() {
     let (url, server) = serve(vec![("200 OK", "{}")]);
     let out = cli(d.path())
         .env("TEKA_PASSWORD", "secret")
-        .args(["app", "deploy", "--build", "app", "--box", &url])
+        .args(["app", "deploy", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -469,7 +465,7 @@ fn errors_without_password_and_rejects_login_redirect() {
         ("302 Found", "login"),
     ]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "app", "--box", &url])
+        .args(["app", "deploy", "app", "--box", &url])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
@@ -680,7 +676,7 @@ fn initialized_apps_build_without_names_or_flake_flags() {
                 .output()
                 .unwrap();
             success(&output);
-            assert_eq!(output.stdout, b"result/hello-world\n");
+            assert_eq!(output.stdout, b"result/hello-world/app.tpk\n");
             assert!(cwd.join("result/hello-world/app.tpk").is_file());
             let calls = fs::read_to_string(cwd.join("calls")).unwrap();
             let dir = if enclosing_repository {
@@ -724,35 +720,33 @@ fn build_and_deploy_reject_ambiguous_or_invalid_discovered_apps() {
 
 #[test]
 fn deploy_defaults_to_the_only_declared_app() {
-    for build in [false, true] {
-        let d = TempDir::new().unwrap();
-        apps_flake(d.path());
-        script(
-            &d.path().join("bin/nix"),
-            &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
-        );
-        if !build {
-            prebuilt_app(d.path(), "hello-world", Architecture::X86_64);
-        }
-        let (url, server) = serve(vec![
-            ("200 OK", r#"{"auth_disabled":true}"#),
-            ("200 OK", r#"{"architecture":"amd64"}"#),
-            ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
-            ("200 OK", "hello world"),
-        ]);
-        let mut process = cli(d.path());
-        process.args(["app", "deploy", "--box", &url]);
-        if build {
-            process.arg("--build");
-        }
-        success(&process.output().unwrap());
-        let requests = server.join().unwrap();
-        assert_eq!(
-            requests[2].body,
-            fs::read(d.path().join("result/hello-world/app.tpk")).unwrap()
-        );
-        assert_eq!(d.path().join("calls").exists(), build);
-    }
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    script(
+        &d.path().join("bin/nix"),
+        &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
+    );
+    let outside = TempDir::new().unwrap();
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"amd64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+        ("200 OK", "hello world"),
+    ]);
+    success(
+        &cli(d.path())
+            .current_dir(outside.path())
+            .args(["app", "deploy", "--box", &url, "--flake"])
+            .arg(d.path())
+            .output()
+            .unwrap(),
+    );
+    assert_eq!(
+        server.join().unwrap()[2].body,
+        fs::read(d.path().join("packages/x86_64-linux/hello-world.tpk")).unwrap()
+    );
+    assert!(outside.path().join("calls").is_file());
+    assert!(!outside.path().join("result").exists());
 }
 
 #[test]
@@ -769,7 +763,7 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
         success(&out);
         assert_eq!(
             String::from_utf8(out.stdout).unwrap().trim(),
-            "result/hello-world"
+            "result/hello-world/app.tpk"
         );
     }
     let mut file = fs::File::open(d.path().join("result/hello-world/app.tpk")).unwrap();
@@ -789,6 +783,51 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     let out = cli(d.path()).args(["app", "list"]).output().unwrap();
     success(&out);
     assert_eq!(out.stdout, b"app\nhello-world\n");
+}
+
+#[test]
+fn deploy_installs_a_copied_build_without_nix_or_a_project() {
+    let project = TempDir::new().unwrap();
+    apps_flake(project.path());
+    let build = cli(project.path())
+        .args(["app", "build", "hello-world", "app"])
+        .output()
+        .unwrap();
+    success(&build);
+    let stdout = String::from_utf8(build.stdout).unwrap();
+    let paths: Vec<_> = stdout.lines().collect();
+    assert_eq!(paths, ["result/hello-world/app.tpk", "result/app/app.tpk"]);
+
+    let outside = TempDir::new().unwrap();
+    let names = ["./hello-world.tpk", "app.tpk"];
+    for (path, name) in paths.into_iter().zip(names) {
+        fs::copy(project.path().join(path), outside.path().join(name)).unwrap();
+    }
+    drop(project);
+
+    let (url, server) = serve(vec![
+        ("200 OK", r#"{"auth_disabled":true}"#),
+        ("200 OK", r#"{"architecture":"aarch64"}"#),
+        ("200 OK", r#"{"success":true,"app_id":"hello-world"}"#),
+        ("200 OK", "healthy"),
+        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
+        ("200 OK", "healthy"),
+    ]);
+    success(
+        &cli(outside.path())
+            .env("PATH", outside.path())
+            .args(["app", "deploy", "--box", &url])
+            .args(names)
+            .output()
+            .unwrap(),
+    );
+    let requests = server.join().unwrap();
+    for (index, name) in [2, 4].into_iter().zip(names) {
+        assert_eq!(
+            requests[index].body,
+            fs::read(outside.path().join(name)).unwrap()
+        );
+    }
 }
 
 #[test]
@@ -1062,8 +1101,14 @@ fn cli_rejects_invalid_usage() {
         vec!["system", "status", "--host", "device.local"],
         vec!["system", "status", "-H", "device.local"],
         vec!["app", "deploy"],
-        vec!["app", "deploy", "--build"],
-        vec!["app", "deploy", "hello-world", "--build", "hello-world"],
+        vec![
+            "app",
+            "deploy",
+            "--box",
+            "http://device",
+            "--build",
+            "hello-world",
+        ],
         vec![
             "app",
             "deploy",
@@ -1092,7 +1137,7 @@ fn deploy_requires_host() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
     let out = cli(d.path())
-        .args(["app", "deploy", "--build", "hello-world"])
+        .args(["app", "deploy", "hello-world"])
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(2));
@@ -1397,7 +1442,7 @@ fn selected_devices_are_default_deployment_targets() {
     assert_eq!(fs::read(config).unwrap(), before);
     success(
         &cli(d.path())
-            .args(["app", "deploy", "--build", "app"])
+            .args(["app", "deploy", "app"])
             .output()
             .unwrap(),
     );
@@ -1751,7 +1796,6 @@ fn arch_accepts_aliases() {
 fn host_flag_overrides_environment() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
-    prebuilt_app(d.path(), "hello-world", Architecture::X86_64);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
         ("200 OK", r#"{"architecture":"amd64"}"#),
@@ -1769,9 +1813,20 @@ fn host_flag_overrides_environment() {
 }
 
 #[test]
-fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
+fn deploy_builds_unique_architectures_once_and_preserves_standalone_build() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
+    success(
+        &cli(d.path())
+            .args(["app", "build", "app"])
+            .output()
+            .unwrap(),
+    );
+    let standalone = d.path().join("result/app/app.tpk");
+    corrupt_package(&standalone, 0);
+    let stale = fs::read(&standalone).unwrap();
+    fs::remove_file(d.path().join("calls")).unwrap();
+
     let arm_replies = vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
         ("200 OK", r#"{"architecture":"arm64"}"#),
@@ -1810,7 +1865,6 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
         .args([
             "app",
             "deploy",
-            "--build",
             "--jobs",
             "2",
             "--box",
@@ -1823,6 +1877,8 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
         .output()
         .unwrap();
     success(&out);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let store = d.path().join("packages/teka-multi").canonicalize().unwrap();
     let arm_requests = arm_server.join().unwrap();
     let x86_requests = x86_server.join().unwrap();
     let install_bodies = |requests: &[Request]| {
@@ -1846,11 +1902,13 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
             .unwrap()
         });
         assert_eq!(install_bodies(requests), expected);
-        assert_eq!(
-            fs::read(d.path().join("result").join(target).join("app/app.tpk")).unwrap(),
-            expected[0]
+        let package = store.join(target).join("app/app.tpk");
+        assert!(
+            stderr.contains(&format!("teka: installing {} (", package.display())),
+            "{stderr}"
         );
     }
+    assert_eq!(fs::read(standalone).unwrap(), stale);
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
     assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
     for name in ["app", "hello-world"] {
@@ -1861,33 +1919,10 @@ fn deploy_builds_unique_architectures_once_and_reuses_multi_target_result() {
             "apps.teka.apps.\"{name}\".packages.\"x86_64-linux\".\"x86_64-linux\""
         )));
     }
-    let (arm_url, arm_server) = serve(vec![
-        ("200 OK", r#"{"auth_disabled":true}"#),
-        ("200 OK", r#"{"architecture":"aarch64"}"#),
-        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
-        ("200 OK", "healthy"),
-    ]);
-    let (x86_url, x86_server) = serve(vec![
-        ("200 OK", r#"{"auth_disabled":true}"#),
-        ("200 OK", r#"{"architecture":"x86_64"}"#),
-        ("200 OK", r#"{"success":true,"app_id":"app"}"#),
-        ("200 OK", "healthy"),
-    ]);
-    success(
-        &cli(d.path())
-            .args(["app", "deploy", "--box", &arm_url, "--box", &x86_url, "app"])
-            .output()
-            .unwrap(),
-    );
-    for (target, requests) in [
-        ("aarch64-linux", arm_server.join().unwrap()),
-        ("x86_64-linux", x86_server.join().unwrap()),
-    ] {
-        assert_eq!(
-            install_bodies(&requests),
-            vec![fs::read(d.path().join("packages").join(target).join("app.tpk")).unwrap()]
-        );
-    }
+    let (_, args) = calls.split_once("--out-link\n").unwrap();
+    let out_link = Path::new(args.lines().next().unwrap());
+    assert!(out_link.is_absolute());
+    assert!(!out_link.parent().unwrap().exists());
 }
 
 #[test]
@@ -1913,7 +1948,6 @@ fn deploy_reuses_one_build_for_same_architecture_hosts() {
         .args([
             "app",
             "deploy",
-            "--build",
             "--box",
             &first_url,
             "--box",
@@ -1935,13 +1969,13 @@ fn deploy_reuses_one_build_for_same_architecture_hosts() {
     assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
     assert!(calls.contains("pkgs.linkFarm \"teka-aarch64-linux\""));
     assert!(!calls.contains("teka-multi"));
-    assert!(d.path().join("result/app/app.tpk").is_file());
+    assert!(!d.path().join("result").exists());
 }
 
 #[test]
-fn deploy_rejects_mixed_architectures_without_matching_build() {
+fn deploy_rejects_a_package_for_the_wrong_architecture_on_any_box() {
     let d = TempDir::new().unwrap();
-    apps_flake(d.path());
+    let package = app_package(d.path(), "app.tpk", Architecture::Aarch64, &["app"]);
     let (arm_url, arm_server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
         ("200 OK", r#"{"architecture":"aarch64"}"#),
@@ -1951,12 +1985,16 @@ fn deploy_rejects_mixed_architectures_without_matching_build() {
         ("200 OK", r#"{"architecture":"x86_64"}"#),
     ]);
     let out = cli(d.path())
-        .args(["app", "deploy", "--box", &arm_url, "--box", &x86_url, "app"])
+        .args(["app", "deploy", "--box", &arm_url, "--box", &x86_url])
+        .arg(package)
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&out.stderr).contains("mixed-architecture deploy"));
-    assert!(!d.path().join("calls").exists());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("is for aarch64; device is x86_64"),
+        "{stderr}"
+    );
     assert_eq!(arm_server.join().unwrap().len(), 2);
     assert_eq!(x86_server.join().unwrap().len(), 2);
 }
@@ -1980,6 +2018,7 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
     let os = os_package(d.path(), "os.tpk", Architecture::Aarch64);
     for (path, expected) in [
         (raw, "requires a .tpk file"),
+        (d.path().join("missing.tpk"), "No such file"),
         (malformed, "read TPK envelope"),
         (corrupt, "HashMismatch"),
         (multiple, "exactly one component"),
@@ -1999,52 +2038,42 @@ fn deploy_rejects_invalid_files_before_contacting_device() {
         );
         assert!(!stderr.contains("authenticate"), "{stderr}");
     }
-    for option in ["--build", "--remove"] {
-        let out = cli(d.path())
-            .args(["app", "deploy", "--box", "http://127.0.0.1:1", option])
-            .arg(&valid)
-            .output()
-            .unwrap();
-        assert_eq!(out.status.code(), Some(2));
-        assert!(String::from_utf8_lossy(&out.stderr).contains("file inputs cannot be used"));
-    }
+    let out = cli(d.path())
+        .args(["app", "deploy", "--remove"])
+        .arg(&valid)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("file inputs cannot be used with --remove")
+    );
 }
 
 #[test]
-fn deploy_accepts_bare_package_filename_and_preserves_named_app_lookup() {
+fn deploy_rejects_mixed_inputs_and_treats_dotted_names_as_app_ids() {
     let d = TempDir::new().unwrap();
-    let package = app_package(d.path(), "external.tpk", Architecture::X86_64, &["app"]);
-    let named_package = prebuilt_app(d.path(), "app", Architecture::X86_64);
-    fs::write(d.path().join("app"), b"not a package").unwrap();
-    for input in ["external.tpk", "app"] {
-        let (url, server) = serve(vec![
-            ("200 OK", r#"{"auth_disabled":true}"#),
-            ("200 OK", r#"{"architecture":"amd64"}"#),
-            ("200 OK", r#"{"success":true,"app_id":"runtime-app"}"#),
-            ("200 OK", "healthy"),
-        ]);
-        success(
-            &cli(d.path())
-                .args(["app", "deploy", "--box", &url, input])
-                .output()
-                .unwrap(),
-        );
-        let requests = server.join().unwrap();
-        let expected = if input == "app" {
-            &named_package
-        } else {
-            &package
-        };
-        assert_eq!(requests[2].body, fs::read(expected).unwrap());
-        assert!(requests[3].line.contains("/runtime-app/logs"));
+    for inputs in [["app", "missing.tpk"], ["./missing", "app"]] {
+        let out = cli(d.path())
+            .args(["app", "deploy"])
+            .args(inputs)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2));
+        assert!(String::from_utf8_lossy(&out.stderr).contains("separate invocations"));
     }
+    let out = cli(d.path())
+        .args(["app", "deploy", "--box", "http://127.0.0.1:1", "bad.name"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("invalid app id 'bad.name'"));
 }
 
 #[test]
 fn deploy_preflight_blocks_device_mutation() {
     let d = TempDir::new().unwrap();
-    prebuilt_app(d.path(), "app", Architecture::Aarch64);
-    let invalid = prebuilt_app(d.path(), "hello-world", Architecture::Aarch64);
+    apps_flake(d.path());
+    let invalid = d.path().join("packages/aarch64-linux/hello-world.tpk");
     corrupt_package(&invalid, 0);
     let (url, server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
@@ -2086,7 +2115,12 @@ fn deploy_preflight_blocks_device_mutation() {
             "has app ID other, expected app",
         ),
     ] {
-        app_package(&d.path().join("result/app"), "app.tpk", arch, &[id]);
+        app_package(
+            &d.path().join("packages/aarch64-linux"),
+            "app.tpk",
+            arch,
+            &[id],
+        );
         let (url, server) = serve(vec![
             ("200 OK", r#"{"auth_disabled":true}"#),
             ("200 OK", r#"{"architecture":"aarch64"}"#),
@@ -2099,7 +2133,7 @@ fn deploy_preflight_blocks_device_mutation() {
         assert_eq!(out.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(
-            stderr.contains(expected) && stderr.contains("result/app/app.tpk"),
+            stderr.contains(expected) && stderr.contains("packages/app/app.tpk"),
             "{stderr}"
         );
         assert!(DeviceClient::new(&url).unwrap().get_json("done").is_ok());
@@ -2110,7 +2144,12 @@ fn deploy_preflight_blocks_device_mutation() {
             .all(|r| r.line.starts_with("GET ")));
     }
 
-    apps_flake(d.path());
+    app_package(
+        &d.path().join("packages/aarch64-linux"),
+        "app.tpk",
+        Architecture::Aarch64,
+        &["app"],
+    );
     corrupt_package(&d.path().join("packages/x86_64-linux/app.tpk"), 0);
     let (arm_url, arm_server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
@@ -2124,7 +2163,7 @@ fn deploy_preflight_blocks_device_mutation() {
     ]);
     let out = cli(d.path())
         .args([
-            "app", "deploy", "--build", "--remove", "--box", &arm_url, "--box", &x86_url, "app",
+            "app", "deploy", "--remove", "--box", &arm_url, "--box", &x86_url, "app",
         ])
         .output()
         .unwrap();
@@ -2148,7 +2187,6 @@ fn deploy_preflight_blocks_device_mutation() {
 fn deploy_collects_failures_after_other_hosts_finish() {
     let d = TempDir::new().unwrap();
     apps_flake(d.path());
-    prebuilt_app(d.path(), "app", Architecture::Aarch64);
     let (good_url, good_server) = serve(vec![
         ("200 OK", r#"{"auth_disabled":true}"#),
         ("200 OK", r#"{"architecture":"aarch64"}"#),
@@ -2846,7 +2884,7 @@ fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
         let out = cli(d.path())
             .env("TEKA_BUILD_VM", "always")
             .env("MOCK_SYSTEM", "aarch64-darwin")
-            .args(["app", "deploy", "--build", "app", "--box", &url])
+            .args(["app", "deploy", "app", "--box", &url])
             .output()
             .unwrap();
         success(&out);
