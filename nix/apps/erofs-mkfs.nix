@@ -4,7 +4,7 @@
 # kernel ≥6.6). Shared with downstream appliance image builders.
 #
 # `output` and `sourceDir` are raw shell fragments (e.g. "$out/foo.raw", tree).
-{ lib, erofs-utils }:
+{ lib }:
 let
   args = [
     "--all-root"
@@ -17,8 +17,9 @@ in
 {
   inherit args;
 
-  mkfs =
+  mkErofsImageScript =
     {
+      erofs-utils,
       output,
       sourceDir,
       extraArgs ? [ ],
@@ -27,10 +28,12 @@ in
       flags = args ++ [ "-zlz4hc,level=9" ] ++ extraArgs;
     in
     ''
-      SOURCE_DATE_EPOCH=0 ${erofs-utils}/bin/mkfs.erofs \
-        ${lib.escapeShellArgs flags} \
-        ${output} \
-        ${sourceDir}
-      ${erofs-utils}/bin/fsck.erofs ${output}
+      (
+        SOURCE_DATE_EPOCH=0 ${erofs-utils}/bin/mkfs.erofs \
+          ${lib.escapeShellArgs flags} \
+          ${output} \
+          ${sourceDir} &&
+        ${erofs-utils}/bin/fsck.erofs ${output}
+      )
     '';
 }

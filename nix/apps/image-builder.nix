@@ -13,7 +13,7 @@
 }:
 let
   inherit (version) imageVersion buildId appArtifactRawName;
-  erofs = import ./erofs-mkfs.nix { inherit lib erofs-utils; };
+  erofs = import ./erofs-mkfs.nix { inherit lib; };
   signedDdi = import ./signed-ddi.nix { inherit lib; };
   # IMAGE_VERSION / VERSION / BUILD_ID follow the app release scheme. ID stays
   # the portable name. VERSION_ID=1 is the current GPU compatibility generation

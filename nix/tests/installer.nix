@@ -11,6 +11,7 @@
   published ? false,
 }:
 let
+  inherit (import ./installer-common.nix) validateReleaseTag stageInstaller installPublished;
   image = fetchurl {
     url = "https://cloud-images.ubuntu.com/releases/noble/release-20261017/ubuntu-24.04-server-cloudimg-amd64.img";
     hash = "sha256:04e8f2461a16a44e78a370284471f29616cdd9baf1893df25807b71f985b6c94";
@@ -26,12 +27,7 @@ writeShellApplication {
     gnused
   ];
   text = ''
-    ${lib.optionalString published ''
-      if (( $# > 1 )) || [[ -n "''${1:-}" && ! "$1" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]; then
-        echo 'Usage: test-published-install [RELEASE_TAG]' >&2
-        exit 1
-      fi
-    ''}
+    ${lib.optionalString published validateReleaseTag}
     work=$(mktemp -d)
     log=$(mktemp --tmpdir --suffix=.log teka-installer.XXXXXX)
     cleanup() {
@@ -48,10 +44,7 @@ writeShellApplication {
 
     qemu-img create -q -f qcow2 -F qcow2 -b ${image} disk.qcow2
     qemu-img resize -q disk.qcow2 16G
-    ${lib.optionalString published ''
-      cp ${../../install.sh} install.sh
-      printf '%s\n' "''${1:-}" > release-tag
-    ''}
+    ${lib.optionalString published (stageInstaller ".")}
     ${lib.optionalString (!published) "cp ${dist}/teka-x86_64-linux teka"}
     echo 'instance-id: teka-installer' > meta-data
     cat > user-data <<EOF
@@ -68,14 +61,7 @@ writeShellApplication {
     test -z "$(command -v nix)"
     ${
       if published then
-        ''
-          release_tag=$(cat /mnt/test/release-tag)
-          if [ -n "$release_tag" ]; then
-            cat /mnt/test/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh -s -- "$release_tag"
-          else
-            curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh
-          fi
-        ''
+        installPublished "/mnt/test"
       else
         ''
           install -m755 /mnt/test/teka /teka

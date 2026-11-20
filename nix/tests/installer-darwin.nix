@@ -15,6 +15,7 @@
   published ? false,
 }:
 let
+  inherit (import ./installer-common.nix) validateReleaseTag stageInstaller installPublished;
   # FIXME: Drop this override once Nixpkgs has Tart with --net-fd,
   # which gvproxy needs to avoid VPN-sensitive vmnet routing.
   networkTart = tart.overrideAttrs (
@@ -45,12 +46,7 @@ writeShellApplication {
     SSH_ASKPASS_REQUIRE = "force";
   };
   text = ''
-    ${lib.optionalString published ''
-      if (( $# > 1 )) || [[ -n "''${1:-}" && ! "$1" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]; then
-        echo 'Usage: test-published-install [RELEASE_TAG]' >&2
-        exit 1
-      fi
-    ''}
+    ${lib.optionalString published validateReleaseTag}
     # Keep Unix socket paths below Darwin's 104-byte limit.
     work=$(mktemp -d /tmp/teka-installer.XXXXXX)
     log=$(mktemp --tmpdir --suffix=.log teka-installer.XXXXXX)
@@ -151,14 +147,7 @@ writeShellApplication {
     sudo install -d -o "$(id -u)" -g "$(id -g)" /usr/local/bin
     ${
       if published then
-        ''
-          release_tag=$(cat /tmp/teka-build-init/release-tag)
-          if [ -n "$release_tag" ]; then
-            cat /tmp/teka-build-init/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh -s -- "$release_tag"
-          else
-            curl -fsSL https://raw.githubusercontent.com/ouster-lidar/teka-sdk/main/install.sh | NIX_INSTALLER_NO_CONFIRM=true sh
-          fi
-        ''
+        installPublished "/tmp/teka-build-init"
       else
         ''
           chmod 755 /tmp/teka-build-init/teka
@@ -222,10 +211,7 @@ writeShellApplication {
     ${builtins.readFile ./builder-tcg.nix}
     EOF
     ${lib.optionalString (!published) ''cp ${dist}/teka-aarch64-darwin "$work/teka"''}
-    ${lib.optionalString published ''
-      cp ${../../install.sh} "$work/install.sh"
-      printf '%s\n' "''${1:-}" > "$work/release-tag"
-    ''}
+    ${lib.optionalString published (stageInstaller "$work")}
     run_test() {
       guest 'mkdir -p /tmp/teka-build-init'
       scp "''${ssh_options[@]}" \

@@ -1,27 +1,16 @@
 {
   pkgs,
   crane,
-  advisoryDb,
+  mkTeka,
   nixpkgsRev,
-  sdkRef,
 }:
 let
   inherit (pkgs) lib stdenv;
   inherit (stdenv.hostPlatform) system;
   craneLib = crane.mkLib pkgs;
-  mkTeka =
-    pkgs: portable:
-    pkgs.callPackage ./packages/teka-cli.nix {
-      inherit
-        portable
-        nixpkgsRev
-        sdkRef
-        advisoryDb
-        ;
-      craneLib = crane.mkLib pkgs;
-    };
-  portable = mkTeka (if stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs) true;
-  teka = (mkTeka pkgs false).overrideAttrs (old: {
+  portablePkgs = if stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
+  portable = (mkTeka portablePkgs).override { portable = true; };
+  teka = (mkTeka pkgs).overrideAttrs (old: {
     passthru = old.passthru // {
       dist =
         pkgs.runCommand "teka-dist-${portable.version}"
@@ -39,6 +28,23 @@ let
           '';
     };
   });
+  asApp = package: {
+    type = "app";
+    program = lib.getExe package;
+  };
+  installerApp =
+    published:
+    asApp (
+      pkgs.callPackage
+        (if stdenv.hostPlatform.isDarwin then ./tests/installer-darwin.nix else ./tests/installer.nix)
+        (
+          {
+            inherit (teka) dist;
+            inherit published;
+          }
+          // lib.optionalAttrs stdenv.hostPlatform.isDarwin { inherit nixpkgsRev; }
+        )
+    );
   rustShell = craneLib.devShell {
     inputsFrom = [ teka ];
     packages =
@@ -70,35 +76,11 @@ rec {
   };
 
   apps = {
-    teka = {
-      type = "app";
-      program = lib.getExe teka;
-    };
-    default = apps.teka;
+    default = asApp teka;
   }
   // lib.optionalAttrs (system == "x86_64-linux" || system == "aarch64-darwin") {
-    test-build-init = {
-      type = "app";
-      program = lib.getExe (
-        pkgs.callPackage
-          (if stdenv.hostPlatform.isDarwin then ./tests/installer-darwin.nix else ./tests/installer.nix)
-          ({ inherit (teka) dist; } // lib.optionalAttrs stdenv.hostPlatform.isDarwin { inherit nixpkgsRev; })
-      );
-    };
-    test-published-install = {
-      type = "app";
-      program = lib.getExe (
-        pkgs.callPackage
-          (if stdenv.hostPlatform.isDarwin then ./tests/installer-darwin.nix else ./tests/installer.nix)
-          (
-            {
-              inherit (teka) dist;
-              published = true;
-            }
-            // lib.optionalAttrs stdenv.hostPlatform.isDarwin { inherit nixpkgsRev; }
-          )
-      );
-    };
+    test-build-init = installerApp false;
+    test-published-install = installerApp true;
   };
 
   checks = {
@@ -109,22 +91,7 @@ rec {
       inherit system;
     };
   }
-  // import ./tests/sdk.nix {
-    inherit craneLib;
-    inherit (pkgs)
-      lib
-      stdenv
-      openssl
-      pkg-config
-      osslsigncode
-      cryptsetup
-      sbsigntool
-      ;
-  }
-  // import ./tests/features.nix {
-    inherit craneLib;
-    inherit (pkgs) lib openssl pkg-config;
-  };
+  // import ./tests/sdk.nix { inherit pkgs craneLib; };
 
   devShells = {
     rust = rustShell;

@@ -27,6 +27,15 @@
     }:
     let
       inherit (nixpkgs) lib;
+      nixpkgsRev = nixpkgs.rev;
+      mkTeka =
+        pkgs:
+        pkgs.callPackage ./nix/packages/teka-cli.nix {
+          inherit nixpkgsRev;
+          craneLib = crane.mkLib pkgs;
+          advisoryDb = rustsecAdvisoryDb;
+          sdkRef = if self ? rev then "github:ouster-lidar/teka-sdk/${self.rev}" else null;
+        };
       perSystem =
         lib.genAttrs
           [
@@ -43,10 +52,12 @@
               };
             in
             import ./nix {
-              inherit pkgs crane;
-              advisoryDb = rustsecAdvisoryDb;
-              nixpkgsRev = nixpkgs.rev;
-              sdkRef = if self ? rev then "github:ouster-lidar/teka-sdk/${self.rev}" else null;
+              inherit
+                pkgs
+                crane
+                mkTeka
+                nixpkgsRev
+                ;
             }
           );
       examples = import ./apps {
@@ -57,11 +68,9 @@
     in
     {
       lib = {
+        certs.app.dev = builtins.readFile ./nix/apps/dev-keys/apps.pem;
         mkVersion = import ./nix/apps/version.nix;
-        paths = {
-          erofsMkfs = ./nix/apps/erofs-mkfs.nix;
-          coreVersionValidate = ./nix/apps/core-version-validate.nix;
-        };
+        inherit (import ./nix/apps/erofs-mkfs.nix { inherit lib; }) mkErofsImageScript;
         mkAppOutputs = import ./nix/apps {
           inherit nixpkgs crane;
           tekaFor = system: self.packages.${system}.teka;
@@ -89,8 +98,14 @@
 
       checks = lib.recursiveUpdate (outputFor "checks") examples.checks;
 
-      overlays.default = final: _: {
-        inherit (self.packages.${final.stdenv.hostPlatform.system}) teka teka-runner;
-      };
+      overlays.default =
+        final: _:
+        let
+          inherit (final.stdenv) buildPlatform hostPlatform;
+        in
+        {
+          teka =
+            if buildPlatform == hostPlatform then self.packages.${hostPlatform.system}.teka else mkTeka final;
+        };
     };
 }
