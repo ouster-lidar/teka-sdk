@@ -1318,7 +1318,7 @@ fn device_list_retains_connections_without_credentials() {
     assert!(out.stdout.is_empty());
     let config = d.path().join("config/teka/config.json");
     fs::create_dir_all(config.parent().unwrap()).unwrap();
-    fs::write(&config, r#"{"default_device":"ZULU.local:80"}"#).unwrap();
+    fs::write(&config, r#"{"selected_devices":["ZULU.local:80"]}"#).unwrap();
     let out = list();
     success(&out);
     assert_eq!(
@@ -1510,7 +1510,7 @@ fn failed_batch_selection_preserves_previous_targets() {
     let d = TempDir::new().unwrap();
     let config = d.path().join("config/teka/config.json");
     fs::create_dir_all(config.parent().unwrap()).unwrap();
-    fs::write(&config, r#"{"default_device":"http://previous.local/"}"#).unwrap();
+    fs::write(&config, r#"{"selected_devices":["http://previous.local/"]}"#).unwrap();
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#)]);
     let out = cli(d.path())
         .args(["box", "select", &url, "http://localhost:1"])
@@ -2844,7 +2844,7 @@ fn system_requires_host() {
     for contents in [
         "{",
         r#"{"password":"secret"}"#,
-        r#"{"default_device":"box?token=secret"}"#,
+        r#"{"selected_devices":["box?token=secret"]}"#,
     ] {
         fs::write(&config, contents).unwrap();
         let out = system_cli(d.path())

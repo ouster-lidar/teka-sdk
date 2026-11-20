@@ -39,7 +39,6 @@ pub(crate) struct Metadata {
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Config {
-    pub default_device: Option<String>,
     #[serde(default)]
     pub devices: BTreeSet<String>,
     #[serde(default)]
@@ -57,12 +56,6 @@ pub(crate) fn connections() -> Result<Config> {
     };
     let mut config: Config = serde_json::from_slice(&contents)
         .with_context(|| format!("invalid configuration in {}", path.display()))?;
-    config.default_device = config
-        .default_device
-        .as_deref()
-        .map(canonical_url)
-        .transpose()
-        .context("invalid default_device in configuration")?;
     config.devices = config
         .devices
         .iter()
@@ -75,11 +68,6 @@ pub(crate) fn connections() -> Result<Config> {
         .map(|device| canonical_url(device))
         .collect::<Result<_>>()
         .context("invalid selected device in configuration")?;
-    if config.selected_devices.is_empty() {
-        config
-            .selected_devices
-            .extend(config.default_device.iter().cloned());
-    }
     config
         .devices
         .extend(config.selected_devices.iter().cloned());
@@ -89,11 +77,6 @@ pub(crate) fn connections() -> Result<Config> {
         .map(|(url, metadata)| Ok((canonical_url(&url)?, metadata)))
         .collect::<Result<_>>()
         .context("invalid device metadata in configuration")?;
-    config.default_device = config
-        .selected_devices
-        .first()
-        .filter(|_| config.selected_devices.len() == 1)
-        .cloned();
     Ok(config)
 }
 
@@ -263,11 +246,6 @@ pub(crate) fn forget_connection(device: &str) -> Result<()> {
     set(device, None, &metadata)?;
     config.devices.remove(device);
     config.selected_devices.remove(device);
-    config.default_device = config
-        .selected_devices
-        .first()
-        .filter(|_| config.selected_devices.len() == 1)
-        .cloned();
     let result = save_config(&config);
     if result.is_err() {
         if let Err(rollback) = set(device, previous.as_deref(), &metadata) {
@@ -280,11 +258,6 @@ pub(crate) fn forget_connection(device: &str) -> Result<()> {
 pub(crate) fn set_selection(devices: &[String]) -> Result<()> {
     let mut config = connections()?;
     config.selected_devices = devices.iter().cloned().collect();
-    config.default_device = config
-        .selected_devices
-        .first()
-        .filter(|_| config.selected_devices.len() == 1)
-        .cloned();
     save_config(&config)
 }
 
