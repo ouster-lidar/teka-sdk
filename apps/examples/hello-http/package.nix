@@ -23,6 +23,6 @@ teka.lib.mkAppImage {
       install -Dm644 -t "$web" ${./web}/{hello-http.html,hello-http.js}
       substituteInPlace "$web/hello-http.js" --replace-fail "__HELLO_HTTP_PORT__" "${port}"
     '')
-    teka.lib.webApi
+    pkgs.teka-app-api-js
   ];
 }

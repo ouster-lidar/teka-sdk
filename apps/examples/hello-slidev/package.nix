@@ -1,9 +1,11 @@
-{ pkgs, teka }:
+{
+  lib,
+  pkgs,
+  teka,
+}:
 let
-  inherit (pkgs) lib buildPackages;
-  program = teka.lib.buildRustApp {
-    srcDir = ./.;
-  };
+  inherit (pkgs) buildPackages;
+  program = teka.lib.buildRustApp { srcDir = ./.; };
 
   slidevSrc = builtins.path {
     path = ./slidev;
@@ -67,10 +69,8 @@ teka.lib.mkAppImage {
       };
     };
   };
-  image = {
-    packages = [
-      (pkgs.linkFarm "hello-slidev-web" { "${teka.appDir}/web" = ./web; })
-      teka.lib.webApi
-    ];
-  };
+  image.packages = [
+    (pkgs.linkFarm "hello-slidev-web" { "${teka.appDir}/web" = ./web; })
+    pkgs.teka-app-api-js
+  ];
 }

@@ -29,7 +29,6 @@ let
   teka.appId = name;
   teka.appDir = "usr/lib/teka/app";
   teka.lib = {
-    webApi = pkgs.linkFarm "teka-web-api" { "${teka.appDir}/web/app-api.js" = ./web/app-api.js; };
     buildRustApp = pkgs.callPackage ./app-crate.nix { inherit craneLib advisoryDb; };
     inherit wayland;
     tekaRunner = pkgs.callPackage ../packages/teka-runner.nix { inherit craneLib; };

@@ -594,7 +594,3 @@
     height: 100%;
     padding: 0.25rem;
 }
-
-.how-terminal .xterm-viewport {
-    overflow-y: auto !important;
-}

@@ -73,7 +73,7 @@ let
                 pkgs.fakeNss
                 rootFiles
                 (pkgs.linkFarm "packaging-probe-web-root" { "${teka.appDir}/web" = web; })
-                teka.lib.webApi
+                pkgs.teka-app-api-js
                 (pkgs.linkFarm "packaging-probe-overrides" {
                   "etc/hosts" = pkgs.writeText "probe-hosts" "127.0.0.1 localhost\n";
                   "etc/passwd" = pkgs.writeText "probe-passwd" "fixture\n";
@@ -121,7 +121,7 @@ let
           exit 1
         fi
         extract "$app_dir/web/app-api.js" > app-api.js
-        cmp ${../../nix/apps/web/app-api.js} app-api.js
+        cmp ${../../nix/packages/teka-app-api-js/app-api.js} app-api.js
         ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --ls --path=nix/store "$raw" > store-files
         if awk 'NF == 3 { print $3 }' store-files |
           grep -Fx -e "${baseNameOf (toString web)}" -e "${baseNameOf (toString tool)}"

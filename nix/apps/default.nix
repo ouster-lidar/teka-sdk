@@ -78,6 +78,10 @@ let
     ) "Malformed app build ID '${id}'";
     id;
   forSystems = lib.genAttrs systems;
+  appOverlay = final: _: {
+    teka-app-api-js = final.buildPackages.callPackage ../packages/teka-app-api-js { };
+    xterm-web = final.callPackage ../packages/xterm.nix { };
+  };
   waylandOverlay = import ./overlays/wayland-compositors-overlay.nix;
   crossOverlay = import ./overlays/cross.nix;
 
@@ -92,7 +96,7 @@ let
         {
           localSystem = buildSystem;
           config.allowUnfree = true;
-          overlays = overlays ++ [ waylandOverlay ] ++ lib.optional isCross crossOverlay;
+          overlays = [ appOverlay ] ++ overlays ++ [ waylandOverlay ] ++ lib.optional isCross crossOverlay;
         }
         // lib.optionalAttrs isCross { crossSystem = targetSystem; }
       )

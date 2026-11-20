@@ -7,6 +7,6 @@ teka.lib.mkAppImage {
   };
   image.packages = [
     (pkgs.linkFarm "hello-webui-web" { "${teka.appDir}/web" = ./web; })
-    teka.lib.webApi
+    pkgs.teka-app-api-js
   ];
 }

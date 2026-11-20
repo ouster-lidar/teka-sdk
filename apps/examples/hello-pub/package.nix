@@ -18,6 +18,6 @@ teka.lib.mkAppImage {
   };
   image.packages = [
     (pkgs.linkFarm "hello-pub-web" { "${teka.appDir}/web" = ./web; })
-    teka.lib.webApi
+    pkgs.teka-app-api-js
   ];
 }

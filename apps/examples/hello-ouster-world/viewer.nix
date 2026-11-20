@@ -30,6 +30,7 @@
 let
   name = teka.appId;
   display = teka.lib.wayland;
+  inherit (pkgs.buildPackages) xterm-web;
   pythonSrc = lib.fileset.toSource {
     root = src;
     fileset = lib.fileset.unions (
@@ -194,7 +195,11 @@ teka.lib.mkAppImage {
     packages = [
       (pkgs.writeTextDir "srv/recordings/.keep" "")
       (pkgs.linkFarm "${name}-web" { "${teka.appDir}/web" = src + "/web"; })
-      teka.lib.webApi
+      (pkgs.buildPackages.linkFarm "xterm-assets" {
+        "${teka.appDir}/web" = "${xterm-web}/share/xterm";
+        "usr/share/licenses/xterm" = "${xterm-web}/share/licenses/xterm";
+      })
+      pkgs.teka-app-api-js
     ];
   };
 }

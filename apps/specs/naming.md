@@ -14,7 +14,7 @@ Web assets install under `usr/lib/teka/mission-control/web/`.
 | App id / registry key | `hello-{topic}` | `teka.apps.hello-http` |
 | Source dir | topic | `examples/hello-http/` |
 | App guide | `README.md` | `examples/hello-http/README.md` |
-| Shared web helper (source) | `nix/apps/web/app-api.js` | — |
+| Shared web helper (source) | `nix/packages/teka-app-api-js/app-api.js` | — |
 | Shared web helper (DDI install) | `usr/lib/teka/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
 | App panel JS global | `tekaAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
 

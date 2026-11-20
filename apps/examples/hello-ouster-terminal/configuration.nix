@@ -40,6 +40,6 @@
 
   image.packages = [
     (pkgs.linkFarm "hello-ouster-terminal-web" { "${teka.appDir}/web" = ./web; })
-    teka.lib.webApi
+    pkgs.teka-app-api-js
   ];
 }

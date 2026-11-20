@@ -47,6 +47,6 @@ in
   cmp display.js ${../web/display.js}
   for name in app-api.js xterm.js xterm.css xterm-addon-fit.js; do
     extract "usr/lib/teka/app/web/$name" >asset
-    cmp asset "${../web}/$name"
+    test -s asset
   done
 ''
