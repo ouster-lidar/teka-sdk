@@ -27,17 +27,17 @@
 
       isAarch64 = stdenv.hostPlatform.system == "aarch64-linux";
 
-      # aarch64: upstream prebuilt (nixpkgs ollama does not cross from x86_64).
+      # Jetson needs the JetPack build, and Nixpkgs Ollama cannot cross-compile.
       ollamaBackend =
-        if isAarch64 then pkgs.callPackage ./ollama-aarch64-prebuilt.nix { } else pkgs.ollama;
+        if isAarch64 then
+          pkgs.callPackage ./ollama-aarch64-prebuilt.nix { }
+        else if pkgs.stdenv.buildPlatform != pkgs.stdenv.hostPlatform then
+          pkgs.callPackage ./ollama-amd64-prebuilt.nix { }
+        else
+          pkgs.ollama;
 
-      # Container rootfs on all platforms (nixpkgs open-webui pulls torch and is slow to build).
-      openWebUi = pkgs.callPackage ./open-webui-docker.nix {
-        unpackGnutar = pkgs.buildPackages.gnutar;
-        unpackJq = pkgs.buildPackages.jq;
-        hostPatchelf = pkgs.buildPackages.patchelf;
-        hostWriteShellScript = pkgs.buildPackages.writeShellScript;
-      };
+      # Use the container rootfs to avoid building PyTorch.
+      openWebUi = pkgs.callPackage ./open-webui-docker.nix { };
 
       ollamaBin = lib.getExe ollamaBackend;
 
