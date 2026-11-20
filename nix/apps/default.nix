@@ -1,69 +1,135 @@
 {
   nixpkgs,
   crane,
+  rustsecAdvisoryDb,
   tekaFor,
 }:
-
+let
+  sdkNixpkgs = nixpkgs;
+  supportedSystems = [
+    "x86_64-linux"
+    "aarch64-linux"
+  ];
+in
 {
   self,
   apps,
-  systems ? [
-    "x86_64-linux"
-    "aarch64-linux"
-  ],
-  version ? import ./version.nix {
-    inherit self;
-    inherit (nixpkgs) lib;
-  },
-  advisoryDb ? null,
-  tekaSrc ? null,
+  nixpkgs ? sdkNixpkgs,
+  systems ? supportedSystems,
+  audit ? false,
   overlays ? [ ],
-  simpleCrossApps ? [ ],
-  imageChecks ? { },
 }:
 let
   inherit (nixpkgs) lib;
-  inherit (version) appArtifactRawName imageVersion buildId;
-  appNames = lib.attrNames apps;
+  versionNumber = "(0|[1-9][0-9]*)";
+  prereleaseId = "(${versionNumber}|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)";
+  readApp =
+    {
+      package,
+      modules ? [ ],
+      imageCheck ? (_: ""),
+    }:
+    let
+      manifest = builtins.dirOf package + "/manifest.json";
+      data = lib.importJSON manifest;
+      id = data.id or (throw "Missing id in ${toString manifest}");
+      version = data.version or (throw "Missing version in ${toString manifest}");
+    in
+    assert lib.assertMsg (builtins.pathExists manifest) "Missing ${toString manifest}";
+    assert lib.assertMsg (
+      builtins.isString id && builtins.match "[a-z0-9][a-z0-9_-]{0,63}" id != null && id != "default"
+    ) "Invalid id in ${toString manifest}";
+    assert lib.assertMsg (
+      builtins.isString version
+      && builtins.stringLength version <= 64
+      &&
+        builtins.match "${versionNumber}\\.${versionNumber}\\.${versionNumber}(-${prereleaseId}(\\.${prereleaseId})*)?" version
+        != null
+    ) "Invalid version in ${toString manifest}";
+    lib.nameValuePair id {
+      inherit
+        package
+        modules
+        imageCheck
+        manifest
+        version
+        ;
+      fullVersion = "${version}+${buildId}";
+    };
+  appsById = builtins.listToAttrs (map readApp apps);
+  appNames = lib.attrNames appsById;
+  artifactBase = id: target: "${id}-${target}-v${appsById.${id}.fullVersion}";
+  buildId =
+    let
+      shortRev = self.shortRev or "";
+      dirtyRev = builtins.replaceStrings [ "-dirty" ] [ "" ] (self.dirtyShortRev or "");
+      rev =
+        if shortRev != "" && shortRev != "0000000" then
+          shortRev
+        else if dirtyRev != "" then
+          dirtyRev
+        else
+          "0000000";
+      hash = builtins.substring 0 7 (builtins.hashString "sha256" (self.narHash or ""));
+      id = "${self.lastModifiedDate or "19700101000000"}.g${rev}.n${hash}";
+    in
+    assert lib.assertMsg (
+      builtins.match "[0-9]{14}\\.g[0-9a-f]+\\.n[0-9a-f]{7}" id != null
+    ) "Malformed app build ID '${id}'";
+    id;
+  forSystems = lib.genAttrs systems;
   waylandOverlay = import ./overlays/wayland-compositors-overlay.nix;
   crossOverlay = import ./overlays/cross.nix;
+
+  packageSets = forSystems (
+    buildSystem:
+    forSystems (
+      targetSystem:
+      let
+        isCross = buildSystem != targetSystem;
+      in
+      import nixpkgs (
+        {
+          localSystem = buildSystem;
+          config.allowUnfree = true;
+          overlays = overlays ++ [ waylandOverlay ] ++ lib.optional isCross crossOverlay;
+        }
+        // lib.optionalAttrs isCross { crossSystem = targetSystem; }
+      )
+    )
+  );
 
   packageFor =
     id: buildSystem: targetSystem:
     let
-      isCross = buildSystem != targetSystem;
-      pkgs = import nixpkgs (
+      pkgs = packageSets.${buildSystem}.${targetSystem};
+      app = appsById.${id};
+      inherit (app) version;
+      basename = artifactBase id targetSystem;
+      artifact = "${basename}.raw";
+      image = lib.makeOverridable (
         {
-          config.allowUnfree = true;
-          overlays = overlays
-          ++ [ waylandOverlay ]
-          ++ lib.optional (isCross && !(lib.elem id simpleCrossApps)) crossOverlay;
-        }
-        // (
-          if isCross then
-            {
-              localSystem = buildSystem;
-              crossSystem = targetSystem;
-            }
-          else
-            { system = buildSystem; }
-        )
-      );
-      ps = pkgs.callPackage ./app-image.nix {
-        inherit
-          version
-          advisoryDb
-          tekaSrc
-          ;
-        craneLib = crane.mkLib pkgs;
-      };
-      image = (pkgs.newScope { dbus = pkgs.dbus-session; }) apps.${id}.image { inherit ps; };
-      artifact = appArtifactRawName id targetSystem;
-      basename = lib.removeSuffix ".raw" artifact;
+          modules ? [ ],
+        }:
+        let
+          teka = import ./app-scope.nix {
+            name = id;
+            inherit pkgs artifact buildId;
+            inherit (app) manifest version;
+            modules = app.modules ++ modules;
+            advisoryDb = if audit then rustsecAdvisoryDb else null;
+            craneLib = crane.mkLib pkgs;
+          };
+        in
+        (pkgs.newScope { inherit teka; }) app.package { }
+      ) { };
+      tpkFileName = "${basename}.tpk";
       arch = lib.removeSuffix "-linux" targetSystem;
     in
     pkgs.buildPackages.runCommand "${id}-${targetSystem}-tpk"
       {
+        pname = id;
+        inherit version;
         __structuredAttrs = true;
         # Package members contain the signed image and its complete runtime closure.
         unsafeDiscardReferences.out = true;
@@ -71,13 +137,13 @@ let
           pkgs.buildPackages.jq
           (tekaFor buildSystem)
         ];
-        passthru = { inherit image; };
+        passthru = { inherit image tpkFileName; };
       }
       ''
         raw=${lib.escapeShellArg "${image}/${artifact}"}
         jq -n \
           --arg arch ${lib.escapeShellArg arch} \
-          --arg version ${lib.escapeShellArg version.compose} \
+          --arg version ${lib.escapeShellArg app.fullVersion} \
           --arg id ${lib.escapeShellArg id} \
           --arg root_hash "$(cat ${lib.escapeShellArg "${image}/${basename}.roothash"})" \
           '{format:1,arch:$arch,components:[{type:"app",id:$id,version:$version,root_hash:$root_hash,image:{path:($id+".raw")}}]}' >manifest.json
@@ -85,90 +151,90 @@ let
         teka tpk pack --manifest manifest.json \
           --member ${lib.escapeShellArg "${id}.raw"}="$raw" \
           --private-key ${./dev-keys/apps.key} --certificate ${./dev-keys/apps.pem} \
-          --output "$out/${basename}.tpk"
+          --output "$out/${tpkFileName}"
       '';
 
   appPackages = lib.genAttrs appNames (
-    id: lib.genAttrs systems (buildSystem: lib.genAttrs systems (packageFor id buildSystem))
+    id: forSystems (buildSystem: forSystems (packageFor id buildSystem))
   );
 
-  mkRawCheck =
-    pkgs: checkName: serviceName: drv: artifactRaw:
-    pkgs.runCommand checkName { } ''
-      raw="${drv}/${artifactRaw}"
-      test -f "$raw"
-      root_offset=$(${pkgs.util-linux}/bin/sfdisk --json "$raw" | ${pkgs.jq}/bin/jq -er '.partitiontable | .sectorsize as $sector | .partitions[] | select((.type | ascii_downcase) == "4f68bce3-e8cd-4db1-96e7-fbcaf984b709" or (.type | ascii_downcase) == "b921b045-1df0-41c3-af44-4c6f280d3fae") | .start * $sector')
-      ${pkgs.erofs-utils}/bin/fsck.erofs --offset="$root_offset" "$raw" >/dev/null
-      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=etc/os-release "$raw" >os-release
-      ${pkgs.erofs-utils}/bin/dump.erofs --offset="$root_offset" --cat --path=usr/lib/systemd/system/${serviceName}.service "$raw" | ${pkgs.gnugrep}/bin/grep . >/dev/null
-      expect_line() {
-        ${pkgs.gnugrep}/bin/grep -qxF "$1" os-release || {
-          echo "app image check ${serviceName}: missing os-release line: $1" >&2
-          cat os-release >&2
-          exit 1
-        }
-      }
-      ${(imageChecks.${serviceName} or (_: "")) { inherit pkgs imageVersion; }}
-      expect_line "ID=${serviceName}"
-      expect_line "IMAGE_ID=${serviceName}"
-      expect_line 'IMAGE_VERSION="${imageVersion}"'
-      expect_line 'VERSION="${imageVersion}"'
-      expect_line 'VERSION_ID=1'
-      expect_line 'BUILD_ID="${buildId}"'
-      touch "$out"
-    '';
+  defaultTarget = if lib.elem "aarch64-linux" systems then "aarch64-linux" else lib.head systems;
+  packagesFor =
+    buildSystem:
+    let
+      packages = lib.mapAttrs (
+        _: byBuilder:
+        let
+          targets = byBuilder.${buildSystem};
+        in
+        targets.${defaultTarget}.overrideAttrs (old: {
+          passthru = old.passthru // {
+            inherit targets;
+          };
+        })
+      ) appPackages;
+    in
+    packages
+    // lib.optionalAttrs (lib.length appNames == 1) {
+      default = packages.${lib.head appNames};
+    };
+
+  mkRawCheck = import ./image-check.nix;
 
   checksFor =
     buildSystem:
     let
-      pkgs = nixpkgs.legacyPackages.${buildSystem};
+      pkgs = packageSets.${buildSystem}.${buildSystem};
+      imageCheck =
+        id: targetSystem:
+        let
+          name = if buildSystem == targetSystem then id else "${id}-cross-${targetSystem}";
+          app = appsById.${id};
+          image = appPackages.${id}.${buildSystem}.${targetSystem}.image;
+        in
+        lib.nameValuePair name (mkRawCheck {
+          inherit pkgs targetSystem buildId;
+          inherit (app) manifest imageCheck;
+          checkName = "app-image-check-${name}";
+          serviceName = id;
+          imageVersion = app.version;
+          raw = "${image}/${artifactBase id targetSystem}.raw";
+        });
+      entries = lib.concatMap (id: map (imageCheck id) systems) appNames;
+      checks = builtins.listToAttrs entries;
     in
-    lib.foldl' (
-      checks: id:
-      checks
-      // lib.listToAttrs (
-        map (
-          targetSystem:
-          let
-            name = if buildSystem == targetSystem then id else "${id}-cross-${targetSystem}";
-            image = appPackages.${id}.${buildSystem}.${targetSystem}.image;
-          in
-          lib.nameValuePair name (
-            mkRawCheck pkgs "app-image-check-${name}" id image (appArtifactRawName id targetSystem)
-          )
-        ) systems
-      )
-      // lib.mapAttrs' (name: drv: lib.nameValuePair "${id}-${name}" drv) (
-        appPackages.${id}.${buildSystem}.${buildSystem}.image.cargoChecks or { }
-      )
-    ) { } appNames
-    // {
-      app-packages = pkgs.runCommand "app-packages-check" { } ''
-        ${lib.concatMapStringsSep "\n" (
-          id:
-          lib.concatMapStringsSep "\n" (
-            targetSystem:
-            let
-              package = appPackages.${id}.${buildSystem}.${targetSystem};
-              artifact = lib.removeSuffix ".raw" (appArtifactRawName id targetSystem);
-            in
-            ''
-              test -f ${package}/${artifact}.tpk
-            ''
-          ) systems
-        ) appNames}
-        touch "$out"
-      '';
-    };
+    assert lib.assertMsg (
+      lib.length entries == lib.length (lib.attrNames checks)
+    ) "Duplicate app check names for ${buildSystem}";
+    checks;
 in
-assert lib.assertMsg (lib.all (
-  system:
-  lib.elem system [
-    "x86_64-linux"
-    "aarch64-linux"
-  ]
-) systems) "Teka app builders and targets must be x86_64-linux or aarch64-linux";
+assert lib.assertMsg (builtins.length apps == builtins.length appNames) "Duplicate app ID";
+assert lib.assertMsg (
+  systems != [ ] && lib.all (system: lib.elem system supportedSystems) systems
+) "Teka app builders and targets must be x86_64-linux or aarch64-linux";
+assert lib.assertMsg (lib.unique systems == systems) "Duplicate Teka app systems";
 {
-  teka.apps = lib.mapAttrs (_: packages: { inherit packages; }) appPackages;
-  checks = lib.genAttrs systems checksFor;
+  teka.lib.linkFarm = system: nixpkgs.legacyPackages.${system}.linkFarm;
+  teka.apps = lib.genAttrs appNames (id: {
+    path =
+      let
+        root = toString (self.outPath or "");
+        dir = toString (builtins.dirOf appsById.${id}.package);
+        prefix = root + "/";
+      in
+      if root == "" then
+        null
+      else if dir == root then
+        "."
+      else if lib.hasPrefix prefix dir then
+        builtins.unsafeDiscardStringContext (lib.removePrefix prefix dir)
+      else
+        null;
+  });
+  packages =
+    forSystems packagesFor
+    // lib.optionalAttrs (lib.elem "aarch64-linux" systems) {
+      aarch64-darwin = packagesFor "aarch64-linux";
+    };
+  checks = forSystems checksFor;
 }

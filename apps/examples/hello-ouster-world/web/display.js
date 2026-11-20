@@ -1,7 +1,10 @@
 (function () {
     'use strict';
 
-    var appApi = tekaAppApi('hello-ouster-world');
+    var appApi = tekaAppApi();
+    var signInHref = '/login?next=' + encodeURIComponent(appApi.appPage(appApi.appId, '/'));
+    var guestSignIn = document.querySelector('.how-guest-signin');
+    if (guestSignIn) guestSignIn.href = signInHref;
     var howStack = document.querySelector('.how-stack');
     var guestAccessToggle = document.getElementById('guest-access-toggle');
     var guestView = false;
@@ -108,7 +111,7 @@
         if (guestOffSignedOut) {
             showError('Guest view is off.');
             if (streamAlert) {
-                streamAlert.innerHTML = 'Guest view is off. <a href="/login?next=/app/hello-ouster-world">Sign in</a> to view.';
+                streamAlert.innerHTML = 'Guest view is off. <a href="' + signInHref + '">Sign in</a> to view.';
             }
         }
     }

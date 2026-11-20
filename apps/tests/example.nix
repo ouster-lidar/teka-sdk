@@ -7,8 +7,7 @@ let
   };
   outputs = (import (source + "/flake.nix")).outputs {
     self = outputs // {
-      lastModifiedDate = "20260102030405";
-      shortRev = "abc1234";
+      outPath = source;
     };
     teka-sdk = sdk;
   };

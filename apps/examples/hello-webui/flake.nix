@@ -7,7 +7,11 @@
     { self, teka-sdk, ... }:
     teka-sdk.lib.mkAppOutputs {
       inherit self;
-      apps.hello-webui = import ./.;
-      imageChecks.hello-webui = import ./tests/image-check.nix;
+      apps = [
+        {
+          package = ./package.nix;
+          imageCheck = import ./tests/image-check.nix;
+        }
+      ];
     };
 }

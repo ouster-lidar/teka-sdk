@@ -1,48 +1,72 @@
 {
-  ps,
-  pkgs,
   lib,
-  runCommand,
+  stdenv,
+  buildPackages,
   craneLib,
   advisoryDb ? null,
-  tekaSrc ? pkgs.buildPackages.callPackage ../packages/teka-src.nix { inherit craneLib; },
 }:
 
 let
-  appApiJsSrc = ./web/app-api.js;
+  inherit (buildPackages) runCommand;
+  tekaSrc = buildPackages.callPackage ../packages/teka-src.nix { inherit craneLib; };
 
-  prepareAppSource = pkgs.buildPackages.callPackage ./app-source.nix {
-    inherit tekaSrc craneLib;
-  };
-
-  buildAppCrate =
+  buildRustApp =
     {
-      src,
-      dummySrc,
-      cargoRoot,
-      cargoToml,
-      cargoLock,
+      srcDir ? null,
+      src ? null,
       nativeBuildInputs ? [ ],
       buildInputs ? [ ],
       meta ? { },
     }:
+    assert lib.assertMsg (
+      (srcDir == null) != (src == null)
+    ) "buildRustApp requires exactly one of srcDir or src";
     let
+      appSrc =
+        if srcDir != null then
+          lib.sources.sourceByRegex srcDir [
+            "Cargo.lock"
+            "Cargo.toml"
+            "build[.]rs"
+            "[.]cargo(/config([.]toml)?)?"
+            "(src|tests|examples|benches)(/.*)?"
+          ]
+        else
+          src;
+      # Read Cargo metadata without materializing the filtered source.
+      sourceRoot = if appSrc._isLibCleanSourceWith or false then appSrc.origSrc else appSrc;
+      cargoToml = sourceRoot + "/Cargo.toml";
+      cargoLock = sourceRoot + "/Cargo.lock";
       manifest = builtins.fromTOML (builtins.readFile cargoToml);
+      inherit (manifest.package) name version;
+      cargoRoot = "apps/examples/${name}";
+      # Keep Cargo path dependencies at the same relative paths in both builds.
+      assemble =
+        app: sdk:
+        runCommand "${name}-source" { } ''
+          mkdir -p "$out/${cargoRoot}" "$out/crates"
+          cp -r -- ${lib.escapeShellArg "${app}/."} "$out/${cargoRoot}/"
+          cp -r -- ${lib.escapeShellArg "${sdk}"} "$out/crates/teka"
+        '';
+      dummySrc = assemble (craneLib.mkDummySrc { src = appSrc; }) tekaSrc.dummySrc;
       common = {
-        pname = manifest.package.name;
-        version = manifest.package.version;
-        inherit src nativeBuildInputs buildInputs;
+        pname = name;
+        src = assemble appSrc tekaSrc;
+        inherit
+          version
+          cargoToml
+          nativeBuildInputs
+          buildInputs
+          ;
         cargoVendorDir = craneLib.vendorCargoDeps { inherit cargoLock; };
         postUnpack = "sourceRoot+=/${lib.escapeShellArg cargoRoot}";
         strictDeps = true;
-        doCheck = pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform;
+        doCheck = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
         # Cargo caps dependency lints, leaving warnings fatal for our local crates.
         RUSTFLAGS = "-Dwarnings";
       };
-      cargoArtifacts = craneLib.buildDepsOnly (
-        (builtins.removeAttrs common [ "src" ]) // { inherit dummySrc; }
-      );
-      cargoChecks = {
+      cargoArtifacts = craneLib.buildDepsOnly (removeAttrs common [ "src" ] // { inherit dummySrc; });
+      tests = {
         clippy = craneLib.cargoClippy (
           common
           // {
@@ -54,10 +78,9 @@ let
       }
       // lib.optionalAttrs (advisoryDb != null) {
         audit = craneLib.cargoAudit {
-          src = builtins.dirOf cargoLock;
+          src = appSrc;
           advisory-db = advisoryDb;
-          pname = manifest.package.name;
-          version = common.version;
+          inherit (common) pname version;
         };
       };
     in
@@ -65,94 +88,12 @@ let
       common
       // {
         inherit cargoArtifacts;
-        passthru = { inherit cargoChecks; };
-        inherit meta;
+        passthru = { inherit tests; };
+        meta = {
+          mainProgram = manifest.package.default-run or name;
+        }
+        // meta;
       }
     );
-
-  appRustSrc =
-    {
-      srcDir,
-      extra ? [ ],
-    }:
-    pkgs.lib.sources.sourceByRegex srcDir (
-      [
-        "Cargo.lock"
-        "Cargo.toml"
-        "src(/.*)?"
-      ]
-      ++ extra
-    );
-
-  appHostUnitDefaults = ps.hostUnitDefaults {
-    environmentFileWlroots = false;
-    hostGpuChecksCfg = {
-      enable = false;
-    };
-  };
-
-  appWebTree =
-    {
-      name,
-      webSrc,
-      webFiles,
-      extraInstall ? "",
-    }:
-    runCommand "${name}-web" { } ''
-      mkdir -p "$out/web"
-      install -m644 ${appApiJsSrc} "$out/web/app-api.js"
-      for f in ${lib.concatStringsSep " " webFiles}; do
-        case "$f" in
-          *.js)
-            cat ${appApiJsSrc} ${webSrc}/"$f" > "$out/web/$f"
-            ;;
-          *)
-            install -m644 ${webSrc}/"$f" "$out/web/$f"
-            ;;
-        esac
-      done
-      ${extraInstall}
-    '';
-
-  # Keep web assets out of evaluation so other platforms need no native builder.
-  appWebCopyFiles = webTree: [
-    {
-      path = "usr/lib/teka/mission-control/web";
-      source = "${webTree}/web/.";
-    }
-  ];
-
-  appStateStub = name: builtins.toFile "${name}-state-stub" "";
-
-  appManifestCopyFiles =
-    {
-      name,
-      appManifest,
-      webTree,
-    }:
-    [
-      {
-        path = "usr/lib/teka/mission-control/manifest.json";
-        source = appManifest;
-      }
-      {
-        path = "var/lib/${name}/.keep";
-        source = appStateStub name;
-      }
-    ]
-    ++ appWebCopyFiles webTree;
-
 in
-{
-  inherit
-    appApiJsSrc
-    prepareAppSource
-    buildAppCrate
-    appRustSrc
-    appHostUnitDefaults
-    appWebTree
-    appWebCopyFiles
-    appStateStub
-    appManifestCopyFiles
-    ;
-}
+buildRustApp

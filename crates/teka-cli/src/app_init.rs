@@ -13,10 +13,10 @@ use std::{
 
 const APP_GUIDANCE: &str = r#"# Agent guidelines
 
-Read [README.md](README.md) for app behavior and verification. Follow the template's `flake.nix`, locked inputs, and existing build definitions.
+Read [README.md](README.md) for app behavior and verification. Include any separate `configuration.nix` or `options.nix` in the app module's `imports`.
 
 - Keep changes small. Reuse existing builders for images, packaging, and signing.
-- Keep the app ID consistent across the flake, image metadata, and service. Services are wanted by `teka-apps.target`.
+- Set the app ID and release version in `manifest.json`. The SDK derives the primary service name from that ID and adds it to `teka-apps.target`.
 - Keep input declarations in `flake.nix` and exact revisions in `flake.lock`. Update pins only when requested.
 - Format Nix with `nixfmt` and keep README consistent with behavior.
 - Stage source files before Nix evaluation: Git flakes exclude untracked files. Preserve unrelated work.

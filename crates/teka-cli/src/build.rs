@@ -28,9 +28,30 @@ pub struct ListOptions {
 /// Out-link for the linkFarm of requested apps.
 pub const RESULT: &str = "result";
 
+const BUILD_EXPRESSION: &str = r#"{ flake, builder, appIds, targetSystems }:
+let
+  outputs = builtins.getFlake flake;
+  linkFarm = outputs.teka.lib.linkFarm builder;
+  apps = builtins.fromJSON appIds;
+  targets = builtins.fromJSON targetSystems;
+  linuxBuilder = builtins.match ".*-linux" builder != null;
+  targetFarm = target:
+    let buildSystem = if linuxBuilder then builder else target;
+    in linkFarm "teka-${target}" (map (id: {
+      name = id;
+      path = outputs.packages.${buildSystem}.${id}.targets.${target};
+    }) apps);
+in
+if builtins.length targets == 1 then targetFarm (builtins.head targets)
+else linkFarm "teka-multi" (map (target: {
+  name = target;
+  path = targetFarm target;
+}) targets)
+"#;
+
 #[derive(Clone, Debug, Args)]
 pub struct BuildOptions {
-    /// App IDs to build (default: the project's only app)
+    /// App IDs to build (default: the app in this directory or the project's only app)
     #[arg(value_name = "APP")]
     pub apps: Vec<String>,
     /// Architecture to build for
@@ -66,26 +87,57 @@ pub fn validate_apps(apps: &[String]) -> Result<()> {
 
 pub(crate) fn resolve_apps(source: &BuildSource, apps: &[String]) -> Result<(String, Vec<String>)> {
     validate_apps(apps)?;
-    let (flake, known) = find_apps(source.flake.as_deref())?;
+    let AppCatalog {
+        directory,
+        reference,
+        paths,
+    } = find_apps(source.flake.as_deref())?;
     let apps = if apps.is_empty() {
+        let known: Vec<_> = paths.keys().cloned().collect();
         validate_apps(&known)?;
         match known.len() {
             0 => {
                 bail!("no apps declared in teka.apps; declare an app before building or deploying")
             }
-            1 => (),
-            _ => bail!(
-                "multiple apps declared in teka.apps; specify an app explicitly; see `teka app list`"
-            ),
+            1 => known,
+            _ => vec![app_at_cwd(&directory, &paths)?],
         }
-        known
     } else {
-        if let Some(app) = apps.iter().find(|app| !known.contains(app)) {
+        if let Some(app) = apps.iter().find(|app| !paths.contains_key(*app)) {
             bail!("unknown app '{app}'; see `teka app list`");
         }
         apps.to_vec()
     };
-    Ok((flake, apps))
+    Ok((reference, apps))
+}
+
+type AppPaths = BTreeMap<String, Option<PathBuf>>;
+
+struct AppCatalog {
+    directory: PathBuf,
+    reference: String,
+    paths: AppPaths,
+}
+
+fn app_at_cwd(flake_dir: &Path, apps: &AppPaths) -> Result<String> {
+    let cwd = std::env::current_dir()?;
+    if let Ok(relative) = cwd.strip_prefix(flake_dir) {
+        for ancestor in relative.ancestors() {
+            let path = if ancestor.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                ancestor
+            };
+            let mut matches = apps.iter().filter(|(_, dir)| dir.as_deref() == Some(path));
+            if let Some((app, _)) = matches.next() {
+                if matches.next().is_none() {
+                    return Ok(app.clone());
+                }
+                break;
+            }
+        }
+    }
+    bail!("multiple apps declared in teka.apps; specify an app explicitly; see `teka app list`")
 }
 
 pub(crate) fn build_targets(
@@ -105,13 +157,15 @@ pub(crate) fn build_targets(
         .args(["build", "--file", "-", "-L", "--out-link"])
         .arg(out_link)
         .args(["--no-write-lock-file", "--argstr", "flake"])
-        .arg(flake);
-    let expr = if !multi_target {
-        result_expr(&builder, targets.first().unwrap(), apps)
-    } else {
-        multi_result_expr(&builder, &targets, apps)
-    };
-    run_with_stdin(&mut command, &expr).context("nix build failed")?;
+        .arg(flake)
+        .args(["--argstr", "builder", &builder])
+        .args(["--argstr", "appIds", &serde_json::to_string(apps)?])
+        .args([
+            "--argstr",
+            "targetSystems",
+            &serde_json::to_string(&targets)?,
+        ]);
+    run_with_stdin(&mut command, BUILD_EXPRESSION).context("nix build failed")?;
 
     targets
         .into_iter()
@@ -135,18 +189,24 @@ pub fn package_paths_at(apps: &[String], root: &Path) -> Result<Vec<PathBuf>> {
         .collect()
 }
 
-fn app_names(reference: &str) -> Result<Option<Vec<String>>> {
+fn load_apps(directory: &Path) -> Result<Option<AppCatalog>> {
+    let reference = flake_reference(directory)?;
     let output = checked_output(Command::new("nix").args([
         "eval",
         &format!("{reference}#."),
         "--apply",
-        "flake: if flake ? teka.apps then builtins.attrNames flake.teka.apps else null",
+        "flake: if flake ? teka.apps then builtins.mapAttrs (_: app: app.path or null) flake.teka.apps else null",
         "--json",
         "--no-write-lock-file",
     ]))
     .with_context(|| format!("read teka.apps from {reference}"))?;
-    serde_json::from_str(&output)
-        .with_context(|| format!("invalid teka.apps names from {reference}"))
+    let paths: Option<AppPaths> = serde_json::from_str(&output)
+        .with_context(|| format!("invalid teka.apps from {reference}"))?;
+    Ok(paths.map(|paths| AppCatalog {
+        directory: directory.to_owned(),
+        reference,
+        paths,
+    }))
 }
 
 struct ExampleCatalog {
@@ -256,8 +316,12 @@ fn default_sdk_reference() -> Result<&'static str> {
         .context("this build has no pinned SDK; use --flake or TEKA_APPS_FLAKE_ROOT with a tested SDK checkout")
 }
 
+fn git_root(directory: &Path) -> Option<&Path> {
+    directory.ancestors().find(|dir| dir.join(".git").exists())
+}
+
 fn flake_reference(flake: &Path) -> Result<String> {
-    let root = flake.ancestors().find(|dir| dir.join(".git").exists());
+    let root = git_root(flake);
     let url = reqwest::Url::from_file_path(root.unwrap_or(flake))
         .map_err(|_| anyhow::anyhow!("invalid flake path: {}", flake.display()))?;
     let Some(root) = root else {
@@ -277,7 +341,7 @@ pub fn list(args: ListOptions) -> Result<()> {
     let names = if args.examples {
         example_catalog(explicit)?.names
     } else {
-        find_apps(explicit)?.1
+        find_apps(explicit)?.paths.into_keys().collect()
     };
     for name in names {
         if args.examples && name == "default" {
@@ -299,10 +363,36 @@ pub fn run(args: BuildOptions) -> Result<()> {
     Ok(())
 }
 
-fn find_apps(explicit: Option<&Path>) -> Result<(String, Vec<String>)> {
+fn app_workspace(directory: &Path) -> Result<Option<AppCatalog>> {
+    let Some(root) = git_root(directory) else {
+        return Ok(None);
+    };
+    if root == directory
+        || !root.join("flake.nix").is_file()
+        || root.metadata()?.dev() != directory.metadata()?.dev()
+    {
+        return Ok(None);
+    }
+    // A template's source directory builds with its workspace SDK.
+    let Some(workspace) = load_apps(root)? else {
+        return Ok(None);
+    };
+    let relative = directory.strip_prefix(root)?;
+    Ok(workspace
+        .paths
+        .values()
+        .any(|dir| dir.as_deref() == Some(relative))
+        .then_some(workspace))
+}
+
+fn find_apps(explicit: Option<&Path>) -> Result<AppCatalog> {
     if let Some(catalog) = find_catalog(explicit, "teka.apps", |directory| {
-        let reference = flake_reference(directory)?;
-        Ok(app_names(&reference)?.map(|names| (reference, names)))
+        if explicit.is_none() {
+            if let Some(workspace) = app_workspace(directory)? {
+                return Ok(Some(workspace));
+            }
+        }
+        load_apps(directory)
     })? {
         Ok(catalog)
     } else {
@@ -343,68 +433,6 @@ fn find_catalog<T>(
         }
     }
     Ok(None)
-}
-
-/// One native derivation depending on the requested packages. Passed to
-/// `nix build --file -` so Nix does not treat a temp directory as a flake.
-fn result_expr(builder: &str, target: &str, apps: &[String]) -> String {
-    let entries = package_entries(builder, target, apps);
-    format!(
-        r#"{{ flake }}:
-let
-  apps = builtins.getFlake flake;
-  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.nixpkgs).legacyPackages."{builder}";
-in
-pkgs.linkFarm "teka-{target}" [
-{entries}
-]
-"#
-    )
-}
-
-fn multi_result_expr(builder: &str, targets: &BTreeSet<String>, apps: &[String]) -> String {
-    let mut farms = Vec::new();
-    let mut links = Vec::new();
-    for (index, target) in targets.iter().enumerate() {
-        farms.push(format!(
-            "  target{index} = pkgs.linkFarm \"teka-{target}\" [\n{}\n  ];",
-            package_entries(builder, target, apps)
-        ));
-        links.push(format!(
-            "    {{ name = \"{target}\"; path = target{index}; }}"
-        ));
-    }
-    format!(
-        r#"{{ flake }}:
-let
-  apps = builtins.getFlake flake;
-  pkgs = (apps.inputs.nixpkgs or apps.inputs.teka-sdk.inputs.nixpkgs).legacyPackages."{builder}";
-{farms}
-in
-pkgs.linkFarm "teka-multi" [
-{links}
-]
-"#,
-        farms = farms.join("\n"),
-        links = links.join("\n")
-    )
-}
-
-fn package_entries(builder: &str, target: &str, apps: &[String]) -> String {
-    // App images require Linux; other hosts delegate to a target-native builder.
-    let build_system = if builder.ends_with("-linux") {
-        builder
-    } else {
-        target
-    };
-    apps.iter()
-        .map(|app| {
-            format!(
-                "    {{\n      name = \"{app}\";\n      path = apps.teka.apps.\"{app}\".packages.\"{build_system}\".\"{target}\";\n    }}"
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn nom_available() -> bool {

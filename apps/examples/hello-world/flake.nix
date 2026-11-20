@@ -7,6 +7,6 @@
     { self, teka-sdk, ... }:
     teka-sdk.lib.mkAppOutputs {
       inherit self;
-      apps.hello-world = import ./.;
+      apps = [ { package = ./package.nix; } ];
     };
 }

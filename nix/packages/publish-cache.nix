@@ -18,7 +18,7 @@ let
     sdk.packages.${system}.teka-src
     sdk.packages.${buildSystem}.teka-runner
   ]
-  ++ map (app: sdk.teka.apps.${app}.packages.${buildSystem}.aarch64-linux) apps;
+  ++ map (app: sdk.packages.${buildSystem}.${app}.targets.aarch64-linux) apps;
   # Capture this flake's derivations: re-evaluating its store copy loses Git metadata.
   installables = map (drv: "${builtins.unsafeDiscardOutputDependency drv.drvPath}^*") roots;
   manifest = pkgs.writeText "cache-root.nix" ''

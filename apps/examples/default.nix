@@ -4,15 +4,19 @@ let
   root = ./.;
   entries = builtins.readDir root;
   appNames = lib.filter (
-    name: entries.${name} == "directory" && builtins.pathExists (root + "/${name}/default.nix")
+    name: entries.${name} == "directory" && builtins.pathExists (appPath name + "/package.nix")
   ) (lib.attrNames entries);
   appPath = name: root + "/${name}";
-  apps = lib.genAttrs appNames (name: import (appPath name));
+  apps = map (
+    name:
+    let
+      package = appPath name + "/package.nix";
+      check = appPath name + "/tests/image-check.nix";
+    in
+    { inherit package; } // lib.optionalAttrs (builtins.pathExists check) { imageCheck = import check; }
+  ) appNames;
   templateApps = lib.filter (name: builtins.pathExists (appPath name + "/flake.nix")) appNames;
   cargoApps = lib.filter (name: builtins.pathExists (appPath name + "/Cargo.toml")) appNames;
-  imageCheckApps = lib.filter (
-    name: builtins.pathExists (appPath name + "/tests/image-check.nix")
-  ) appNames;
 in
 {
   inherit apps;
@@ -21,5 +25,4 @@ in
     description = "${name} Teka app";
   });
   cargoDirs = map (name: "apps/examples/${name}") cargoApps;
-  imageChecks = lib.genAttrs imageCheckApps (name: import (appPath name + "/tests/image-check.nix"));
 }

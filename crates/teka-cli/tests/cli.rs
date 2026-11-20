@@ -136,59 +136,41 @@ if [ "$1 $2" = "flake lock" ]; then
     exit
 fi
 if [ "$1" = build ]; then
-    expr=$(cat)
-    out=result
-    prev=
+    cat >/dev/null
+    printf '%s\n' "$@" >> calls
     for arg in "$@"; do
-        if [ "$prev" = --out-link ]; then
-            out=$arg
-        fi
+        case "$prev" in
+            --out-link) out=$arg ;;
+            appIds) names=$(printf '%s' "$arg" | tr -d '[]"' | tr ',' ' ') ;;
+            targetSystems) targets=$(printf '%s' "$arg" | tr -d '[]"' | tr ',' ' ') ;;
+        esac
         prev=$arg
     done
-    names=$(printf '%s\n' "$expr" | sed -n 's/^[[:space:]]*name = "\([^"]*\)".*/\1/p')
-    if [ -z "$names" ]; then
-        echo "mock: no linkFarm names in nix expression" >&2
-        printf '%s\n' "$expr" >&2
-        exit 1
-    fi
-    if printf '%s\n' "$expr" | grep -q 'pkgs.linkFarm "teka-multi"'; then
+    set -- $targets
+    test "$#" -gt 0 && test -n "$names" || exit 1
+    rm -rf "$out"
+    if [ "$#" -gt 1 ]; then
         store="$TEKA_MOCK_PACKAGES/teka-multi"
-        rm -rf "$out" "$store"
+        rm -rf "$store"
         mkdir -p "$store"
-        farm=
-        while IFS= read -r line; do
-            case "$line" in
-                *'pkgs.linkFarm "teka-'*)
-                    farm=$(printf '%s\n' "$line" | sed -n 's/.*pkgs.linkFarm "teka-\([^"]*\)".*/\1/p')
-                    ;;
-                *'name = "'* )
-                    name=$(printf '%s\n' "$line" | sed -n 's/.*name = "\([^"]*\)".*/\1/p')
-                    if [ -n "$farm" ] && [ "$farm" != multi ]; then
-                        mkdir -p "$store/$farm/$name"
-                        cp "$TEKA_MOCK_PACKAGES/$farm/$name.tpk" "$store/$farm/$name/app.tpk"
-                    fi
-                    ;;
-            esac
-        done <<EOF
-$expr
-EOF
         ln -s "$store" "$out"
-    else
-        rm -rf "$out"
-        mkdir -p "$out"
-        farm=$(printf '%s\n' "$expr" | sed -n 's/.*pkgs.linkFarm "teka-\([^"]*\)".*/\1/p')
-        for name in $names; do
-            mkdir -p "$out/$name"
-            cp "$TEKA_MOCK_PACKAGES/$farm/$name.tpk" "$out/$name/app.tpk"
-        done
     fi
-    printf '%s\n' "$@" "$expr" >> calls
+    for target in "$@"; do
+        root=$out
+        if [ "$#" -gt 1 ]; then
+            root="$out/$target"
+        fi
+        for name in $names; do
+            mkdir -p "$root/$name"
+            cp "$TEKA_MOCK_PACKAGES/$target/$name.tpk" "$root/$name/app.tpk"
+        done
+    done
 elif [ "$2" = --raw ]; then
     printf '%s' "${MOCK_SYSTEM:-x86_64-linux}"
 else
     case "$*" in
         *flake.templates*) printf '{"names":["default","hello-world"],"is_sdk":true}' ;;
-        *) printf '["app","hello-world"]' ;;
+        *) printf '{"app":null,"hello-world":null}' ;;
     esac
 fi"#;
 
@@ -486,7 +468,7 @@ fn apps_flake_environment_and_flag_precedence() {
     }
     script(
         &bin.join("nix"),
-        "if [ \"$2\" = --raw ]; then printf x86_64-linux; else printf '%s' \"$2\" > \"$TEKA_TEST_NIX_ARGS\"; printf '[\"hello-world\"]'; fi",
+        "if [ \"$2\" = --raw ]; then printf x86_64-linux; else printf '%s' \"$2\" > \"$TEKA_TEST_NIX_ARGS\"; printf '{\"hello-world\":null}'; fi",
     );
     let captured = d.path().join("nix-args");
     for explicit in [false, true] {
@@ -517,32 +499,40 @@ fn app_discovery_selects_the_nearest_registry() {
     let d = TempDir::new().unwrap();
     let root = d.path().canonicalize().unwrap();
     apps_flake(&root);
-    discovery_flake(&root, "[\"parent\"]");
+    discovery_flake(&root, r#"{"parent":null}"#);
     let local = root.join("local");
     let unrelated = local.join("unrelated");
     discovery_flake(&unrelated, "null");
     let nested = unrelated.join("nested");
     fs::create_dir(&nested).unwrap();
     for (names, expected, parent) in [
-        ("[\"local\"]", "local\n", false),
-        ("[]", "", false),
+        (r#"{"local":null}"#, "local\n", false),
+        ("{}", "", false),
         ("null", "parent\n", true),
     ] {
         discovery_flake(&local, names);
         let (output, probes) = discover(&root, &nested, &[]);
         success(&output);
         assert_eq!(output.stdout, expected.as_bytes());
-        let mut expected_probes = format!("{}#.\n{}#.\n", unrelated.display(), local.display());
+        let mut expected_probes = format!(
+            "{root}#.\n{unrelated}#.\n{root}#.\n{local}#.\n",
+            root = root.display(),
+            unrelated = unrelated.display(),
+            local = local.display(),
+        );
         if parent {
             expected_probes.push_str(&format!("{}#.\n", root.display()));
         }
         assert_eq!(probes, expected_probes);
     }
-    discovery_flake(&local, "[\"local\"]");
+    discovery_flake(&local, r#"{"local":null}"#);
     let (output, probes) = discover(&root, &local, &[]);
     success(&output);
     assert_eq!(output.stdout, b"local\n");
-    assert_eq!(probes, format!("{}#.\n", local.display()));
+    assert_eq!(
+        probes,
+        format!("{}#.\n{}#.\n", root.display(), local.display())
+    );
 }
 
 #[test]
@@ -551,10 +541,10 @@ fn app_discovery_stops_at_git_roots_without_searching_children() {
         let d = TempDir::new().unwrap();
         let root = d.path().canonicalize().unwrap();
         apps_flake(&root);
-        discovery_flake(&root, "[\"outside\"]");
+        discovery_flake(&root, r#"{"outside":null}"#);
         let repo = root.join("repo");
         discovery_flake(&repo, "null");
-        discovery_flake(&repo.join("apps"), "[\"child\"]");
+        discovery_flake(&repo.join("apps"), r#"{"child":null}"#);
         if worktree {
             fs::write(repo.join(".git"), "gitdir: /unused\n").unwrap();
         } else {
@@ -572,14 +562,17 @@ fn app_discovery_reports_evaluation_errors_without_falling_back() {
     let d = TempDir::new().unwrap();
     let root = d.path().canonicalize().unwrap();
     apps_flake(&root);
-    discovery_flake(&root, "[\"parent\"]");
+    discovery_flake(&root, r#"{"parent":null}"#);
     let local = root.join("local");
     discovery_flake(&local, "null");
     fs::write(local.join("eval-error"), "broken local flake\n").unwrap();
     let (output, probes) = discover(&root, &local, &[]);
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("broken local flake"));
-    assert_eq!(probes, format!("{}#.\n", local.display()));
+    assert_eq!(
+        probes,
+        format!("{}#.\n{}#.\n", root.display(), local.display())
+    );
 }
 
 #[test]
@@ -587,7 +580,7 @@ fn explicit_flakes_must_export_the_app_registry() {
     let d = TempDir::new().unwrap();
     let root = d.path().canonicalize().unwrap();
     apps_flake(&root);
-    discovery_flake(&root, "[\"parent\"]");
+    discovery_flake(&root, r#"{"parent":null}"#);
     let local = root.join("local");
     discovery_flake(&local, "null");
     let (output, probes) = discover(&root, &local, &["--flake", "."]);
@@ -599,7 +592,7 @@ fn explicit_flakes_must_export_the_app_registry() {
 fn discovery_flake(directory: &Path, names: &str) {
     fs::create_dir_all(directory).unwrap();
     fs::write(directory.join("flake.nix"), "{}").unwrap();
-    fs::write(directory.join("app-names.json"), names).unwrap();
+    fs::write(directory.join("app-paths.json"), names).unwrap();
 }
 
 fn discover(root: &Path, cwd: &Path, args: &[&str]) -> (Output, String) {
@@ -623,7 +616,7 @@ if [ -f "$flake/eval-error" ]; then
     cat "$flake/eval-error" >&2
     exit 1
 fi
-cat "$flake/app-names.json""#,
+cat "$flake/app-paths.json""#,
     );
     let output = cli(root)
         .current_dir(cwd)
@@ -641,13 +634,14 @@ fn initialized_apps_build_without_names_or_flake_flags() {
         let d = TempDir::new().unwrap();
         apps_flake(d.path());
         fs::create_dir(d.path().join("example-source")).unwrap();
-        fs::write(d.path().join("example-source/default.nix"), "{}").unwrap();
+        fs::write(d.path().join("example-source/package.nix"), "{}").unwrap();
         fs::write(d.path().join("example-source/flake.nix"), "{}").unwrap();
         script(
             &d.path().join("bin/nix"),
-            &NIX_MOCK
-                .replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]")
-                .replace("[false,", "[true,"),
+            &NIX_MOCK.replace(
+                r#"{"app":null,"hello-world":null}"#,
+                r#"{"hello-world":null}"#,
+            ),
         );
         fs::write(d.path().join("flake.nix"), "{}").unwrap();
         if enclosing_repository {
@@ -690,18 +684,129 @@ fn initialized_apps_build_without_names_or_flake_flags() {
 }
 
 #[test]
+fn build_selects_the_deepest_app_directory_in_a_nested_flake() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let flake = d.path().join("workspace");
+    let cwd = flake.join("apps/browser demo/src");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::write(flake.join("flake.nix"), "{}").unwrap();
+    script(
+        &d.path().join("bin/nix"),
+        &NIX_MOCK.replace(
+            r#"{"app":null,"hello-world":null}"#,
+            r#"{"app":"apps","hello-world":"apps/browser demo"}"#,
+        ),
+    );
+
+    for (args, expected) in [
+        (&["app", "build"][..], "hello-world"),
+        (&["app", "build", "app"][..], "app"),
+    ] {
+        let output = cli(d.path()).current_dir(&cwd).args(args).output().unwrap();
+        success(&output);
+        assert_eq!(
+            output.stdout,
+            format!("result/{expected}/app.tpk\n").as_bytes()
+        );
+    }
+    let calls = fs::read_to_string(cwd.join("calls")).unwrap();
+    assert!(calls.contains("?dir=workspace\n"), "{calls}");
+}
+
+#[test]
+fn build_uses_the_workspace_for_a_registered_template_directory() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let template = d.path().join("examples/hello-world");
+    let cwd = template.join("src");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::write(template.join("flake.nix"), "{}").unwrap();
+    script(
+        &d.path().join("bin/nix"),
+        &NIX_MOCK.replace(
+            r#"*) printf '{"app":null,"hello-world":null}' ;;"#,
+            r#"*dir=examples%2Fhello-world#.*) echo 'template SDK unavailable' >&2; exit 1 ;;
+        *) printf '{"app":null,"hello-world":"examples/hello-world"}' ;;"#,
+        ),
+    );
+    let listing = cli(d.path())
+        .current_dir(&cwd)
+        .args(["app", "list"])
+        .output()
+        .unwrap();
+    success(&listing);
+    assert_eq!(listing.stdout, b"app\nhello-world\n");
+
+    let output = cli(d.path())
+        .current_dir(&cwd)
+        .args(["app", "build"])
+        .output()
+        .unwrap();
+    success(&output);
+    assert_eq!(output.stdout, b"result/hello-world/app.tpk\n");
+    assert!(fs::read_to_string(cwd.join("calls"))
+        .unwrap()
+        .contains("?dir=\n"));
+
+    let output = cli(d.path())
+        .current_dir(&cwd)
+        .args(["app", "build", "--flake", ".."])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("template SDK unavailable"));
+}
+
+#[test]
+fn app_discovery_reports_invalid_workspace_registry() {
+    let d = TempDir::new().unwrap();
+    apps_flake(d.path());
+    let nested = d.path().join("nested");
+    fs::create_dir(&nested).unwrap();
+    fs::write(nested.join("flake.nix"), "{}").unwrap();
+    script(
+        &d.path().join("bin/nix"),
+        r#"case "$2" in
+    *'dir=#.') echo 'invalid workspace registry' >&2; exit 1 ;;
+    *) printf '%s' '{"nested":"."}' ;;
+esac"#,
+    );
+
+    let list = || {
+        let mut cmd = cli(d.path());
+        cmd.current_dir(&nested).args(["app", "list"]);
+        cmd
+    };
+    let implicit = list().output().unwrap();
+    assert!(!implicit.status.success());
+    assert!(String::from_utf8_lossy(&implicit.stderr).contains("invalid workspace registry"));
+
+    let explicit = list().args(["--flake", "."]).output().unwrap();
+    success(&explicit);
+    assert_eq!(explicit.stdout, b"nested\n");
+}
+
+#[test]
 fn build_and_deploy_reject_ambiguous_or_invalid_discovered_apps() {
     for command in ["build", "deploy"] {
         for (names, reason) in [
-            ("[]", "no apps declared in teka.apps"),
-            ("[\"bad.name\"]", "invalid app id 'bad.name'"),
-            ("[\"app\",\"hello-world\"]", "specify an app explicitly"),
+            ("{}", "no apps declared in teka.apps"),
+            (r#"{"bad.name":null}"#, "invalid app id 'bad.name'"),
+            (
+                r#"{"app":null,"hello-world":null}"#,
+                "specify an app explicitly",
+            ),
+            (
+                r#"{"app":".","hello-world":"."}"#,
+                "specify an app explicitly",
+            ),
         ] {
             let d = TempDir::new().unwrap();
             apps_flake(d.path());
             script(
                 &d.path().join("bin/nix"),
-                &NIX_MOCK.replace("[\"app\",\"hello-world\"]", names),
+                &NIX_MOCK.replace(r#"{"app":null,"hello-world":null}"#, names),
             );
             let mut process = cli(d.path());
             process.args(["app", command]);
@@ -724,7 +829,10 @@ fn deploy_defaults_to_the_only_declared_app() {
     apps_flake(d.path());
     script(
         &d.path().join("bin/nix"),
-        &NIX_MOCK.replace("[\"app\",\"hello-world\"]", "[\"hello-world\"]"),
+        &NIX_MOCK.replace(
+            r#"{"app":null,"hello-world":null}"#,
+            r#"{"hello-world":null}"#,
+        ),
     );
     let outside = TempDir::new().unwrap();
     let (url, server) = serve(vec![
@@ -771,12 +879,10 @@ fn build_prints_paths_and_lists_apps_without_a_device() {
     teka::tpk::verify(&mut file, &package).unwrap();
     assert_eq!(package.manifest.components[0].id, "hello-world");
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
-    assert!(calls
-        .contains("apps.teka.apps.\"hello-world\".packages.\"x86_64-linux\".\"aarch64-linux\""));
-    assert!(
-        calls.contains("apps.teka.apps.\"hello-world\".packages.\"x86_64-linux\".\"x86_64-linux\"")
-    );
-    assert!(calls.contains("builtins.getFlake") && calls.contains("?dir=\n"));
+    assert!(calls.contains("appIds\n[\"hello-world\"]\n"));
+    assert!(calls.contains("targetSystems\n[\"aarch64-linux\"]\n"));
+    assert!(calls.contains("targetSystems\n[\"x86_64-linux\"]\n"));
+    assert!(calls.contains("?dir=\n"));
     assert!(calls.contains("--file"));
     assert!(calls.contains("--out-link"));
     assert!(!calls.contains("#packages"));
@@ -831,14 +937,14 @@ fn deploy_installs_a_copied_build_without_nix_or_a_project() {
 }
 
 #[test]
-fn build_selects_explicit_linux_build_and_target_systems() {
-    for (builder, arch, build_system) in [
-        ("x86_64-linux", "x86_64", "x86_64-linux"),
-        ("x86_64-linux", "aarch64", "x86_64-linux"),
-        ("aarch64-linux", "x86_64", "aarch64-linux"),
-        ("aarch64-linux", "aarch64", "aarch64-linux"),
-        ("aarch64-darwin", "x86_64", "x86_64-linux"),
-        ("aarch64-darwin", "aarch64", "aarch64-linux"),
+fn build_passes_builder_and_target_systems() {
+    for (builder, arch) in [
+        ("x86_64-linux", "x86_64"),
+        ("x86_64-linux", "aarch64"),
+        ("aarch64-linux", "x86_64"),
+        ("aarch64-linux", "aarch64"),
+        ("aarch64-darwin", "x86_64"),
+        ("aarch64-darwin", "aarch64"),
     ] {
         let d = TempDir::new().unwrap();
         apps_flake(d.path());
@@ -850,16 +956,11 @@ fn build_selects_explicit_linux_build_and_target_systems() {
                 .unwrap(),
         );
         let target = format!("{arch}-linux");
-        let expression = fs::read_to_string(d.path().join("calls")).unwrap();
+        let calls = fs::read_to_string(d.path().join("calls")).unwrap();
+        assert!(calls.contains(&format!("builder\n{builder}\n")), "{calls}");
         assert!(
-            expression.contains(&format!(
-                "apps.teka.apps.\"app\".packages.\"{build_system}\".\"{target}\""
-            )),
-            "{expression}"
-        );
-        assert!(
-            expression.contains(&format!("legacyPackages.\"{builder}\"")),
-            "{expression}"
+            calls.contains(&format!("targetSystems\n[\"{target}\"]\n")),
+            "{calls}"
         );
     }
 }
@@ -875,7 +976,7 @@ fn list_examples_hides_only_the_default_alias() {
                 r#"case "$*" in
     *metadata*) printf '%s' '{{"revision":"abc","url":"github:ouster-lidar/teka-sdk/abc"}}' ;;
     *flake.templates*) printf '%s' '{{"names":{examples},"is_sdk":false}}' ;;
-    *) printf '%s' '["app","hello-world"]' ;;
+    *) printf '%s' '{{"app":null,"hello-world":null}}' ;;
 esac"#
             ),
         );
@@ -926,7 +1027,7 @@ elif [ "$1" = build ]; then
     echo "boom-from-nix" >&2
     exit 1
 else
-    printf '["hello-world"]'
+    printf '{"hello-world":null}'
 fi"#,
     );
     let out = cli(d.path())
@@ -1793,8 +1894,8 @@ fn arch_accepts_aliases() {
         );
     }
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
-    assert!(calls.contains("teka-aarch64-linux"));
-    assert!(calls.contains("teka-x86_64-linux"));
+    assert!(calls.contains("targetSystems\n[\"aarch64-linux\"]\n"));
+    assert!(calls.contains("targetSystems\n[\"x86_64-linux\"]\n"));
 }
 
 #[test]
@@ -1916,14 +2017,8 @@ fn deploy_builds_unique_architectures_once_and_preserves_standalone_build() {
     assert_eq!(fs::read(standalone).unwrap(), stale);
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
     assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
-    for name in ["app", "hello-world"] {
-        assert!(calls.contains(&format!(
-            "apps.teka.apps.\"{name}\".packages.\"x86_64-linux\".\"aarch64-linux\""
-        )));
-        assert!(calls.contains(&format!(
-            "apps.teka.apps.\"{name}\".packages.\"x86_64-linux\".\"x86_64-linux\""
-        )));
-    }
+    assert!(calls.contains("appIds\n[\"app\",\"hello-world\"]\n"));
+    assert!(calls.contains("targetSystems\n[\"aarch64-linux\",\"x86_64-linux\"]\n"));
     let (_, args) = calls.split_once("--out-link\n").unwrap();
     let out_link = Path::new(args.lines().next().unwrap());
     assert!(out_link.is_absolute());
@@ -1972,8 +2067,8 @@ fn deploy_reuses_one_build_for_same_architecture_hosts() {
     }
     let calls = fs::read_to_string(d.path().join("calls")).unwrap();
     assert_eq!(calls.lines().filter(|line| *line == "build").count(), 1);
-    assert!(calls.contains("pkgs.linkFarm \"teka-aarch64-linux\""));
-    assert!(!calls.contains("teka-multi"));
+    assert!(calls.contains("targetSystems\n[\"aarch64-linux\"]\n"));
+    assert!(!d.path().join("packages/teka-multi").exists());
     assert!(!d.path().join("result").exists());
 }
 
@@ -2897,21 +2992,16 @@ fn app_build_and_deploy_use_system_nix_without_invoking_the_vm_plugin() {
             server.join().unwrap()[2].body,
             fs::read(d.path().join(format!("packages/{target}-linux/app.tpk"))).unwrap()
         );
-        let expression = fs::read_to_string(d.path().join("calls")).unwrap();
+        let calls = fs::read_to_string(d.path().join("calls")).unwrap();
+        assert!(calls.contains("builder\naarch64-darwin\n"), "{calls}");
         assert!(
-            expression.contains("legacyPackages.\"aarch64-darwin\""),
-            "{expression}"
+            calls.contains(&format!("targetSystems\n[\"{target}-linux\"]\n")),
+            "{calls}"
         );
+        assert!(calls.contains("--out-link\nresult"), "{calls}");
         assert!(
-            expression.contains(&format!(
-                "teka.apps.\"app\".packages.\"{target}-linux\".\"{target}-linux\""
-            )),
-            "{expression}"
-        );
-        assert!(expression.contains("--out-link\nresult"), "{expression}");
-        assert!(
-            !expression.contains("--store") && !expression.contains("--builders"),
-            "{expression}"
+            !calls.contains("--store") && !calls.contains("--builders"),
+            "{calls}"
         );
     }
 }

@@ -1,6 +1,6 @@
 {
   "id": "hello-slidev",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello Slidev",
   "nav": {
     "label": "Hello Slidev",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "Hello Slidev",
-    "template": "slides.html",
     "styles": [
       "hello-slidev.css"
     ],

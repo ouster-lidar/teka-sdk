@@ -1,119 +1,131 @@
-# Shared Sway/Cage + Firefox app image builder.
+# Shared Sway/Cage + Firefox app image.
 {
-  ps,
+  teka,
+  imports,
   lib,
   stdenv,
-  path,
+  firefox-bin,
   bash,
-  replaceVars,
+  replaceVarsWith,
   writeText,
-  runCommand,
-  writeShellScript,
-  dbus,
+  callPackage,
   pkgsStatic,
   vulkan-loader,
-  compositorPkg,
+  sway,
+  cage,
   nssTools,
   p11-kit,
   adwaita-icon-theme,
-  dejavu_fonts,
-  name,
-  description,
-  stubId,
-  startUrl,
-  kiosk ? false,
-  profileRel ? (if kiosk then "firefox-kiosk-profile" else "firefox-profile"),
-  startLog,
 }:
+teka.lib.mkAppImage (
+  { config, ... }:
+  let
+    name = teka.appId;
+    display = teka.lib.wayland;
+    inherit (display) fontsConf;
 
-let
-  inherit (import ./firefox-bin-app.nix { inherit lib stdenv path; }) firefox-bin;
+    kiosk = config.mode == "kiosk";
+    compositorPkg = if kiosk then cage else sway;
+    compositorName = if kiosk then "Cage" else "Sway";
+    browserName = if kiosk then "Firefox kiosk" else "Firefox";
+    url = lib.escapeShellArg config.startUrl;
 
-  mkFirefoxClientLoop = import ./client-loop.nix {
-    inherit writeText runCommand writeShellScript;
-    inherit (ps) caBundlePath;
-  };
+    clientLd = lib.makeLibraryPath [
+      vulkan-loader
+      stdenv.cc.cc.lib
+    ];
+    clientPath = lib.makeBinPath [
+      bash
+      display.dbus
+      compositorPkg
+      pkgsStatic.busybox
+      firefox-bin
+    ];
 
-  jp = ps.hostUnitDefaults {
-    hostGpuChecksCfg = {
-      enable = true;
-      gbmBackends = true;
+    firefoxLoop = callPackage ./client-loop.nix {
+      inherit nssTools p11-kit firefox-bin;
+      name = "${name}-client-loop";
+      firefoxCliTail = if kiosk then "--kiosk ${url}" else url;
+      profileRel = if kiosk then "firefox-kiosk-profile" else "firefox-profile";
     };
-  };
 
-  fontsConf = ps.mkFontconfigConf {
-    name = "${name}-fonts.conf";
-    inherit dejavu_fonts;
-    cacheDir = "/run/${name}/fontconfig-cache";
-  };
+    swayConfig = writeText "${name}-sway.conf" ''
+      exec ${firefoxLoop}
+    '';
 
-  clientLd = lib.makeLibraryPath [
-    vulkan-loader
-    stdenv.cc.cc.lib
-  ];
-
-  firefoxLoop = mkFirefoxClientLoop {
-    inherit nssTools p11-kit firefox-bin;
-    name = "${name}-client-loop";
-    firefoxCliTail =
-      if kiosk then "--kiosk ${lib.escapeShellArg startUrl}" else lib.escapeShellArg startUrl;
-    inherit profileRel;
-  };
-
-  compositorCmd =
-    if kiosk then
-      "${lib.getExe compositorPkg} -- ${firefoxLoop}"
-    else
-      "${lib.getExe compositorPkg} --unsupported-gpu --config \"${swayConfig}\"";
-
-  swayConfig = writeText "${name}-sway.conf" ''
-    exec ${firefoxLoop}
-  '';
-
-  clientPath = lib.makeBinPath [
-    bash
-    dbus
-    compositorPkg
-    pkgsStatic.busybox
-    firefox-bin
-  ];
-
-  innerRun = replaceVars ./firefox-wayland-run.sh.in {
-    bash = "${bash}";
-    wlrootsAppWaylandEnv = ps.wlrootsSwayEnvShSubst {
-      bash = "${bash}";
-      inherit clientLd clientPath;
-      xdgRuntimeDir = "/run/${name}";
+    runLoop = replaceVarsWith {
+      src = ./firefox-wayland-run.sh.in;
+      isExecutable = true;
+      replacements = {
+        bash = "${bash}";
+        wlrootsAppWaylandEnv = display.mkShellEnv { inherit clientLd clientPath; };
+        inherit fontsConf;
+        startLog = "starting ${compositorName} (wlroots) + ${browserName} on DRM with NVIDIA clients";
+        logTag = name;
+        cursorIcons = "${adwaita-icon-theme}";
+        compositorCmd =
+          if kiosk then
+            "${lib.getExe compositorPkg} -- ${firefoxLoop}"
+          else
+            "${lib.getExe compositorPkg} --unsupported-gpu --config \"${swayConfig}\"";
+      };
     };
-    inherit fontsConf startLog;
-    logTag = name;
-    cursorIcons = "${adwaita-icon-theme}";
-    inherit compositorCmd;
-  };
 
-  runLoopPack = ps.mkAppRunWrapper {
-    inherit name innerRun bash;
-  };
-  runLoop = "${runLoopPack}/run";
-in
-ps.makeAppImage {
-  inherit name;
-  copyFiles =
-    ps.mkPasswdGroupStubCopyFiles stubId
-    ++ ps.waylandAppBaseCopyFiles
-    ++ ps.appGpuManifestCopyFiles {
-      inherit name;
-      gpu = "wayland";
+  in
+  {
+    options = {
+      mode = lib.mkOption {
+        type = lib.types.enum [
+          "browser"
+          "kiosk"
+        ];
+        description = "Run Firefox in Sway or in kiosk mode under Cage.";
+      };
+      startUrl = lib.mkOption {
+        type = lib.types.str;
+        description = "Page Firefox opens at startup.";
+      };
     };
-  unit = ps.mkGpuWaylandUnit {
-    inherit name jp description;
-    execStart = runLoop;
-    runtimeDirectory = name;
-    useTty = true;
-    bindHostEtc = true;
-  };
-  runtimeClosures = [
-    runLoopPack
-  ]
-  ++ jp.runtimeClosures;
-}
+    config = {
+      services.main = {
+        runtime.gpu = "wayland";
+        runtime.network = "host";
+        systemd = {
+          description = "${name} (${compositorName} + ${browserName} on Wayland)";
+          after = [
+            "systemd-user-sessions.service"
+            "network.target"
+            "network-online.target"
+            "time-sync.target"
+            "seatd.service"
+          ];
+          wants = [
+            "network-online.target"
+            "time-sync.target"
+            "seatd.service"
+          ];
+          conflicts = [
+            "getty@tty1.service"
+            "display-manager.service"
+          ];
+          serviceConfig = {
+            User = "root";
+            ExecStart = runLoop;
+            Restart = "always";
+            RestartSec = 3;
+            StandardInput = "tty";
+            StandardOutput = "journal";
+            TTYPath = "/dev/tty1";
+            TTYReset = true;
+            TTYVHangup = true;
+            TTYVTDisallocate = true;
+            BindReadOnlyPaths = display.hostEtcBindPaths;
+            RuntimeDirectory = "%N";
+            RuntimeDirectoryMode = "0700";
+          };
+        };
+      };
+    };
+    inherit imports;
+  }
+)

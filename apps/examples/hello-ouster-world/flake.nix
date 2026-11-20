@@ -5,13 +5,15 @@
 
   outputs =
     { self, teka-sdk, ... }:
-    let
-      builds = teka-sdk.lib.mkAppOutputs {
-        inherit self;
-        apps.hello-ouster-world = import ./.;
-      };
-    in
-    builds
+    teka-sdk.lib.mkAppOutputs {
+      inherit self;
+      apps = [
+        {
+          package = ./package.nix;
+          imageCheck = import ./tests/image-check.nix;
+        }
+      ];
+    }
     // {
       apps = builtins.mapAttrs (
         system: _:
@@ -23,7 +25,7 @@
             type = "app";
             program = pkgs.lib.getExe (
               pkgs.callPackage ./tests {
-                teka = teka-sdk.packages.${system}.teka;
+                inherit (teka-sdk.packages.${system}) teka;
               }
             );
           };

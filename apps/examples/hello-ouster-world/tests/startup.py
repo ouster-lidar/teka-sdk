@@ -4,6 +4,7 @@ from pathlib import Path
 import select
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 from types import ModuleType
 import unittest
 from unittest import mock
@@ -20,7 +21,7 @@ bridge.PointCloudViz = mock.Mock()
 bridge.VizPid = mock.Mock()
 with mock.patch.dict(sys.modules, {"ouster": ModuleType("ouster"), "ouster.sdk": sdk,
                                   "ouster.sdk.viz": viz, "viz_utils": bridge}):
-    import hello_ouster_world as world
+    import viewer as world
 
 
 def connection_error(reason="Could not connect to server"):
@@ -47,6 +48,14 @@ class StartupTests(unittest.TestCase):
 
     def sleep(self, seconds):
         self.now += seconds
+
+    def test_loads_source_config_from_service_state_directory(self):
+        with TemporaryDirectory() as state, mock.patch.dict("os.environ", STATE_DIRECTORY=state):
+            config = Path(state) / "source-config.json"
+            config.write_text('{"sensor_hostname": "renamed-sensor"}', encoding="utf-8")
+            watch = world.SourceConfigWatch()
+            source = world.load_source_config(defaults=watch.defaults)
+            self.assertEqual(source["sensor_hostname"], "renamed-sensor")
 
     def test_recovers_from_connection_and_timeout_failures(self):
         world._configure_sensor.side_effect = [

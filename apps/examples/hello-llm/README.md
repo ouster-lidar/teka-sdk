@@ -23,7 +23,7 @@ avoided on all platforms (pulls torch; aarch64 also lacks rapidocr-onnxruntime).
 | Storage | `OLLAMA_MODELS` → `/var/lib/hello-llm/ollama` (not in the DDI) |
 | First boot | `ollama pull nemotron-3-nano:4b`, then a one-line `ollama run` warm-up |
 
-Bump `modelStamp` in `default.nix` to force a re-pull after changing the default tag.
+Bump `modelStamp` in `package.nix` to force a re-pull after changing the default tag.
 
 ## Web search
 

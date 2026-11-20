@@ -9,10 +9,10 @@
 }:
 let
   inherit (lib)
-    mkDefault
     mkIf
     mkMerge
     mkOption
+    mkOptionDefault
     types
     ;
   inherit (config) runtime;
@@ -95,10 +95,10 @@ in
   config = mkMerge [
     {
       systemd.unitConfig.X-Teka-PortableGPU = mkIf (runtime.gpu != null) runtime.gpu;
-      systemd.serviceConfig.SyslogIdentifier = mkDefault "%N";
+      systemd.serviceConfig.SyslogIdentifier = mkOptionDefault "%N";
     }
     (mkIf (config.program != null) {
-      systemd.serviceConfig.ExecStart = lib.mkOptionDefault (lib.getExe config.program);
+      systemd.serviceConfig.ExecStart = mkOptionDefault (lib.getExe config.program);
     })
     (mkIf runtime.managed {
       systemd.after = [ "teka-manager.target" ];
@@ -106,14 +106,14 @@ in
     })
     (mkIf runtime.notify {
       systemd.serviceConfig = {
-        Type = mkDefault "notify";
-        NotifyAccess = mkDefault "main";
+        Type = mkOptionDefault "notify";
+        NotifyAccess = mkOptionDefault "main";
       };
     })
     (mkIf (runtime.network != null) {
       systemd.environment = {
-        LANG = mkDefault "C.UTF-8";
-        LC_ALL = mkDefault "C.UTF-8";
+        LANG = mkOptionDefault "C.UTF-8";
+        LC_ALL = mkOptionDefault "C.UTF-8";
       };
       systemd.serviceConfig = {
         PrivateNetwork = runtime.network == "private";
@@ -125,16 +125,7 @@ in
     (mkIf (runtime.gpu == "wayland") {
       systemd.serviceConfig = {
         EnvironmentFile = "/etc/teka/wlroots.env";
-        ExecStartPre =
-          let
-            checks = pkgs.callPackage ./wayland/host-gpu-checks.nix { };
-          in
-          map (name: "${checks}/bin/teka-portable-check-${name}") [
-            "vulkan-icds"
-            "glvnd-egl-vendors"
-            "seatd-socket"
-            "gbm-backends"
-          ];
+        ExecStartPre = import ./wayland/host-gpu-checks.nix { inherit (pkgs) writeShellScript; };
       };
     })
   ];

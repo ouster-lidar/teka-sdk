@@ -1,6 +1,6 @@
 {
   "id": "hello-webui",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello WebUI",
   "nav": {
     "label": "Hello WebUI",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "Hello WebUI",
-    "template": "demo.html",
     "styles": [
       "demo.css"
     ]

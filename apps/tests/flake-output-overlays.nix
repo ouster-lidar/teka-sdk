@@ -2,7 +2,6 @@
   mkAppOutputs,
   nixpkgs,
   pkgs,
-  version,
 }:
 
 let
@@ -12,53 +11,50 @@ let
     "aarch64-linux"
   ];
   markerOverlay = _: prev: { appOverlayMarker = (prev.appOverlayMarker or 0) + 1; };
-  outputsFor =
-    simpleCrossApps:
-    mkAppOutputs {
-      self = { };
-      inherit systems version simpleCrossApps;
-      overlays = [ markerOverlay ];
-      apps.overlay-probe.image =
-        { pkgs, ps, ... }:
-        pkgs.runCommand "overlay-probe"
-          {
-            passthru = {
-              marker = pkgs.appOverlayMarker or null;
-              targetSystem = pkgs.stdenv.hostPlatform.system;
-              buildSystem = pkgs.stdenv.buildPlatform.system;
-              sourceSystem =
-                (ps.appCrate.prepareAppSource {
-                  crateName = "hello-pub";
-                  src = ../examples/hello-pub;
-                }).src.system;
-              runnerTarget = ps.tekaRunner.CARGO_BUILD_TARGET;
-              expectedRunnerTarget = pkgs.stdenv.hostPlatform.rust.rustcTarget;
-            };
-          }
-          ''
-            touch "$out"
-          '';
-    };
+  outputs = mkAppOutputs {
+    self = { };
+    inherit systems;
+    overlays = [ markerOverlay ];
+    apps = [
+      {
+        package = ./fixtures/overlay-probe.nix;
+        imageCheck =
+          { pkgs, ... }:
+          assert pkgs.appOverlayMarker == 1;
+          "";
+      }
+    ];
+  };
   overlayApplied =
-    outputs:
-    !(outputs ? packages)
+    outputs.packages.aarch64-darwin.default.drvPath
+    == outputs.packages.aarch64-linux.packaging-probe.targets.aarch64-linux.drvPath
     && lib.all (
       buildSystem:
-      lib.all (
+      let
+        packages = outputs.packages.${buildSystem};
+        inherit (packages.packaging-probe) targets;
+      in
+      packages.default.drvPath == targets.aarch64-linux.drvPath
+      && packages.packaging-probe.drvPath == targets.aarch64-linux.drvPath
+      && lib.all (
         targetSystem:
         let
-          package = outputs.teka.apps.overlay-probe.packages.${buildSystem}.${targetSystem};
+          package = targets.${targetSystem};
           image = package.image;
+          checkName =
+            if buildSystem == targetSystem then "packaging-probe" else "packaging-probe-cross-${targetSystem}";
         in
-        image.marker == 1
+        builtins.isString outputs.checks.${buildSystem}.${checkName}.drvPath
+        && image.marker == 1
         && image.targetSystem == targetSystem
         && image.buildSystem == buildSystem
-        && image.sourceSystem == buildSystem
         && image.runnerTarget == image.expectedRunnerTarget
         && (builtins.elemAt package.nativeBuildInputs 1).system == buildSystem
       ) systems
     ) systems;
 in
-assert overlayApplied (outputsFor [ "overlay-probe" ]);
-assert overlayApplied (outputsFor [ ]);
+assert overlayApplied;
+assert
+  (outputs.teka.lib.linkFarm pkgs.stdenv.hostPlatform.system "app-output-probe" [ ]).drvPath
+  == (pkgs.linkFarm "app-output-probe" [ ]).drvPath;
 pkgs.emptyFile

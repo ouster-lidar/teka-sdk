@@ -61,10 +61,9 @@
     {
       lib = {
         certs.app.dev = builtins.readFile ./nix/apps/dev-keys/apps.pem;
-        mkVersion = import ./nix/apps/version.nix;
         inherit (import ./nix/apps/erofs-mkfs.nix { inherit lib; }) mkErofsImageScript;
         mkAppOutputs = import ./nix/apps {
-          inherit nixpkgs crane;
+          inherit nixpkgs crane rustsecAdvisoryDb;
           tekaFor = system: self.packages.${system}.teka;
         };
       };
@@ -75,7 +74,9 @@
         default = examples.templates.hello-world;
       };
 
-      packages = outputFor "packages";
+      packages = lib.mapAttrs (
+        system: outputs: (examples.packages.${system} or { }) // outputs.packages
+      ) perSystem;
       apps = lib.recursiveUpdate (outputFor "apps") examples.apps;
       devShells = outputFor "devShells";
       checks = lib.recursiveUpdate (outputFor "checks") examples.checks;

@@ -1,18 +1,26 @@
 { pkgs, imageVersion }:
-
+let
+  inherit (pkgs.lib.importJSON ../manifest.json) id;
+in
 ''
   dump=${pkgs.erofs-utils}/bin/dump.erofs
-  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/mission-control/manifest.json "$raw" >manifest.json
+  "$dump" --offset="$root_offset" --cat --path=usr/lib/systemd/system/${id}.service "$raw" >service
+  grep -qxF 'Description=Teka App ${id}' service
+  grep -qxF 'Type=oneshot' service
+  grep -qxF 'ExecStart=/bin/true' service
+  grep -qxF 'RemainAfterExit=true' service
+  grep -qxF 'WantedBy=teka-apps.target' service
+  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/app/manifest.json "$raw" >manifest.json
   ${pkgs.jq}/bin/jq -e '
-    .id == "hello-webui" and .version == "${imageVersion}" and
-    .ui.mode == "static" and .ui.template == "demo.html" and .ui.styles == ["demo.css"] and
+    .id == "${id}" and .version == "${imageVersion}" and
+    .ui.mode == "static" and .ui.styles == ["demo.css"] and
     .nav.panels == [{"label":"Demo","panel":"demo"}] and .backend.mode == "none"
   ' manifest.json >/dev/null
-  "$dump" --offset="$root_offset" --ls --path=usr/lib/teka/mission-control/web "$raw" >web-files
+  "$dump" --offset="$root_offset" --ls --path=usr/lib/teka/app/web "$raw" >web-files
   test "$(awk 'NF == 3 && $2 == 1 { print $3 }' web-files)" = "$(printf '%s\n' app-api.js demo.css demo.html demo.js)"
-  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/mission-control/web/demo.html "$raw" >demo.html
+  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/app/web/demo.html "$raw" >demo.html
   test -s demo.html
-  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/mission-control/web/demo.js "$raw" >demo.js
+  "$dump" --offset="$root_offset" --cat --path=usr/lib/teka/app/web/demo.js "$raw" >demo.js
   ${pkgs.nodejs}/bin/node - demo.js <<'JS'
   const assert = require('node:assert/strict');
   const fs = require('node:fs');

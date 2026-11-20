@@ -92,14 +92,11 @@ export RAG_EMBEDDING_MODEL=
 export ENABLE_PERSISTENT_CONFIG=false
 export DATA_DIR=/tmp/hello-llm-state/open-webui
 export WEBUI_SECRET_KEY_FILE=/tmp/hello-llm-state/.webui_secret_key
-# bubblewrap hides DDI /etc/ssl; ddgs/primp verifies TLS (unlike busybox wget).
+# Open WebUI needs the CA bundle inside its bubblewrap root.
+webui_ca=/etc/ssl/certs/ca-certificates.crt
 bwrap_extra=()
 [[ -r /etc/resolv.conf ]] && bwrap_extra+=(--ro-bind /etc/resolv.conf /etc/resolv.conf)
 [[ -r /etc/hosts ]] && bwrap_extra+=(--ro-bind /etc/hosts /etc/hosts)
-if [[ -r /etc/ssl/certs/ca-certificates.crt ]]; then
-  export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-  bwrap_extra+=(--ro-bind /etc/ssl/certs /etc/ssl/certs)
-fi
 # Container python expects /lib/ld-linux (FHS). Rootfs is read-only; state lives
 # under /tmp/hello-llm-state inside the sandbox (no /var/lib in the image).
 exec @bubblewrap@ \
@@ -110,6 +107,8 @@ exec @bubblewrap@ \
   --tmpfs /tmp \
   --bind "$state" /tmp/hello-llm-state \
   --bind "$static_rw" /app/backend/open_webui/static \
+  --ro-bind "$SSL_CERT_FILE" "$webui_ca" \
+  --setenv SSL_CERT_FILE "$webui_ca" \
   "${bwrap_extra[@]}" \
   --setenv PATH /usr/local/bin:/usr/bin:/bin \
   --setenv PYTHONPATH /usr/local/lib/python3.11/site-packages:/app/backend \

@@ -29,7 +29,7 @@ let
         types.submoduleWith {
           modules = [
             ./service.nix
-            { systemd.environment.APP_ID = lib.mkDefault appId; }
+            { systemd.environment.APP_ID = lib.mkOptionDefault appId; }
           ];
           specialArgs = { inherit appId pkgs systemdUtils; };
         }

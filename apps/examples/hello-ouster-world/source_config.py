@@ -20,8 +20,10 @@ class FrameSetSourceType(str, Enum):
 
 @dataclass(frozen=True)
 class SourceDefaults:
-    config_path: str = "/var/lib/hello-ouster-world/source-config.json"
-    runtime_status_path: str = "/run/hello-ouster-world/source-runtime.json"
+    config_path: Path = field(default_factory=lambda: Path(
+        os.environ.get("STATE_DIRECTORY", "/var/lib/hello-ouster-world"),
+        "source-config.json",
+    ))
     osf_path: str = ""
     sensor_hostname: str = ""
 

@@ -1,0 +1,8 @@
+{
+  "id": "hello-wayland-gpu",
+  "version": "0.1.0-alpha.1",
+  "portable": {
+    "displayService": true,
+    "gpu": "wayland"
+  }
+}

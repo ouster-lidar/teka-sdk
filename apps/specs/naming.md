@@ -26,17 +26,15 @@ Each directory under `examples/` with a `default.nix` is discovered as an app. C
 
 ## Package names and identity
 
-App artifacts live under `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>` and contain one signed `.tpk` each. Native builds use equal systems; cross-builds use distinct systems.
+The `.tpk`, `.raw`, and `.roothash` files share the basename `<id>-<system>-v<version>+<buildId>`. The signed TPK component version is `<version>+<buildId>`.
 
-Package filenames use `<id>-<system>-v<compose>.tpk` in each app output.
-
-- **`<id>`** — app id (`os-release` **`ID=`**).
+- **`<id>`** — manifest `id` (`os-release` **`ID=`**).
 - **`<system>`** — Nix platform (`x86_64-linux`, `aarch64-linux`); the filename uses the **target**.
-- **`<compose>`** — **`${IMAGE_VERSION}+${BUILD_ID}`** from `nix/apps/version.nix`.
+- **`<version>`** — manifest `version` (`os-release` **`IMAGE_VERSION=`**).
+- **`<buildId>`** — `<lastModifiedDate>.g<rev>.n<hash>`. Use the flake's `shortRev`, falling back to `dirtyShortRev` without `-dirty` or to `0000000`. The date defaults to `19700101000000`. The hash is the first seven hex digits of the SHA-256 of the flake's `narHash` string.
 
 - Replace identity is **`(id, root_hash)`** from the verified package, independent of **`VERSION_ID`** and SemVer order.
 - Deploy requires exactly one **`.tpk`** per app output.
-- App manifest **`version`** should match the release version **`IMAGE_VERSION`** from `nix/apps/version.nix`.
 
 App image `os-release`:
 
@@ -47,11 +45,10 @@ App image `os-release`:
 | `IMAGE_ID` | same as `ID` |
 | `IMAGE_VERSION` | SemVer core (`MAJOR.MINOR.PATCH` plus optional pre-release) |
 | `VERSION` | same as `IMAGE_VERSION` |
-| `VERSION_ID` | `1` — GPU compatibility generation (not SemVer; not the compose string) |
-| `BUILD_ID` | `${lastModifiedDate}.g${rev}.n${narHash7}` (`rev` = git shortRev, or `0000000` on path flakes) |
+| `VERSION_ID` | `1` — GPU compatibility generation |
+| `BUILD_ID` | `<buildId>` |
 | `PRETTY_NAME` | `<id> portable <IMAGE_VERSION>` |
 | `PORTABLE_PREFIXES` | app id |
 
-- Filename **`<compose>`** is **`${IMAGE_VERSION}+${BUILD_ID}`** from `nix/apps/version.nix`. **`TEKA_TEST_VERSION`** overrides the SemVer core when set (flake eval reads env only with **`--impure`**); unset defaults to **`0.1.0-alpha.1`**. Malformed SemVer throws at eval.
-- Flake **`checks.<system>.<id>`** (and **`<id>-cross-<system>`**) validates image naming and `os-release` fields against `nix/apps/version.nix`, including **`VERSION_ID=1`**.
+- Flake **`checks.<system>.<id>`** (and **`<id>-cross-<target>`**) validates the image filesystem, copied manifest, primary service file, and `os-release` identity and version fields.
 - Host GPU **`extension-release.portable-gl-extension`** matches **`ID=teka-portable`** via **`ID_LIKE`** and **`VERSION_ID=1`** (same GPU compatibility generation as app images). Bump both sides only for a breaking GPU extension change.
