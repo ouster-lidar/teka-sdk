@@ -28,6 +28,11 @@
     let
       inherit (nixpkgs) lib;
       nixpkgsRev = nixpkgs.rev;
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
       mkTeka =
         pkgs:
         pkgs.callPackage ./nix/packages/teka-cli.nix {
@@ -36,30 +41,17 @@
           advisoryDb = rustsecAdvisoryDb;
           sdkRef = if self ? rev then "github:ouster-lidar/teka-sdk/${self.rev}" else null;
         };
-      perSystem =
-        lib.genAttrs
-          [
-            "x86_64-linux"
-            "aarch64-linux"
-            "aarch64-darwin"
-          ]
-          (
-            system:
-            let
-              pkgs = import nixpkgs {
-                inherit system;
-                config.allowUnfreePredicate = pkg: lib.getName pkg == "tart";
-              };
-            in
-            import ./nix {
-              inherit
-                pkgs
-                crane
-                mkTeka
-                nixpkgsRev
-                ;
-            }
-          );
+      perSystem = lib.genAttrs systems (
+        system:
+        import ./nix {
+          sdk = self;
+          inherit crane mkTeka nixpkgsRev;
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfreePredicate = pkg: lib.getName pkg == "tart";
+          };
+        }
+      );
       examples = import ./apps {
         sdk = self;
         inherit jetpack;
@@ -80,22 +72,12 @@
       inherit (examples) teka;
 
       templates = examples.templates // {
-        default = self.templates.hello-world;
+        default = examples.templates.hello-world;
       };
 
-      packages = lib.mapAttrs (
-        system: outputs:
-        outputs.packages
-        // {
-          publish-cache = import ./nix/publish-cache.nix {
-            pkgs = nixpkgs.legacyPackages.${system};
-            sdk = self;
-          };
-        }
-      ) perSystem;
+      packages = outputFor "packages";
       apps = lib.recursiveUpdate (outputFor "apps") examples.apps;
       devShells = outputFor "devShells";
-
       checks = lib.recursiveUpdate (outputFor "checks") examples.checks;
 
       overlays.default =

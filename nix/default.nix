@@ -1,5 +1,6 @@
 {
   pkgs,
+  sdk,
   crane,
   mkTeka,
   nixpkgsRev,
@@ -72,6 +73,7 @@ rec {
     teka-runner = pkgs.callPackage ./packages/teka-runner.nix { inherit craneLib; };
     teka-src = pkgs.callPackage ./packages/teka-src.nix { inherit craneLib; };
     fern = pkgs.callPackage ./packages/fern.nix { nodejs = pkgs.nodejs-slim_22; };
+    publish-cache = pkgs.callPackage ./packages/publish-cache.nix { inherit sdk; };
     default = teka;
   };
 

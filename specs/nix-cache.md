@@ -15,7 +15,7 @@ Publish manually alongside GitHub pushes, especially after lockfile updates:
 nix run .#publish-cache
 ```
 
-- The selected packages, apps, build platforms and destination cache are defined in [`publish-cache.nix`](../nix/publish-cache.nix).
+- The selected packages, apps, build platforms and destination cache are defined in [`publish-cache.nix`](../nix/packages/publish-cache.nix).
 - The command builds the selection, collects locally realized build/runtime dependencies, deduplicates store paths and pushes their manifest closure.
 - Nix supplies the tools; authenticate with a cache-scoped `CACHIX_AUTH_TOKEN` or the publisher's Cachix configuration.
 - Use `--dry-run` to build and inspect the manifest without uploading or pinning.
