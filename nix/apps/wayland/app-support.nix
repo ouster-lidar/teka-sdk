@@ -68,8 +68,8 @@ let
         "@bash@"
       ]
       [
-        clientPath
-        clientLd
+        (lib.escapeShellArg clientPath)
+        (lib.escapeShellArg clientLd)
         xdgRuntimeDir
         bash
       ]

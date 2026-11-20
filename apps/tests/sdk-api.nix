@@ -2,6 +2,29 @@
 
 let
   pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
+  wayland = import ../../nix/apps/wayland/app-support.nix {
+    inherit (pkgs) lib writeText;
+    version = sdk.lib.mkVersion {
+      self = sdk;
+      inherit (pkgs) lib;
+    };
+    caBundleCopyFiles = [ ];
+    etcHostsStub = null;
+    nsswitchConf = null;
+    hostEtcBindPaths = "";
+    passwdGroupBindPaths = "";
+  };
+  waylandEnvProbe =
+    clientPath: clientLd:
+    pkgs.writeShellScript "wayland-library-path-check" ''
+      set -eu
+      ${wayland.wlrootsSwayEnvShSubst {
+        inherit clientPath clientLd;
+        xdgRuntimeDir = "/run/wayland-library-path-check";
+        bash = toString pkgs.bash;
+      }}
+      exec ${pkgs.lib.getExe' pkgs.coreutils "printenv"} LD_LIBRARY_PATH
+    '';
   crossPkgs = import sdk.inputs.nixpkgs {
     localSystem = system;
     crossSystem = "aarch64-linux";
@@ -60,6 +83,11 @@ assert
   ];
 assert sdk.templates.default.path == sdk.templates.hello-world.path;
 pkgs.runCommand "sdk-api" { } ''
+  LD_LIBRARY_PATH=/host/driver/lib ${waylandEnvProbe "/app/bin" "/app/lib"} > inherited-library-path
+  printf '%s\n' /host/driver/lib:/app/lib | diff -u - inherited-library-path
+  LD_LIBRARY_PATH=/host/driver/lib ${waylandEnvProbe "" ""} > host-library-path
+  printf '%s\n' /host/driver/lib | diff -u - host-library-path
+
   mkdir "source tree"
   echo fixture > "source tree/probe"
   ${sdk.lib.mkErofsImageScript {
