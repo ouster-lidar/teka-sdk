@@ -1510,7 +1510,11 @@ fn failed_batch_selection_preserves_previous_targets() {
     let d = TempDir::new().unwrap();
     let config = d.path().join("config/teka/config.json");
     fs::create_dir_all(config.parent().unwrap()).unwrap();
-    fs::write(&config, r#"{"selected_devices":["http://previous.local/"]}"#).unwrap();
+    fs::write(
+        &config,
+        r#"{"selected_devices":["http://previous.local/"]}"#,
+    )
+    .unwrap();
     let (url, server) = serve(vec![("200 OK", r#"{"auth_disabled":true}"#)]);
     let out = cli(d.path())
         .args(["box", "select", &url, "http://localhost:1"])
