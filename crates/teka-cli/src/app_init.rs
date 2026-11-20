@@ -67,7 +67,7 @@ pub fn run(options: InitOptions) -> Result<()> {
             build_check::display_path(&options.directory)
         ),
         || {
-            let (template, provider) =
+            let (template, sdk_pin) =
                 build::template_reference(&options.source, options.example.as_deref())?;
             let directory = &options.directory;
             ensure!(
@@ -137,16 +137,20 @@ pub fn run(options: InitOptions) -> Result<()> {
                 false,
             )?;
             initialized?;
-            build_check::run_command(
-                Command::new("nix")
-                    .current_dir(directory)
-                    .args(["flake", "lock", "path:."])
-                    .args(["--override-input", "teka-sdk", &provider])
-                    // Overrides normally disable writing the lock file.
-                    .args(["--output-lock-file", "flake.lock"]),
-                "nix flake lock",
-                false,
-            )?;
+            let mut lock = Command::new("nix");
+            lock.current_dir(directory)
+                .args(["flake", "lock", "path:."]);
+            if let Some(sdk_pin) = sdk_pin.as_deref() {
+                // Overrides normally disable writing the lock file.
+                lock.args([
+                    "--override-input",
+                    "teka-sdk",
+                    sdk_pin,
+                    "--output-lock-file",
+                    "flake.lock",
+                ]);
+            }
+            build_check::run_command(&mut lock, "nix flake lock", false)?;
             if directory.join("flake.lock").try_exists()? {
                 build_check::run_command(
                     Command::new("git")

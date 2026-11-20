@@ -124,7 +124,7 @@ fn corrupt_package(path: &Path, member: usize) {
 }
 
 const NIX_MOCK: &str = r#"if [ "$1 $2" = "flake metadata" ]; then
-    printf '{"url":"github:ouster-lidar/teka-sdk/0123456789012345678901234567890123456789"}'
+    printf '{"revision":"0123456789012345678901234567890123456789","url":"github:ouster-lidar/teka-sdk/0123456789012345678901234567890123456789"}'
     exit
 fi
 if [ "$1 $2" = "flake new" ]; then
@@ -187,7 +187,7 @@ elif [ "$2" = --raw ]; then
     printf '%s' "${MOCK_SYSTEM:-x86_64-linux}"
 else
     case "$*" in
-        *provider.templates*) printf '[false,["default","hello-world"]]' ;;
+        *flake.templates*) printf '{"names":["default","hello-world"],"is_sdk":true}' ;;
         *) printf '["app","hello-world"]' ;;
     esac
 fi"#;
@@ -873,7 +873,8 @@ fn list_examples_hides_only_the_default_alias() {
             &d.path().join("bin/nix"),
             &format!(
                 r#"case "$*" in
-    *provider.templates*) printf '%s' '[false,{examples}]' ;;
+    *metadata*) printf '%s' '{{"revision":"abc","url":"github:ouster-lidar/teka-sdk/abc"}}' ;;
+    *flake.templates*) printf '%s' '{{"names":{examples},"is_sdk":false}}' ;;
     *) printf '%s' '["app","hello-world"]' ;;
 esac"#
             ),
