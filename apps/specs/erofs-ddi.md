@@ -1,7 +1,7 @@
 # App image erofs DDI format
 
 App `.tpk` packages contain signed GPT **DDI** images with erofs and dm-verity per [TPK specification](../../specs/teka-tpk.md).
-`makeAppImage` uses `systemd-repart` with the mkfs tuning below.
+`mkAppImage` uses `systemd-repart` with the mkfs tuning below.
 Bind `roothash` into the package manifest.
 
 ## Decision
@@ -22,7 +22,7 @@ mkfs.erofs --all-root -T0 -zlz4hc,level=9 -Efragments -C 16384 <output> <tree>
 fsck.erofs <output>
 ```
 
-**Build wiring:** Importing `nix/apps/erofs-mkfs.nix` with `{ lib, erofs-utils }` returns shared `args` and a `mkfs` function accepting `{ output, sourceDir, extraArgs ? [ ] }`. `nix/apps/image-builder.nix` → `makeAppImage` passes `args` to repart and remains the only erofs entry point. App packages must not call `mkfs.erofs` directly.
+**Build wiring:** `nix/apps/image-builder.nix` passes the shared mkfs options from `erofs-mkfs.nix` to repart. `lib.mkErofsImageScript` exposes the same settings for standalone EROFS images.
 
 ## Extension DDI sizes (`x86_64-linux` `*.raw`)
 
@@ -50,7 +50,7 @@ Measured 2026-09-29 from source revision `2be1287c02f934b298ea3324af8ee6a5cc26e5
 
 ## Coverage
 
-All erofs app images use `ps.makeAppImage`:
+All erofs app images use `teka.lib.mkAppImage`:
 
 | Group | Services |
 |-------|----------|

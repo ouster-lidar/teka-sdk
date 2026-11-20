@@ -29,13 +29,12 @@ let
     overlays = [ sdk.overlays.default ];
   };
   acceptsChecks =
-    systems: recipes:
+    systems: apps:
     (builtins.tryEval (
       builtins.attrNames
         (sdk.lib.mkAppOutputs {
           self = { };
-          inherit systems;
-          apps = map (package: { inherit package; }) recipes;
+          inherit apps systems;
         }).checks.x86_64-linux
     )).success;
   fixture = ./fixtures/app.nix;
@@ -120,7 +119,7 @@ assert
       (sdk.lib.mkAppOutputs {
         self.outPath = ./fixtures;
         apps = [
-          { package = fixture; }
+          fixture
           { package = ../examples/hello-world/package.nix; }
         ];
       }).teka.apps;

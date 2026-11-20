@@ -47,9 +47,9 @@ The root Cargo workspace contains `teka` and `teka-cli`. Rust examples remain in
 | `apps/default.nix` | Example collection, Jetpack overlays and collection checks |
 | Example `flake.nix` | Standalone downstream SDK consumer |
 
-Workspace package definitions live under `nix/packages/`, reusable app builders under `nix/apps/`, and CLI checks under `nix/tests/`. App definitions live under `apps/examples/`, with collection checks under `apps/tests/`. Both the collection and standalone templates use `teka-sdk.lib.mkAppOutputs`. See the [app build library](../apps/specs/app-lib.md) for composition and Cargo source preparation.
+Workspace package definitions live under `nix/packages/`, reusable app builders under `nix/apps/`, and CLI checks under `nix/tests/`. App definitions live under `apps/examples/`, with collection checks under `apps/tests/`. Both the collection and standalone templates use `teka-sdk.lib.mkAppOutputs`. See the [Nix app API](../specs/nix-api.md) for recipes and outputs.
 
-App artifacts live at `teka.apps.<id>.packages.<LinuxBuildSystem>.<LinuxTargetSystem>`. Root `packages` contains SDK and CLI outputs; app builds use the registry directly. Run the following commands from the repository root.
+App artifacts live at `packages.<LinuxBuildSystem>.<id>.targets.<LinuxTargetSystem>`. Run the following commands from the repository root.
 
 **Cross-build** (x86_64-linux host → aarch64-linux box):
 
@@ -60,7 +60,7 @@ teka app build --arch aarch64 hello-world
 The equivalent explicit Nix build is:
 
 ```bash
-nix build .#teka.apps.hello-world.packages.x86_64-linux.aarch64-linux
+nix build .#packages.x86_64-linux.hello-world.targets.aarch64-linux
 ```
 
 On macOS, `teka app build` selects a Linux build system and uses a configured Linux builder.

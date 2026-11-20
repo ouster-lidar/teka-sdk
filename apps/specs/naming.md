@@ -4,8 +4,8 @@ Naming layers for `apps/` app image DDIs and host platform integration.
 
 ## Host contract
 
-Install the app manifest at host path `usr/lib/teka/mission-control/manifest.json`.
-Web assets install under `usr/lib/teka/mission-control/web/`.
+Install the source app manifest at `usr/lib/teka/app/manifest.json`.
+Web assets install under `usr/lib/teka/app/web/`.
 
 ## Layers
 
@@ -15,14 +15,14 @@ Web assets install under `usr/lib/teka/mission-control/web/`.
 | Source dir | topic | `examples/hello-http/` |
 | App guide | `README.md` | `examples/hello-http/README.md` |
 | Shared web helper (source) | `nix/packages/teka-app-api-js/app-api.js` | — |
-| Shared web helper (DDI install) | `usr/lib/teka/mission-control/web/app-api.js` | prepended into each app `*.js` at build |
-| App panel JS global | `tekaAppApi(defaultId)` | not `appApi` (host `window.appApi` in Mission Control shell) |
+| Shared web helper (DDI install) | `/usr/lib/teka/app/web/app-api.js` | TekaOS loads it before the panel script |
+| App panel JS global | `tekaAppApi(defaultId)` | app panels call this helper |
 
 The Ouster viewers use distinct IDs and roles: `hello-ouster-world` is the direct SDK viewer, and `hello-ouster-dynamo` preserves the advanced FrameSet and tracked-object workflow. See [hello-ouster-viewers.md](hello-ouster-viewers.md).
 
 ## Example discovery
 
-Each directory under `examples/` with a `default.nix` is discovered as an app. Cargo lockfile updates find projects from `Cargo.toml`, and app-specific image checks from `tests/image-check.nix`. `simpleCrossApps` in `apps/default.nix` names the few apps that do not need the heavier cross-build workarounds.
+Each directory under `examples/` with a `package.nix` is discovered as an app. Cargo lockfile updates find projects from `Cargo.toml`, and app-specific image checks from `tests/image-check.nix`.
 
 ## Package names and identity
 

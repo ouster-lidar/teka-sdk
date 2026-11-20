@@ -56,7 +56,9 @@ let
         ;
       fullVersion = "${version}+${buildId}";
     };
-  appsById = builtins.listToAttrs (map readApp apps);
+  appsById = builtins.listToAttrs (
+    map (app: readApp (if builtins.isPath app then { package = app; } else app)) apps
+  );
   appNames = lib.attrNames appsById;
   artifactBase = id: target: "${id}-${target}-v${appsById.${id}.fullVersion}";
   buildId =
