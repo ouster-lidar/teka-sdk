@@ -11,7 +11,7 @@ When your app starts, it checks in with TekaOS:
 3. Open the network ports you need.
 4. When the app stops, call POST `/api/v1/manager/runtime/\<id>/release`.
 
-These calls only work from the box itself. You'll find the base URL in MC_RUNTIME_URL.
+These calls only work from the box itself. You'll find the base URL in TEKA_RUNTIME_URL.
 
 ## Open network ports
 

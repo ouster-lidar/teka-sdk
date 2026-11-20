@@ -161,7 +161,7 @@ fn accepted_leases_replay_before_ports_and_dependent_work_waits_for_restoration(
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     std::env::set_var(
-        "MC_RUNTIME_URL",
+        "TEKA_RUNTIME_URL",
         format!("http://{}", listener.local_addr().unwrap()),
     );
     let host = Arc::new(Host::default());

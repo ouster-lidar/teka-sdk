@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::display_config;
 
 /// Teka injects this on proxied upstream requests when the browser has a session.
-pub const HEADER_PRINCIPAL_ID: &str = "x-mc-principal-id";
+pub const HEADER_PRINCIPAL_ID: &str = "x-teka-principal-id";
 
 const GUEST_ACCESS_FILE: &str = "guest-access.json";
 const ENFORCEMENT_CACHE_TTL: Duration = Duration::from_secs(5);

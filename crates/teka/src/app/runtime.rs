@@ -13,8 +13,6 @@ use crate::app::devres::{self, NftablesBody, NftablesLease, PortBody, SyncBody};
 const HOST_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const HOST_WAIT_POLL: Duration = Duration::from_secs(2);
 
-const RUNTIME_URL_PATH: &str = "/var/lib/mission-control/runtime_url";
-
 static STOPPING: AtomicBool = AtomicBool::new(false);
 static CONTROL_REQUEST: Mutex<()> = Mutex::new(());
 
@@ -117,41 +115,14 @@ fn app_ready_ping() -> bool {
 }
 
 pub fn app_base_url() -> String {
-    if let Ok(v) = std::env::var("MC_RUNTIME_URL") {
-        let u = v.trim();
-        if !u.is_empty() {
-            return u.to_string();
-        }
-    }
-    if let Ok(v) = std::env::var("MC_FIREWALL_URL") {
-        let u = v.trim();
-        if !u.is_empty() {
-            return u.to_string();
-        }
-    }
-    if let Ok(raw) = std::fs::read_to_string(RUNTIME_URL_PATH) {
-        let u = raw.trim();
-        if !u.is_empty() {
-            return u.to_string();
-        }
-    }
-    "http://127.0.0.1:8080".into()
+    runtime_env("TEKA_RUNTIME_URL").unwrap_or_else(|| "http://127.0.0.1:8080".into())
 }
 
 pub fn sensors_list_url() -> Option<String> {
-    if let Ok(url) = std::env::var("MC_SENSORS_URL") {
-        let url = url.trim();
-        if !url.is_empty() {
-            return Some(url.to_string());
-        }
+    if let Some(url) = runtime_env("TEKA_SENSORS_URL") {
+        return Some(url);
     }
-    let peer = std::env::var("MC_SENSORS_APP_ID")
-        .or_else(|_| std::env::var("MC_SENSORS_EXTENSION_ID"))
-        .ok()?;
-    let peer = peer.trim();
-    if peer.is_empty() {
-        return None;
-    }
+    let peer = runtime_env("TEKA_SENSORS_APP_ID")?;
     Some(format!(
         "{}/api/v1/app/{peer}/devices",
         app_base_url().trim_end_matches('/')
@@ -159,34 +130,20 @@ pub fn sensors_list_url() -> Option<String> {
 }
 
 pub fn dhcp_leases_url() -> Option<String> {
-    if let Ok(url) = std::env::var("MC_DHCP_LEASES_URL") {
-        let url = url.trim();
-        if !url.is_empty() {
-            return Some(url.to_string());
-        }
+    if let Some(url) = runtime_env("TEKA_DHCP_LEASES_URL") {
+        return Some(url);
     }
-    if let Ok(peer) = std::env::var("MC_DHCP_LEASES_APP_ID")
-        .or_else(|_| std::env::var("MC_DHCP_LEASES_EXTENSION_ID"))
-    {
-        let peer = peer.trim();
-        if !peer.is_empty() {
-            return Some(format!(
-                "{}/api/v1/app/{peer}/leases",
-                app_base_url().trim_end_matches('/')
-            ));
-        }
-    }
-    let path = std::env::var("MC_DHCP_LEASES_PATH").ok()?;
-    let path = path.trim();
-    if path.is_empty() {
-        return None;
-    }
-    let path = if path.starts_with('/') {
-        path.to_string()
-    } else {
-        format!("/{path}")
-    };
-    Some(format!("{}{}", app_base_url().trim_end_matches('/'), path))
+    let peer = runtime_env("TEKA_DHCP_LEASES_APP_ID")?;
+    Some(format!(
+        "{}/api/v1/app/{peer}/leases",
+        app_base_url().trim_end_matches('/')
+    ))
+}
+
+fn runtime_env(name: &str) -> Option<String> {
+    let value = std::env::var(name).ok()?;
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
 }
 
 fn resolve_app_id(default_id: &str) -> String {
@@ -553,7 +510,7 @@ mod tests {
     fn reconnect_retry_uses_current_ports() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         std::env::set_var(
-            "MC_RUNTIME_URL",
+            "TEKA_RUNTIME_URL",
             format!("http://{}", listener.local_addr().unwrap()),
         );
         *UDP_PORTS.lock().unwrap() = vec![7502];

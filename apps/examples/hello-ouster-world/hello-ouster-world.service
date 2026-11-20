@@ -1,5 +1,5 @@
 [Unit]
-Description=hello-ouster-world (MC Console/Display API)
+Description=hello-ouster-world (console and display API)
 Documentation=file:///usr/lib/teka/mission-control/manifest.json
 # Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
 # Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.
@@ -19,7 +19,7 @@ Environment=HELLO_OUSTER_WORLD_WAYLAND_DISPLAY=wayland-1
 Environment=HELLO_OUSTER_WORLD_SWAYMSG=@swaymsg@
 Environment=HELLO_OUSTER_WORLD_WTYPE=@wtype@
 Environment=HELLO_OUSTER_WORLD_CONSOLE_LOG=/run/hello-ouster-world/console.log
-Environment=MC_SENSORS_APP_ID=sensors
+Environment=TEKA_SENSORS_APP_ID=sensors
 Environment=STATE_DIRECTORY=/var/lib/hello-ouster-world
 Environment=APP_ID=hello-ouster-world
 Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt

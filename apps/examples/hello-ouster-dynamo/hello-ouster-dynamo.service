@@ -1,5 +1,5 @@
 [Unit]
-Description=hello-ouster-dynamo (MC Console/Display API)
+Description=hello-ouster-dynamo (console and display API)
 Documentation=file:///usr/lib/teka/mission-control/manifest.json
 # Screencopy nvvidconv + nvjpegenc. cuda (not wayland) so the generator does not
 # Conflicts= the display compositor. Do not BindReadOnlyPaths=/run/opengl-driver.

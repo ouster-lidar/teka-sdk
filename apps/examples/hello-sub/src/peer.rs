@@ -28,15 +28,15 @@ struct SnapshotData {
     state: Option<Value>,
 }
 
-/// `{MC_RUNTIME_URL}/api/v1/app/{id}` or `MC_HELLO_PUB_URL` override.
+/// `{TEKA_RUNTIME_URL}/api/v1/app/{id}` or `TEKA_HELLO_PUB_URL` override.
 pub fn publisher_base_url_from_env() -> String {
-    if let Ok(url) = std::env::var("MC_HELLO_PUB_URL") {
+    if let Ok(url) = std::env::var("TEKA_HELLO_PUB_URL") {
         let url = url.trim();
         if !url.is_empty() {
             return normalize_publisher_url(url);
         }
     }
-    let peer = std::env::var("MC_HELLO_PUB_APP_ID").unwrap_or_else(|_| "hello-pub".into());
+    let peer = std::env::var("TEKA_HELLO_PUB_APP_ID").unwrap_or_else(|_| "hello-pub".into());
     let peer = peer.trim();
     let peer = if peer.is_empty() { "hello-pub" } else { peer };
     normalize_publisher_url(&format!(
@@ -46,7 +46,7 @@ pub fn publisher_base_url_from_env() -> String {
 }
 
 /// Trim, ensure `http(s)` scheme, strip trailing slash and default ports
-/// (`:80` / `:443` / http `:8080`), rewrite loopback `127.0.0.1` → `localhost`,
+/// (`:80` / `:443`), rewrite loopback `127.0.0.1` → `localhost`,
 /// and append `/api/v1/app/hello-pub` when no app path is present.
 pub fn normalize_publisher_url(raw: &str) -> String {
     let mut url = raw.trim().trim_end_matches('/').to_string();
@@ -75,13 +75,15 @@ pub fn normalize_publisher_url(raw: &str) -> String {
 }
 
 fn simplify_loopback_host(url: &str) -> String {
-    if let Some(rest) = url.strip_prefix("http://127.0.0.1") {
-        format!("http://localhost{rest}")
-    } else if let Some(rest) = url.strip_prefix("https://127.0.0.1") {
-        format!("https://localhost{rest}")
-    } else {
-        url.to_string()
+    if let Some((scheme, rest)) = url.split_once("://") {
+        if let Some(suffix) = rest
+            .strip_prefix("127.0.0.1")
+            .filter(|suffix| suffix.is_empty() || suffix.starts_with([':', '/']))
+        {
+            return format!("{scheme}://localhost{suffix}");
+        }
     }
+    url.to_string()
 }
 
 fn strip_default_port(url: &str) -> String {
@@ -104,7 +106,6 @@ fn strip_default_port(url: &str) -> String {
     } else {
         authority
             .strip_suffix(":80")
-            .or_else(|| authority.strip_suffix(":8080"))
             .unwrap_or(authority)
             .to_string()
     };
@@ -323,7 +324,7 @@ mod tests {
         );
         assert_eq!(
             normalize_publisher_url("192.168.1.10:8080"),
-            "http://192.168.1.10/api/v1/app/hello-pub"
+            "http://192.168.1.10:8080/api/v1/app/hello-pub"
         );
     }
 
@@ -352,6 +353,10 @@ mod tests {
         assert_eq!(
             normalize_publisher_url("http://127.0.0.1:80/api/v1/app/hello-pub"),
             "http://localhost/api/v1/app/hello-pub"
+        );
+        assert_eq!(
+            normalize_publisher_url("http://127.0.0.10:9000"),
+            "http://127.0.0.10:9000/api/v1/app/hello-pub"
         );
     }
 }

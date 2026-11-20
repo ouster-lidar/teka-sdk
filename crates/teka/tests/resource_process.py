@@ -128,7 +128,7 @@ class ProcessFixture(unittest.TestCase):
             os.environ["TEKA_RUNNER"], self.app_id, self.proto, ports, *command,
         ], env={**os.environ,
             "APP_ID": "wrong-holder",
-            "MC_RUNTIME_URL": f"http://127.0.0.1:{self.mc.server_port}",
+            "TEKA_RUNTIME_URL": f"http://127.0.0.1:{self.mc.server_port}",
             "NOTIFY_SOCKET": self.temp.name + "/notify",
         }, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 

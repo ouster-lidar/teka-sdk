@@ -13,7 +13,7 @@ StateDirectory=hello-sub
 StateDirectoryMode=0750
 Environment=SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
 Environment=APP_ID=hello-sub
-Environment=MC_HELLO_PUB_APP_ID=hello-pub
+Environment=TEKA_HELLO_PUB_APP_ID=hello-pub
 Environment=PATH=@binPath@
 @appBackendServiceLines@
 @serviceFragment@

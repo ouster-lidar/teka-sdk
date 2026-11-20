@@ -18,8 +18,8 @@ use tower_http::cors::CorsLayer;
 
 const DEFAULT_STATE_DIR: &str = "/var/lib/hello-slidev";
 const DEFAULT_DECK_ROOT: &str = "/usr/lib/hello-slidev/deck";
-/// MC injects this on proxied upstream requests when the browser has a session.
-const HEADER_PRINCIPAL_ID: &str = "x-mc-principal-id";
+/// The app proxy adds this header when the browser has a session.
+const HEADER_PRINCIPAL_ID: &str = "x-teka-principal-id";
 
 #[derive(Clone)]
 struct AppState {

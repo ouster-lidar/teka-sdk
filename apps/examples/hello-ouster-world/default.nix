@@ -1,6 +1,6 @@
 {
   image =
-    # App image DDI: Sway Wayland + SimpleViz (ps.ousterSdk source build, native GLFW Wayland) + MC UI.
+    # App image DDI: Sway Wayland + SimpleViz (ps.ousterSdk source build, native GLFW Wayland) + app web UI.
     # OSF lives at /srv/recordings (host bind), not in this image or StateDirectory.
     {
       ps,
