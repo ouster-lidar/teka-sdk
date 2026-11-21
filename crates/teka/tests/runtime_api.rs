@@ -9,7 +9,7 @@ use std::net::TcpListener;
 fn macro_propagates_acquisition_failure_and_stops_before_final_release() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     std::env::set_var(
-        "MC_RUNTIME_URL",
+        "TEKA_RUNTIME_URL",
         format!("http://{}", listener.local_addr().unwrap()),
     );
     let host = std::thread::spawn(move || {

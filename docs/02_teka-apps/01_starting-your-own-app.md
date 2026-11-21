@@ -13,11 +13,11 @@ This is what you'll see:
 
 | File | What it does |
 | --- | --- |
-| `flake.nix` | Declares the app and the Teka SDK input. The app ID is the name under `apps.`. |
+| `flake.nix` | Registers the app recipe and declares the Teka SDK input. |
 | `flake.lock` | The SDK commit this app builds with, pinned when you created the app. Commit it with your app. |
-| `default.nix` | How the app image builds: the program, its files, and its systemd service. |
+| `package.nix` | How the app image builds: the program, its files, and its systemd service. |
+| `manifest.json` | The app ID and release version. |
 | `hello-world.rs` | The program. Other examples use Python, C++, or Rust crates. |
-| `hello-world.service` | The systemd unit that starts the program on the box. |
 | `README.md` | How to use, build, and deploy the app. |
 | `AGENTS.md` | Notes for AI agents working on the app. teka adds it only when the folder doesn't have one. |
 
@@ -27,7 +27,7 @@ To start from a different example app, add `--example NAME`. See [App Examples](
 
 ## Change the app ID
 
-The app ID appears in three places: the name under `apps.` in `flake.nix`, the `name` in `default.nix`, and the service file name. Change all three together. Use letters, numbers, hyphens, and underscores, up to 64 characters. Don't start it with mc-.
+Change `id` in `manifest.json`. Don't use `default` or start it with mc-.
 
 ## Where the SDK comes from
 

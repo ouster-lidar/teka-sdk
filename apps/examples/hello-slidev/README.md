@@ -6,7 +6,7 @@ Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slide
 
 - **Slidev** deck with Teka + example-apps overview
 - **Integrated panel** at `/app/hello-slidev` (Slidev deck in an iframe)
-- **Guest access toggle** (signed-in users) stored in app `StateDirectory`; the Rust backend enforces deck access from the toggle + `X-MC-Principal-Id` (host forwards session identity, does not gate the deck)
+- **Guest access toggle** (signed-in users) stored in app `StateDirectory`; the Rust backend enforces deck access from the toggle + `X-Teka-Principal-Id` (host forwards session identity, does not gate the deck)
 - **Deck** at `/api/v1/app/hello-slidev/deck/…` (feature API proxy — app backend enforces guest-access; avoids host HTML login redirect on `/app/…/deck/`)
 
 ## Auth model
@@ -15,7 +15,7 @@ Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slide
 |---------|-------------|
 | `/app/hello-slidev` shell + panel static assets | Host page-session; manifest `ui.anonymous: true` so guests can load the panel |
 | `/api/v1/app/hello-slidev/guest-access` | App backend: public GET, PUT requires principal |
-| `/api/v1/app/hello-slidev/deck/…` | App backend: allow when guest access is on **or** request has `X-MC-Principal-Id` |
+| `/api/v1/app/hello-slidev/deck/…` | App backend: allow when guest access is on **or** request has `X-Teka-Principal-Id` |
 
 ## Build and deploy
 
@@ -23,7 +23,7 @@ Slidev presentation demo packaged as a Teka app. Builds a static SPA with [Slide
 teka app deploy
 ```
 
-Slidev runs at **build time** on the build host (`pkgs.buildPackages`); the app image ships the `dist/` tree under `usr/lib/hello-slidev/deck/`. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`teka.apps.hello-slidev.packages.x86_64-linux.aarch64-linux`) do not compile Node on the target architecture.
+Slidev runs at **build time** on the build host (`pkgs.buildPackages`). The service's `DECK_ROOT` points to the built deck in the image's Nix store. Ouster marketing images are pinned with `fetchurl` in `ouster-assets.nix` so the deck works offline on edge devices. Cross builds (`packages.x86_64-linux.hello-slidev.targets.aarch64-linux`) do not compile Node on the target architecture.
 
 ## Verify
 

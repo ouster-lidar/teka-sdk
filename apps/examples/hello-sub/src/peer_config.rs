@@ -1,6 +1,6 @@
 //! Persisted peer publisher URLs — `{state_dir}/peer-config.json`.
 //!
-//! State directory: `STATE_DIRECTORY` when set (systemd `StateDirectory=hello-sub`),
+//! State directory: `STATE_DIRECTORY` when set by systemd,
 //! else `./tmp` for local dev.
 
 use std::fs;

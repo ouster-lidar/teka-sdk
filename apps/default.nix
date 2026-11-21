@@ -6,8 +6,6 @@ let
   builds = sdk.lib.mkAppOutputs {
     self = sdk;
     apps = catalog.apps;
-    inherit (catalog) imageChecks;
-    advisoryDb = sdk.inputs.rustsecAdvisoryDb;
     overlays = [
       jetpack.overlays.default
       (final: prev: {
@@ -15,17 +13,10 @@ let
         cudaPackages = prev.cudaPackages_13_2;
       })
     ];
-    # These apps do not need the additional cross-build workarounds.
-    simpleCrossApps = [
-      "hello-world"
-      "hello-http"
-      "hello-llm"
-      "nvidia-devtools"
-    ];
   };
 in
 {
-  inherit (builds) teka;
+  inherit (builds) packages teka;
   inherit (catalog) templates;
   checks = lib.recursiveUpdate builds.checks (import ./tests { inherit sdk; });
   apps = lib.genAttrs (lib.attrNames sdk.packages) (

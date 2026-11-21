@@ -122,7 +122,7 @@ Signed-out visitors can watch the browser point-cloud stream only (no console, s
 | `GET /api/v1/app/hello-ouster-world/status` | App backend: public liveness probe (`ok`, `app` only) |
 | `GET /api/v1/app/hello-ouster-world/guest-access` | App backend: public (guest view flag) |
 | `GET /api/v1/app/hello-ouster-world/display/stream`, `/display/status` | App backend: guests when guest view is on (view only; input rejected) |
-| All other app API routes | App backend: signed-in Teka session (`X-MC-Principal-Id`) or open-mode Teka (no password) |
+| All other app API routes | App backend: signed-in Teka session (`X-Teka-Principal-Id`) or open-mode Teka (no password) |
 
 ## Existing installations
 

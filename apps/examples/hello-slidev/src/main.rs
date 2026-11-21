@@ -17,9 +17,8 @@ use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
 const DEFAULT_STATE_DIR: &str = "/var/lib/hello-slidev";
-const DEFAULT_DECK_ROOT: &str = "/usr/lib/hello-slidev/deck";
-/// MC injects this on proxied upstream requests when the browser has a session.
-const HEADER_PRINCIPAL_ID: &str = "x-mc-principal-id";
+/// The app proxy adds this header when the browser has a session.
+const HEADER_PRINCIPAL_ID: &str = "x-teka-principal-id";
 
 #[derive(Clone)]
 struct AppState {
@@ -54,12 +53,6 @@ struct Args {
 fn state_path() -> PathBuf {
     let dir = std::env::var("STATE_DIRECTORY").unwrap_or_else(|_| DEFAULT_STATE_DIR.into());
     PathBuf::from(dir).join("guest-access.json")
-}
-
-fn deck_root() -> PathBuf {
-    std::env::var("DECK_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(DEFAULT_DECK_ROOT))
 }
 
 fn read_guest_access(path: &Path) -> bool {
@@ -209,13 +202,17 @@ fn api_routes() -> Router<AppState> {
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
+    let deck_root = std::env::var_os("DECK_ROOT")
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| anyhow::anyhow!("DECK_ROOT must point to the built Slidev deck"))?;
 
     let bind = hello_slidev::app_runtime::resolve_bind(args.bind).map_err(anyhow::Error::msg)?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(run(bind, state_path(), deck_root()))
+        .block_on(run(bind, state_path(), deck_root))
 }
 
 async fn run(bind: SocketAddr, state_path: PathBuf, deck_root: PathBuf) -> anyhow::Result<()> {

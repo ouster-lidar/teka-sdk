@@ -6,20 +6,23 @@
 
 let
   pkgs = sdk.inputs.nixpkgs.legacyPackages.${system};
-  program = pkgs.callPackage (import example.source).image {
-    ps.makeAppImage = image: builtins.head image.runtimeClosures;
+  program = pkgs.callPackage (example.source + "/package.nix") {
+    teka = {
+      appId = "renamed-hello";
+      lib.mkAppImage = module: pkgs.lib.getExe module.services.main.program;
+    };
   };
-  packages = example.outputs.teka.apps.hello-world.packages.${system};
+  packages = example.outputs.packages.${system}.hello-world.targets;
 in
 {
   hello-world-example-run = pkgs.runCommand "hello-world-run-check" { } ''
-    test "$(${pkgs.lib.getExe program})" = 'hello world'
+    test "$(${program})" = 'hello world'
     touch "$out"
   '';
 
   hello-world-example-version = pkgs.runCommand "hello-world-version-check" { } ''
-    ${pkgs.lib.concatMapStringsSep "\n" (package: ''
-      test -e ${package.image}/*+20260102030405.gabc1234.*.raw
+    ${pkgs.lib.concatMapStrings (package: ''
+      test -f "${package.image}/${pkgs.lib.removeSuffix ".tpk" package.tpkFileName}.raw"
     '') (pkgs.lib.attrValues packages)}
     touch "$out"
   '';

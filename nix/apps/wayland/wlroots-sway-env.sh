@@ -1,7 +1,11 @@
-export PATH="@clientPath@${PATH:+:$PATH}"
+if [[ -n @clientPath@ ]]; then
+  export PATH=@clientPath@"${PATH:+:$PATH}"
+fi
 # Base GPU library path comes from EnvironmentFile=/etc/teka/wlroots.env; append
 # closure-specific dirs (Vulkan, libc, …) baked in at eval time.
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}@clientLd@"
+if [[ -n @clientLd@ ]]; then
+  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}"@clientLd@
+fi
 export XDG_RUNTIME_DIR=@xdgRuntimeDir@
 export HOME="$XDG_RUNTIME_DIR"
 export SHELL=@bash@/bin/bash

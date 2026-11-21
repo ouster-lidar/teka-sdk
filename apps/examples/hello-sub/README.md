@@ -16,23 +16,23 @@ Supports **remote** publishers by pointing at other hosts’ Teka feature URLs (
 
 | Env | Default |
 |-----|---------|
-| `MC_RUNTIME_URL` | From host / `http://localhost` |
+| `TEKA_RUNTIME_URL` | Supplied by the host, or `http://127.0.0.1:8080` if unset |
 | `APP_ID` | `hello-sub` |
-| `MC_HELLO_PUB_APP_ID` | `hello-pub` |
-| `MC_HELLO_PUB_URL` | Optional full base override for the publisher feature API. When set, wins over `MC_HELLO_PUB_APP_ID`. Seed for the runtime peer config (one-element list). |
+| `TEKA_HELLO_PUB_APP_ID` | `hello-pub` |
+| `TEKA_HELLO_PUB_URL` | Optional full base override for the publisher feature API. When set, wins over `TEKA_HELLO_PUB_APP_ID`. Seed for the runtime peer config (one-element list). |
 
 Startup peer URL resolution (initial config):
 
 1. If `{StateDirectory}/peer-config.json` has `publisher_urls` (or legacy `publisher_url`), use that list (last Apply).
-2. Else if `MC_HELLO_PUB_URL` is non-empty, use it as a one-element list.
-3. Else `[{MC_RUNTIME_URL}/api/v1/app/{MC_HELLO_PUB_APP_ID}]`.
+2. Else if `TEKA_HELLO_PUB_URL` is non-empty, use it as a one-element list.
+3. Else `[{TEKA_RUNTIME_URL}/api/v1/app/{TEKA_HELLO_PUB_APP_ID}]`.
 
 URL normalization (Apply and env/file load), per URL:
 
 - Trim; strip trailing `/`
 - If there is no `http://` or `https://` scheme, prepend `http://` (bare host/IP pastes)
 - Rewrite `127.0.0.1` → `localhost`
-- Drop default ports (`:80`, `:443`, http `:8080`)
+- Drop default ports (HTTP `:80`, HTTPS `:443`)
 - If the path has no `/api/v1/app/…` segment, append `/api/v1/app/hello-pub`
 - Deduplicate (first wins)
 

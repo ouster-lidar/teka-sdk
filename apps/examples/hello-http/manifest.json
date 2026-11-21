@@ -1,6 +1,6 @@
 {
   "id": "hello-http",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello HTTP",
   "nav": {
     "label": "Hello HTTP",
@@ -15,13 +15,11 @@
     ]
   },
   "ui": {
-    "mode": "static",
-    "title": "Hello HTTP",
-    "template": "hello-http.html"
+    "mode": "static"
   },
   "backend": {
     "mode": "proxy",
-    "upstream": "http://127.0.0.1:@port@"
+    "upstream": "http://127.0.0.1:8000"
   },
   "auth": {
     "scheme": "teka-proxy-identity",

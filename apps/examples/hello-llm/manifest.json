@@ -1,6 +1,6 @@
 {
   "id": "hello-llm",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello LLM",
   "nav": {
     "label": "Hello LLM",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "Hello LLM",
-    "template": "hello-llm.html",
     "styles": [
       "hello-llm.css"
     ]

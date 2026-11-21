@@ -11,9 +11,11 @@ When your app starts, it checks in with TekaOS:
 3. Open the network ports you need.
 4. When the app stops, call POST `/api/v1/manager/runtime/\<id>/release`.
 
-These calls only work from the box itself. You'll find the base URL in MC_RUNTIME_URL.
+These calls only work from the box itself. You'll find the base URL in TEKA_RUNTIME_URL.
 
 ## Open network ports
+
+Managed services can only use loopback by default. To listen on the box's network interfaces, set `services.main.runtime.network = "host"`.
 
 The firewall blocks incoming traffic until you ask. For example, to get lidar data on UDP 7502 and 7503:
 
@@ -26,4 +28,4 @@ The ports close when your app stops.
 
 ## Know who's calling
 
-If your manifest sets auth to ojs-proxy-identity, every request comes with an X-MC-Identity header that says who sent it. Check it with the keys from activate, and turn away requests that don't have it.
+Set `auth.scheme` to `teka-proxy-identity` and `auth.version` to `0.1.0` to opt into proxy identity. TekaOS sends the caller's principal ID in the `X-Teka-Principal-Id` header when the caller has a session.

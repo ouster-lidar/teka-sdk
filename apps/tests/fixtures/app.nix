@@ -1,0 +1,2 @@
+{ teka }:
+teka.lib.mkAppImage { }

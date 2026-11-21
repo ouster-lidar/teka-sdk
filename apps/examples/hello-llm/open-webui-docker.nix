@@ -5,10 +5,8 @@
   lib,
   stdenv,
   buildPackages,
-  unpackGnutar,
-  unpackJq,
-  hostPatchelf,
-  hostWriteShellScript,
+  gnutar,
+  jq,
   dockerArch ? if stdenv.hostPlatform.system == "aarch64-linux" then "arm64" else "amd64",
 }:
 
@@ -44,9 +42,6 @@ let
         preferLocalBuild = true;
       });
 
-  unpackDockerImage = hostWriteShellScript "unpack-docker-image" (
-    builtins.readFile ./unpack-docker-image.sh
-  );
 in
 stdenv.mkDerivation {
   pname = "open-webui-docker";
@@ -55,32 +50,24 @@ stdenv.mkDerivation {
   dontUnpack = true;
   dontPatchELF = true;
   dontStrip = true;
+  # Absolute symlinks resolve inside the container root.
+  dontCheckForBrokenSymlinks = true;
   fixupPhase = "runHook postFixup";
 
   nativeBuildInputs = [
-    unpackJq
-    unpackGnutar
-    hostPatchelf
+    gnutar
+    jq
   ];
 
   installPhase = ''
     runHook preInstall
-    ${unpackDockerImage} ${image} "$out" \
-      ${lib.getExe' unpackGnutar "tar"} ${lib.getExe unpackJq}
-    find "$out" -type l ! -exec test -e {} \; -delete
+    bash ${./unpack-docker-image.sh} ${image} "$out"
 
     # hello-llm sets BYPASS_EMBEDDING_AND_RETRIEVAL; drop baked HF/cache payloads.
     rm -rf "$out/app/backend/data/cache"
     find "$out" -type d -name __pycache__ -prune -exec rm -rf {} +
     find "$out" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
-    mkdir -p "$out/bin"
-    cat >"$out/bin/open-webui-portable" <<EOF
-    #!/bin/sh
-    echo "open-webui-portable: use hello-llm start.sh (bubblewrap)" >&2
-    exit 1
-    EOF
-    chmod +x "$out/bin/open-webui-portable"
     runHook postInstall
   '';
 

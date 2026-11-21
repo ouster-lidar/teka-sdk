@@ -90,7 +90,7 @@ This fills the current folder with everything the app needs, and pins the Teka S
 ls
 ```
 
-You'll see `default.nix`, `flake.nix`, `hello-world.rs`, `hello-world.service`, and `README.md`. From this folder, build the app and deploy it to your selected box:
+You'll see `package.nix`, `flake.nix`, `manifest.json`, `hello-world.rs`, and `README.md`. From this folder, build the app and deploy it to your selected box:
 
 ```bash
 teka app deploy
@@ -134,7 +134,7 @@ teka app init my-app
 cd my-app
 ```
 
-The app keeps the hello-world ID until you change it. Edit the program and `default.nix`, then build and deploy from the folder:
+The app keeps the hello-world ID until you change it in `manifest.json`. Edit the program and `package.nix`, then build and deploy from the folder:
 
 ```bash
 teka app deploy

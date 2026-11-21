@@ -1,6 +1,6 @@
 {
   "id": "hello-pub",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello Publisher",
   "nav": {
     "label": "Hello Pub",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "Hello Publisher",
-    "template": "index.html",
     "styles": [
       "hello-pub.css"
     ]

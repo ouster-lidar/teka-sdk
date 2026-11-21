@@ -16,8 +16,8 @@ use crate::keys::KeysBody;
 use crate::tegrastats::TegraSample;
 use crate::{AppState, SSH_PORT};
 
-/// MC injects this on proxied upstream requests when the browser has a session.
-const HEADER_PRINCIPAL_ID: &str = "x-mc-principal-id";
+/// The app proxy adds this header when the browser has a session.
+const HEADER_PRINCIPAL_ID: &str = "x-teka-principal-id";
 
 pub fn routes() -> Router<AppState> {
     Router::new()

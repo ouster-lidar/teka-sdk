@@ -4,7 +4,7 @@ HDMI GPU apps use Sway and host `/run/opengl-driver` (`X-Teka-PortableGPU`). The
 
 ## Viz: follow hello-ouster-terminal
 
-- `ouster-sdk = ps.ousterSdk` → `pkgs.python3Packages.ouster-sdk`
+- `pkgs.python3Packages.ouster-sdk`
 - Source build against **nixpkgs** cmake, nanobind, and GLFW
 - `hello-ouster-world` imports `open_source` directly for sensor and OSF sources.
 - `hello-ouster-dynamo` uses `apps/examples/hello-ouster-dynamo/osf-socket/osf_socket.py` for peer FrameSet sockets; public SDK 1.0.1 has no `IoType.OSF_SOCKET`.

@@ -13,10 +13,10 @@ use std::{
 
 const APP_GUIDANCE: &str = r#"# Agent guidelines
 
-Read [README.md](README.md) for app behavior and verification. Follow the template's `flake.nix`, locked inputs, and existing build definitions.
+Read [README.md](README.md) for app behavior and verification. Include any separate `configuration.nix` or `options.nix` in the app module's `imports`.
 
 - Keep changes small. Reuse existing builders for images, packaging, and signing.
-- Keep the app ID consistent across the flake, image metadata, and service. Services are wanted by `teka-apps.target`.
+- Set the app ID and release version in `manifest.json`. The SDK derives the primary service name from that ID and adds it to `teka-apps.target`.
 - Keep input declarations in `flake.nix` and exact revisions in `flake.lock`. Update pins only when requested.
 - Format Nix with `nixfmt` and keep README consistent with behavior.
 - Stage source files before Nix evaluation: Git flakes exclude untracked files. Preserve unrelated work.
@@ -67,7 +67,7 @@ pub fn run(options: InitOptions) -> Result<()> {
             build_check::display_path(&options.directory)
         ),
         || {
-            let (template, provider) =
+            let (template, sdk_pin) =
                 build::template_reference(&options.source, options.example.as_deref())?;
             let directory = &options.directory;
             ensure!(
@@ -137,16 +137,20 @@ pub fn run(options: InitOptions) -> Result<()> {
                 false,
             )?;
             initialized?;
-            build_check::run_command(
-                Command::new("nix")
-                    .current_dir(directory)
-                    .args(["flake", "lock", "path:."])
-                    .args(["--override-input", "teka-sdk", &provider])
-                    // Overrides normally disable writing the lock file.
-                    .args(["--output-lock-file", "flake.lock"]),
-                "nix flake lock",
-                false,
-            )?;
+            let mut lock = Command::new("nix");
+            lock.current_dir(directory)
+                .args(["flake", "lock", "path:."]);
+            if let Some(sdk_pin) = sdk_pin.as_deref() {
+                // Overrides normally disable writing the lock file.
+                lock.args([
+                    "--override-input",
+                    "teka-sdk",
+                    sdk_pin,
+                    "--output-lock-file",
+                    "flake.lock",
+                ]);
+            }
+            build_check::run_command(&mut lock, "nix flake lock", false)?;
             if directory.join("flake.lock").try_exists()? {
                 build_check::run_command(
                     Command::new("git")

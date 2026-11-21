@@ -33,7 +33,7 @@ Supports Linux x86_64/AArch64 and macOS Apple Silicon. `teka build init` prepare
 Add the repository-root flake as an input, following your nixpkgs:
 
 ```nix
-inputs.teka = {
+inputs.teka-sdk = {
   url = "github:ouster-lidar/teka-sdk";
   inputs.nixpkgs.follows = "nixpkgs";
 };
@@ -42,7 +42,7 @@ inputs.teka = {
 Then apply `overlays.default` and install `pkgs.teka`:
 
 ```nix
-nixpkgs.overlays = [ inputs.teka.overlays.default ];
+nixpkgs.overlays = [ inputs.teka-sdk.overlays.default ];
 environment.systemPackages = [ pkgs.teka ]; # Home Manager: home.packages
 ```
 

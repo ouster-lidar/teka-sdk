@@ -13,7 +13,7 @@ teka app deploy
 
 ## Host
 
-**`X-Teka-PortableGPU=wayland`**, **`/run/opengl-driver`**, **`seatd`**. x86 hosts may need the portable GL extension to bind Mesa **`libLLVM`** store roots (see comments in `default.nix`).
+**`X-Teka-PortableGPU=wayland`**, **`/run/opengl-driver`**, **`seatd`**. x86 hosts may need the portable GL extension to bind Mesa **`libLLVM`** store roots.
 
 ## In-kiosk docs
 
@@ -39,4 +39,4 @@ The DDI `RootImage` `/bin` symlink exposes bash and busybox applets for that she
 ## Verify
 
 Configure the sensor destination to this host with lidar UDP 7602 and IMU UDP 7603, then run `ouster-cli viz` in the kiosk, pointing it at the sensor hostname/IP.
-Override these ports and the lease range in `default.nix`.
+Override these ports and the lease range in `package.nix`.

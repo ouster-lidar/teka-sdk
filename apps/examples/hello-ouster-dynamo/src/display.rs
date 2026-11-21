@@ -30,7 +30,7 @@ const DEFAULT_FPS: u64 = 5;
 const ALLOWED_FPS: &[u64] = &[2, 5, 10, 20];
 const STREAM_TARGET_NAME: &str = "stream_target.json";
 const VIZ_WINDOW_TITLE: &str = "Ouster Viz";
-/// Must match `GLFW_WAYLAND_APP_ID` in default.nix.
+/// Must match `GLFW_WAYLAND_APP_ID` in the viewer launcher.
 const VIZ_APP_ID: &str = "hello-ouster-dynamo";
 
 #[derive(Debug)]

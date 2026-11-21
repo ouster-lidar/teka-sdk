@@ -1,6 +1,6 @@
 {
   "id": "nvidia-devtools",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "NVIDIA DevTools",
   "nav": {
     "label": "NVIDIA DevTools",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "NVIDIA DevTools",
-    "template": "nvidia-devtools.html",
     "styles": [
       "nvidia-devtools.css"
     ]

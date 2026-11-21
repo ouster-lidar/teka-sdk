@@ -1,6 +1,6 @@
 {
   "id": "hello-sub",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello Subscriber",
   "nav": {
     "label": "Hello Sub",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "Hello Subscriber",
-    "template": "index.html",
     "styles": [
       "hello-sub.css"
     ]

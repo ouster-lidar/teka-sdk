@@ -1,6 +1,6 @@
 {
   "id": "hello-ouster-terminal",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "Hello Ouster Terminal",
   "nav": {
     "label": "Hello Ouster Terminal",
@@ -14,9 +14,7 @@
     ]
   },
   "ui": {
-    "mode": "static",
-    "title": "Hello Ouster Terminal",
-    "template": "display.html"
+    "mode": "static"
   },
   "backend": {
     "mode": "none"

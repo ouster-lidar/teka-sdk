@@ -12,7 +12,7 @@ SimpleViz overlay helpers for **app** FrameSet sources (e.g. an ouster-dynamo pe
 | `detect_utils.py` | Class id / color maps for tracked objects |
 | `configs/` | Viz overlay defaults (`viz_configs.json`, etc.) |
 
-Installed under `/usr/lib/hello-ouster-dynamo/dynamo-utils` on `PYTHONPATH` when the app runs.
+The app adds this directory from its Nix store to `PYTHONPATH`.
 
 ## Ownership
 

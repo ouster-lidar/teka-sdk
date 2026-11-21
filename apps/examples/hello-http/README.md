@@ -3,7 +3,7 @@
 ## Goal
 
 **Python 3** HTTP server app on **0.0.0.0:8000** returning a small HTML page.
-Teka proxies directly to this fixed listener and manages its TCP 8000 lease through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/crates/teka/teka-runner.md).
+Set the port in `manifest.json` under `backend.upstream`. Teka proxies to this listener and manages its TCP lease through the [SDK runtime](https://github.com/ouster-lidar/teka-sdk/blob/main/crates/teka/teka-runner.md).
 
 ## Build and deploy
 

@@ -1,6 +1,6 @@
 {
   "id": "hello-ouster-world",
-  "version": "@imageVersion@",
+  "version": "0.1.0-alpha.1",
   "display_name": "hello-ouster-world",
   "nav": {
     "label": "hello-ouster-world",
@@ -16,8 +16,6 @@
   },
   "ui": {
     "mode": "static",
-    "title": "hello-ouster-world",
-    "template": "display.html",
     "styles": [
       "display.css",
       "xterm.css"
@@ -49,16 +47,6 @@
     "scheme": "teka-proxy-identity",
     "version": "0.1.0"
   },
-  "ports": [
-    {
-      "port": 7502,
-      "proto": "udp"
-    },
-    {
-      "port": 7503,
-      "proto": "udp"
-    }
-  ],
   "portable": {
     "displayService": true,
     "gpu": "wayland"

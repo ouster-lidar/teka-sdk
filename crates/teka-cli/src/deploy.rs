@@ -22,7 +22,7 @@ const POST_REMOVE_SLEEP: Duration = Duration::from_secs(1);
 pub struct DeployOptions {
     #[command(flatten)]
     pub target: BoxOptions,
-    /// App IDs to build, or paths to prebuilt .tpk files (default: the project's only app)
+    /// App IDs to build, or paths to prebuilt .tpk files (default: the app in this directory or the project's only app)
     #[arg(value_name = "INPUT", value_hint = clap::ValueHint::AnyPath)]
     pub apps: Vec<String>,
     /// App installation profile

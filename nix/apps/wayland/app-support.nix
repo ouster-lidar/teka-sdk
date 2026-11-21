@@ -1,15 +1,46 @@
 {
+  name,
   lib,
+  stdenv,
+  runCommand,
+  mesa,
   writeText,
-  version,
-  caBundleCopyFiles,
-  etcHostsStub,
-  nsswitchConf,
-  hostEtcBindPaths,
-  passwdGroupBindPaths,
+  bash,
+  dbus,
+  dejavu_fonts,
+  linkFarm,
+  cacert,
 }:
 
 let
+  caCertificates = lib.genAttrs [
+    "etc/ssl/certs/ca-bundle.crt"
+    "etc/ssl/certs/ca-certificates.crt"
+    "etc/pki/tls/certs/ca-bundle.crt"
+  ] (_: "${cacert}/etc/ssl/certs/ca-bundle.crt");
+
+  hostEtcBindPaths = [
+    "-/etc/passwd:/etc/passwd"
+    "-/etc/group:/etc/group"
+    "-/etc/resolv.conf"
+    "-/etc/hosts"
+  ]
+  ++ map (path: "-/${path}") (lib.attrNames caCertificates)
+  ++ [ "-/run/seatd.sock" ];
+
+  nsswitchConf = writeText "teka-portable-nsswitch.conf" ''
+    passwd: files
+    group: files
+    shadow: files
+    hosts: files dns
+    networks: files
+    protocols: files
+    services: files
+    ethers: files
+    rpc: files
+    netgroup: files
+  '';
+
   dbusSessionConf = writeText "teka-portable-dbus-session.conf" ''
     <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
      "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
@@ -46,16 +77,24 @@ let
 
   seatdSockStub = builtins.toFile "teka-portable-seatd.sock" "";
 
+  # Preload LLVM for the second GLFW context when host Mesa's RUNPATH cannot
+  # resolve it. Copy only the shared library to avoid embedding the LLVM package.
+  mesaLlvm = runCommand "${name}-libllvm-preload" { } ''
+    mkdir -p "$out/lib"
+    src=${mesa.llvmPackages.libllvm.lib}/lib
+    ver=$(basename "$(readlink -f "$src/libLLVM.so")")
+    cp -L "$src/$ver" "$out/lib/"
+    ln -sfn "$ver" "$out/lib/libLLVM.so"
+  '';
+
   # Shared PATH / client LD append / wlroots stderr filter for app Sway and
   # Cage+wlroots run loops. Host GPU defaults (WLR_*, LD_LIBRARY_PATH, …) come from
   # `EnvironmentFile=/etc/teka/wlroots.env` on the unit; this snippet only adds
   # closure-specific bits and per-service XDG paths.
-  wlrootsSwayEnvShSubst =
+  mkShellEnv =
     {
       clientPath,
       clientLd,
-      xdgRuntimeDir,
-      bash,
     }:
     let
       tpl = builtins.readFile ./wlroots-sway-env.sh;
@@ -68,135 +107,44 @@ let
         "@bash@"
       ]
       [
-        clientPath
-        clientLd
-        xdgRuntimeDir
-        bash
+        (lib.escapeShellArg clientPath)
+        (lib.escapeShellArg clientLd)
+        "/run/${name}"
+        (toString bash)
       ]
       tpl;
 
-  mkFontconfigConf =
-    {
-      name,
-      dejavu_fonts,
-      cacheDir,
-    }:
-    writeText name ''
-      <?xml version="1.0"?>
-      <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-      <fontconfig>
-        <dir>${dejavu_fonts}/share/fonts/truetype</dir>
-        <cachedir>${cacheDir}</cachedir>
-      </fontconfig>
-    '';
-
-  waylandAppBaseCopyFiles = [
-    {
-      path = "etc/dbus-1/session.conf";
-      source = dbusSessionConf;
-    }
-    {
-      path = "etc/hosts";
-      source = etcHostsStub;
-    }
-    {
-      path = "etc/nsswitch.conf";
-      source = nsswitchConf;
-    }
-  ]
-  ++ caBundleCopyFiles
-  ++ [
-    {
-      path = "run/seatd.sock";
-      source = seatdSockStub;
-    }
-  ];
-
-  appGpuManifestJson =
-    {
-      id,
-      gpu,
-    }:
-    writeText "app-manifest.json" ''
-      {"id":"${id}","version":"${version.imageVersion}","portable":{"displayService":true,"gpu":"${gpu}"}}
-    '';
-
-  appGpuManifestCopyFiles =
-    {
-      name,
-      gpu,
-    }:
-    [
-      {
-        path = "usr/lib/teka/mission-control/manifest.json";
-        source = appGpuManifestJson {
-          id = name;
-          inherit gpu;
-        };
-      }
-    ];
-
-  mkGpuWaylandUnit =
-    {
-      name,
-      description,
-      execStart,
-      jp,
-      runtimeDirectory,
-      useTty ? false,
-      serviceType ? "simple",
-      bindHostEtc ? true,
-      extraUnit ? "",
-      extraService ? "",
-      user ? "root",
-      # User=root plus DynamicUser=yes reuses the static root account. Omit User=.
-      dynamicUser ? false,
-    }:
-    writeText "${name}.service" ''
-      [Unit]
-      Description=${description}
-      X-Teka-PortableGPU=wayland
-      After=systemd-user-sessions.service network.target network-online.target time-sync.target seatd.service
-      Wants=network-online.target time-sync.target seatd.service
-      Conflicts=getty@tty1.service display-manager.service
-      ${extraUnit}
-
-      [Service]
-      Type=${serviceType}
-      ${if dynamicUser then "DynamicUser=yes" else "User=${user}"}
-      ${jp.serviceFragment}
-      ExecStart=${execStart}
-      SyslogIdentifier=${name}
-      Restart=always
-      RestartSec=3
-      ${lib.optionalString useTty ''
-        StandardInput=tty
-        StandardOutput=journal
-        TTYPath=/dev/tty1
-        TTYReset=true
-        TTYVHangup=true
-        TTYVTDisallocate=true
-      ''}
-      ${lib.optionalString bindHostEtc hostEtcBindPaths}
-      ${lib.optionalString (!bindHostEtc) passwdGroupBindPaths}
-      BindReadOnlyPaths=-/run/seatd.sock
-      RuntimeDirectory=${runtimeDirectory}
-      RuntimeDirectoryMode=0700
-      ${extraService}
-
-      [Install]
-      WantedBy=teka-apps.target
-    '';
+  fontsConf = writeText "${name}-fonts.conf" ''
+    <?xml version="1.0"?>
+    <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+    <fontconfig>
+      <dir>${dejavu_fonts}/share/fonts/truetype</dir>
+      <cachedir>/run/${name}/fontconfig-cache</cachedir>
+    </fontconfig>
+  '';
 
 in
 {
   inherit
-    dbusSessionConf
-    seatdSockStub
-    wlrootsSwayEnvShSubst
-    mkFontconfigConf
-    waylandAppBaseCopyFiles
-    appGpuManifestCopyFiles
-    mkGpuWaylandUnit
+    dbus
+    fontsConf
+    hostEtcBindPaths
+    mkShellEnv
     ;
+  mesaLlvmPreload = lib.optionalString stdenv.hostPlatform.isx86_64 ''
+    if [[ "$_tegra_l4t" -eq 0 ]]; then
+      export LD_PRELOAD="${mesaLlvm}/lib/libLLVM.so''${LD_PRELOAD:+:''$LD_PRELOAD}"
+    fi
+  '';
+  rootPackage = linkFarm "teka-wayland-root" (
+    caCertificates
+    // {
+      "etc/dbus-1/session.conf" = dbusSessionConf;
+      "etc/hosts" = writeText "teka-portable-etc-hosts" "127.0.0.1 localhost\n::1 localhost\n";
+      "etc/nsswitch.conf" = nsswitchConf;
+      "etc/passwd" = builtins.toFile "empty" "";
+      "etc/group" = builtins.toFile "empty" "";
+      "run/seatd.sock" = seatdSockStub;
+    }
+  );
 }

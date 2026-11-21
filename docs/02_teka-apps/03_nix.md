@@ -24,7 +24,7 @@ teka build check --full
 
 ## Flake outputs and naming
 
-An app's packages live at `teka.apps.<id>.packages.<build-system>.<target-system>`. The root `packages` output holds the SDK and the CLI, not the apps. `teka app build` picks the systems for you. From the repository root, build hello-world for an aarch64 box:
+An app's packages live at `packages.<build-system>.<id>.targets.<target-system>`. `teka app build` picks the systems for you. From the repository root, build hello-world for an aarch64 box:
 
 ```bash
 teka app build hello-world --arch aarch64
@@ -33,7 +33,7 @@ teka app build hello-world --arch aarch64
 The same build with plain Nix, from an x86_64 Linux host:
 
 ```bash
-nix build .#teka.apps.hello-world.packages.x86_64-linux.aarch64-linux
+nix build .#packages.x86_64-linux.hello-world.targets.aarch64-linux
 ```
 
 On a Mac, `teka app build` uses an aarch64 Linux build system on the Linux build VM.

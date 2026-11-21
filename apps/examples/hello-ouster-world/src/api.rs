@@ -46,14 +46,18 @@ pub fn routes() -> Router<AppState> {
         .merge(osf::routes())
 }
 
+fn app_id() -> String {
+    std::env::var("APP_ID").unwrap_or_else(|_| crate::app_runtime::APP_ID.into())
+}
+
 async fn status() -> Json<serde_json::Value> {
-    Json(json!({ "ok": true, "app": "hello-ouster-world" }))
+    Json(json!({ "ok": true, "app": app_id() }))
 }
 
 async fn status_detail(State(state): State<AppState>) -> Json<serde_json::Value> {
     Json(json!({
         "ok": true,
-        "app": "hello-ouster-world",
+        "app": app_id(),
         "pty_sessions": state.pty_sessions.load(std::sync::atomic::Ordering::Relaxed),
         "pty_max": crate::MAX_PTY_SESSIONS,
         "console_log": console_log_path(),

@@ -12,35 +12,28 @@ const SDK_REFERENCE: &str =
 
 const LOCK: &str = "{\"nodes\":{\"root\":{\"inputs\":{}}},\"root\":\"root\",\"version\":7}\n";
 
-const FILES: [&str; 8] = [
-    ".gitignore",
-    "AGENTS.md",
-    "README.md",
-    "default.nix",
-    "flake.lock",
-    "flake.nix",
-    "hello-world.rs",
-    "hello-world.service",
-];
-
 fn example_sdk(command: &mut Command) -> TempDir {
     let sdk = TempDir::new().unwrap();
     let source = sdk.path().join("source");
     let bin = sdk.path().join("bin");
     git(sdk.path(), &["init"]);
-    fs::create_dir(&source).unwrap();
+    fs::create_dir_all(source.join("assets")).unwrap();
     fs::create_dir(&bin).unwrap();
     fs::write(sdk.path().join("flake.nix"), "{}").unwrap();
     for (path, contents) in [
         (".gitignore", "result/\nresult-*/\n"),
         ("README.md", "Preserve @APP_NAME@ verbatim.\n"),
         ("flake.nix", "{ inputs.teka-sdk.url = \"github:ouster-lidar/teka-sdk/main\"; outputs = _: { teka.apps.hello-world = {}; }; }\n"),
-        ("default.nix", "{}\n"),
         (
             "hello-world.rs",
             "fn main() { println!(\"hello world\"); }\n",
         ),
-        ("hello-world.service", "[Service]\nExecStart=@program@\n"),
+        ("package.nix", "{}\n"),
+        (
+            "manifest.json",
+            "{\"id\":\"hello-world\",\"version\":\"0.1.0\"}\n",
+        ),
+        ("assets/example.txt", "template asset\n"),
     ] {
         fs::write(source.join(path), contents).unwrap();
     }
@@ -58,12 +51,12 @@ elif [ "$1 $2" = "flake new" ]; then
   printf '%s\n' "$@" > "$TEKA_TEST_INIT_ARGS"
   cd -- "$6" || exit 1
   if [ -n "$TEKA_TEST_INIT_FAIL" ]; then
-    cp "$TEKA_TEST_EXAMPLE_SOURCE/default.nix" .
+    cp "$TEKA_TEST_EXAMPLE_SOURCE/package.nix" .
     echo 'refusing to overwrite existing file flake.nix' >&2
     exit 1
   fi
   cp -R "$TEKA_TEST_EXAMPLE_SOURCE/." .
-  echo 'wrote: "default.nix"' >&2
+  echo 'wrote: "package.nix"' >&2
 elif [ "$1 $2" = "flake lock" ]; then
   printf '%s\n' "$@" > "$TEKA_TEST_LOCK_ARGS"
   if [ -n "$TEKA_TEST_LOCK_FAIL" ]; then
@@ -72,7 +65,15 @@ elif [ "$1 $2" = "flake lock" ]; then
   fi
   [ -n "$TEKA_TEST_NO_LOCK" ] || printf '%s' "$TEKA_TEST_LOCK" > flake.lock
 else
-  printf '%s' "$TEKA_TEST_CATALOG"
+  case "$2" in
+    github:*|*"&rev="*) names=$TEKA_TEST_CATALOG ;;
+    *) names=${TEKA_TEST_UNPINNED_CATALOG:-$TEKA_TEST_CATALOG} ;;
+  esac
+  if [ "$names" = null ]; then
+    printf 'null'
+  else
+    printf '{"names":%s,"is_sdk":%s}' "$names" "${TEKA_TEST_IS_SDK:-false}"
+  fi
 fi
 "#,
         ),
@@ -97,7 +98,7 @@ fi
             "TEKA_TEST_SDK_METADATA",
             serde_json::json!({ "revision": SDK_REV, "url": SDK_REFERENCE }).to_string(),
         )
-        .env("TEKA_TEST_CATALOG", r#"[false,["default","hello-world"]]"#)
+        .env("TEKA_TEST_CATALOG", r#"["default","hello-world"]"#)
         .env("TEKA_TEST_METADATA_ARGS", sdk.path().join("metadata-args"))
         .env("TEKA_TEST_LOCK", LOCK)
         .env("TEKA_TEST_LOCK_ARGS", sdk.path().join("lock-args"));
@@ -142,6 +143,17 @@ fn git(directory: &Path, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+fn app_files(sdk: &TempDir) -> Vec<String> {
+    let files = git(&sdk.path().join("source"), &["ls-files", "--others", "-z"]);
+    let mut files: Vec<_> = files
+        .split_terminator('\0')
+        .chain(["AGENTS.md", "flake.lock"])
+        .map(str::to_owned)
+        .collect();
+    files.sort();
+    files
+}
+
 #[test]
 fn copied_binary_initializes_selected_example_outside_checkout() {
     let temp = TempDir::new().unwrap();
@@ -155,21 +167,14 @@ fn copied_binary_initializes_selected_example_outside_checkout() {
         .args(["app", "init", "--example", "hello-world", directory]);
     let sdk = example_sdk(&mut command);
     let calls = sdk.path().join("nix-args");
-    command
-        .env("TEKA_TEST_NIX_ARGS", &calls)
-        .env("TEKA_TEST_CATALOG", r#"[true,["default","hello-world"]]"#);
-    let revision = "github:ouster-lidar/teka-sdk/0123456789012345678901234567890123456789";
-    command.env(
-        "TEKA_TEST_SDK_METADATA",
-        serde_json::json!({ "url": revision }).to_string(),
-    );
+    command.env("TEKA_TEST_NIX_ARGS", &calls);
     let stderr = success(command.output().unwrap());
     assert!(
         stderr.starts_with("⏳\u{fe0e} Initializing example\n"),
         "{stderr}"
     );
     assert!(stderr.contains("✓ App: hello-world"), "{stderr}");
-    assert!(stderr.contains("wrote: \"default.nix\""), "{stderr}");
+    assert!(stderr.contains("wrote: \"package.nix\""), "{stderr}");
     let app = temp.path().join(directory).canonicalize().unwrap();
     let build = stderr
         .lines()
@@ -204,24 +209,25 @@ fn copied_binary_initializes_selected_example_outside_checkout() {
         );
     }
     assert!(app.join(".git").is_dir());
-    assert_eq!(git(&app, &["ls-files"]), FILES.join("\n") + "\n");
+    let files = app_files(&sdk);
+    assert_eq!(git(&app, &["ls-files"]), files.join("\n") + "\n");
     assert_eq!(git(&app, &["rev-list", "--all", "--count"]), "0\n");
     assert_eq!(fs::read(app.join("flake.lock")).unwrap(), LOCK.as_bytes());
     assert_eq!(
         fs::read_to_string(sdk.path().join("init-args")).unwrap(),
-        format!("flake\nnew\n--template\n{revision}#hello-world\n--\n{directory}\n")
+        format!("flake\nnew\n--template\n{SDK_REFERENCE}#hello-world\n--\n{directory}\n")
     );
     let calls = fs::read_to_string(calls).unwrap();
-    assert!(calls.contains("--inputs-from\n"), "{calls}");
+    assert!(!calls.contains("--inputs-from\n"), "{calls}");
     assert_eq!(
         fs::read_to_string(sdk.path().join("lock-args")).unwrap(),
-        format!("flake\nlock\npath:.\n--override-input\nteka-sdk\n{revision}\n--output-lock-file\nflake.lock\n")
+        "flake\nlock\npath:.\n"
     );
     let guidance = fs::read_to_string(app.join("AGENTS.md")).unwrap();
     assert!(guidance.contains("README.md") && guidance.contains("flake.nix"));
-    for path in FILES
+    for path in files
         .iter()
-        .filter(|path| !matches!(**path, "flake.lock" | "AGENTS.md"))
+        .filter(|path| !matches!(path.as_str(), "flake.lock" | "AGENTS.md"))
     {
         assert_eq!(
             fs::read(app.join(path)).unwrap(),
@@ -231,7 +237,7 @@ fn copied_binary_initializes_selected_example_outside_checkout() {
 }
 
 #[test]
-fn local_sdk_resolves_committed_head_and_locks_its_reference() {
+fn local_templates_use_committed_head_and_keep_their_declared_inputs() {
     let temp = TempDir::new().unwrap();
     let (mut command, sdk) = init(temp.path(), &["new-app"]);
     success(command.output().unwrap());
@@ -244,12 +250,58 @@ fn local_sdk_resolves_committed_head_and_locks_its_reference() {
     );
     assert_eq!(
         fs::read_to_string(sdk.path().join("lock-args")).unwrap(),
-        format!("flake\nlock\npath:.\n--override-input\nteka-sdk\n{SDK_REFERENCE}\n--output-lock-file\nflake.lock\n")
+        "flake\nlock\npath:.\n"
     );
     assert_eq!(
         fs::read(temp.path().join("new-app/flake.nix")).unwrap(),
         fs::read(sdk.path().join("source/flake.nix")).unwrap()
     );
+}
+
+#[test]
+fn local_sdk_templates_pin_the_same_revision_used_to_copy_the_template() {
+    let temp = TempDir::new().unwrap();
+    let (mut command, sdk) = init(temp.path(), &[]);
+    command
+        .env_remove("TEKA_APPS_FLAKE_ROOT")
+        .env("TEKA_TEST_IS_SDK", "true")
+        .arg("--flake")
+        .arg(sdk.path())
+        .args(["--example", "hello-world", "new-app"]);
+    success(command.output().unwrap());
+    assert_eq!(
+        fs::read_to_string(sdk.path().join("init-args")).unwrap(),
+        format!("flake\nnew\n--template\n{SDK_REFERENCE}#hello-world\n--\nnew-app\n")
+    );
+    assert_eq!(
+        fs::read_to_string(sdk.path().join("lock-args")).unwrap(),
+        format!("flake\nlock\npath:.\n--override-input\nteka-sdk\n{SDK_REFERENCE}\n--output-lock-file\nflake.lock\n")
+    );
+}
+
+#[test]
+fn lists_and_initializes_examples_from_the_committed_provider() {
+    let temp = TempDir::new().unwrap();
+    let (mut init, _sdk) = init(temp.path(), &["--example", "working-tree", "new-app"]);
+    init.env(
+        "TEKA_TEST_UNPINNED_CATALOG",
+        r#"["default","hello-world","working-tree"]"#,
+    );
+    for unpinned in [r#"["default","hello-world","working-tree"]"#, "null"] {
+        let mut list = Command::new(env!("CARGO_BIN_EXE_teka"));
+        list.current_dir(temp.path())
+            .envs(
+                init.get_envs()
+                    .filter_map(|(key, value)| value.map(|value| (key, value))),
+            )
+            .env("TEKA_TEST_UNPINNED_CATALOG", unpinned)
+            .args(["app", "list", "--examples"]);
+        let output = list.output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(output.stdout, b"hello-world\n");
+    }
+    failure(init.output().unwrap(), "unknown example 'working-tree'");
+    assert!(!temp.path().join("new-app").exists());
 }
 
 #[test]
@@ -266,22 +318,21 @@ fn rejects_sdk_sources_without_a_committed_revision() {
 }
 
 #[test]
-fn outside_checkout_keeps_the_remote_sdk_reference() {
+fn uses_the_bundled_sdk_when_the_project_has_no_templates() {
     let temp = TempDir::new().unwrap();
     let (mut command, sdk) = init(temp.path(), &["new-app"]);
+    git(temp.path(), &["init"]);
+    fs::write(temp.path().join("flake.nix"), "{}").unwrap();
+    command
+        .env_remove("TEKA_APPS_FLAKE_ROOT")
+        .env("TEKA_TEST_SDK_METADATA", "{}")
+        .env("TEKA_TEST_UNPINNED_CATALOG", "null");
     let Some(reference) = option_env!("TEKA_SDK_REF").filter(|reference| !reference.is_empty())
     else {
-        command.env_remove("TEKA_APPS_FLAKE_ROOT");
         failure(command.output().unwrap(), "this build has no pinned SDK");
         return;
     };
-    let calls = sdk.path().join("nix-args");
-    command
-        .env_remove("TEKA_APPS_FLAKE_ROOT")
-        .env("TEKA_TEST_NIX_ARGS", &calls);
     success(command.output().unwrap());
-    let calls = fs::read_to_string(calls).unwrap();
-    assert!(!calls.contains("flake\nmetadata\n"), "{calls}");
     assert_eq!(
         fs::read_to_string(sdk.path().join("init-args")).unwrap(),
         format!("flake\nnew\n--template\n{reference}\n--\nnew-app\n")
@@ -295,10 +346,10 @@ fn outside_checkout_keeps_the_remote_sdk_reference() {
 #[test]
 fn native_default_and_named_templates_do_not_require_hello_world() {
     for (name, catalog, directory) in [
-        (None, r#"[false,["default"]]"#, "new-app"),
-        (Some("default"), r#"[false,["default"]]"#, "new-app"),
-        (Some("custom"), r#"[false,["custom"]]"#, "new-app"),
-        (None, r#"[false,["default"]]"#, "-app"),
+        (None, r#"["default"]"#, "new-app"),
+        (Some("default"), r#"["default"]"#, "new-app"),
+        (Some("custom"), r#"["custom"]"#, "new-app"),
+        (None, r#"["default"]"#, "-app"),
     ] {
         let temp = TempDir::new().unwrap();
         let (mut command, sdk) = init(temp.path(), &[]);
@@ -322,7 +373,7 @@ fn native_default_and_named_templates_do_not_require_hello_world() {
         }
         assert_eq!(
             fs::read_to_string(sdk.path().join("lock-args")).unwrap(),
-            format!("flake\nlock\npath:.\n--override-input\nteka-sdk\n{}\n--output-lock-file\nflake.lock\n", SDK_REFERENCE)
+            "flake\nlock\npath:.\n"
         );
         assert_eq!(
             fs::read(temp.path().join(directory).join("flake.nix")).unwrap(),
@@ -330,7 +381,7 @@ fn native_default_and_named_templates_do_not_require_hello_world() {
         );
         let calls = fs::read_to_string(calls).unwrap();
         assert!(!calls.contains("--inputs-from"), "{calls}");
-        assert!(calls.contains("--override-input"), "{calls}");
+        assert!(!calls.contains("--override-input"), "{calls}");
     }
 }
 
@@ -338,7 +389,7 @@ fn native_default_and_named_templates_do_not_require_hello_world() {
 fn missing_default_is_rejected_before_creating_files() {
     let temp = TempDir::new().unwrap();
     let (mut command, sdk) = init(temp.path(), &["new-app"]);
-    command.env("TEKA_TEST_CATALOG", r#"[false,["hello-world"]]"#);
+    command.env("TEKA_TEST_CATALOG", r#"["hello-world"]"#);
     failure(command.output().unwrap(), "unknown");
     assert!(!temp.path().join("new-app").exists());
     assert!(!sdk.path().join("init-args").exists());
@@ -382,10 +433,11 @@ fn reuses_enclosing_repository() {
     git(repo.path(), &["init"]);
     fs::write(repo.path().join("unrelated"), "keep").unwrap();
     git(repo.path(), &["add", "unrelated"]);
-    success(init(repo.path(), &["apps/child-app"]).0.output().unwrap());
+    let (mut command, sdk) = init(repo.path(), &["apps/child-app"]);
+    success(command.output().unwrap());
     let app = repo.path().join("apps/child-app");
     assert!(!app.join(".git").exists());
-    let expected = FILES
+    let expected = app_files(&sdk)
         .iter()
         .map(|path| format!("apps/child-app/{path}\n"))
         .collect::<String>()
@@ -408,11 +460,12 @@ fn initializes_repository_inside_ignored_directory() {
     let tmp = repo.path().join("tmp");
     fs::create_dir(&tmp).unwrap();
 
-    success(init(&tmp, &["my-app"]).0.output().unwrap());
+    let (mut command, sdk) = init(&tmp, &["my-app"]);
+    success(command.output().unwrap());
 
     let app = tmp.join("my-app");
     assert!(app.join(".git").is_dir());
-    assert_eq!(git(&app, &["ls-files"]), FILES.join("\n") + "\n");
+    assert_eq!(git(&app, &["ls-files"]), app_files(&sdk).join("\n") + "\n");
     assert_eq!(git(repo.path(), &["ls-files"]), ".gitignore\n");
 }
 
@@ -448,7 +501,7 @@ fn input_free_templates_do_not_require_a_lockfile() {
     success(command.output().unwrap());
     let app = temp.path().join("new-app");
     assert!(!app.join("flake.lock").exists());
-    let mut files = FILES.to_vec();
+    let mut files = app_files(&sdk);
     files.retain(|path| *path != "flake.lock");
     assert_eq!(git(&app, &["ls-files"]), files.join("\n") + "\n");
 }
@@ -472,12 +525,12 @@ fn template_conflict_stages_sources_for_retry_in_enclosing_repository() {
     );
     assert!(!sdk.path().join("lock-args").exists());
     assert!(!temp.join("flake.lock").exists());
-    assert_eq!(git(&temp, &["ls-files"]), "default.nix\n");
+    assert_eq!(git(&temp, &["ls-files"]), "package.nix\n");
 
     fs::remove_file(temp.join("flake.nix")).unwrap();
     command.env_remove("TEKA_TEST_INIT_FAIL");
     success(command.output().unwrap());
-    assert_eq!(git(&temp, &["ls-files"]), FILES.join("\n") + "\n");
+    assert_eq!(git(&temp, &["ls-files"]), app_files(&sdk).join("\n") + "\n");
 }
 
 #[test]
@@ -526,7 +579,7 @@ fn git_add_failure_preserves_unrelated_index_entries() {
 fn lock_failure_stages_sources_for_retry_in_enclosing_repository() {
     let temp = TempDir::new().unwrap();
     git(temp.path(), &["init"]);
-    let (mut command, _sdk) = init(temp.path(), &["apps/new-app"]);
+    let (mut command, sdk) = init(temp.path(), &["apps/new-app"]);
     command.env("TEKA_TEST_LOCK_FAIL", "1");
     failure(command.output().unwrap(), "mock lock failure");
     let app = temp.path().join("apps/new-app");
@@ -536,7 +589,7 @@ fn lock_failure_stages_sources_for_retry_in_enclosing_repository() {
 
     command.env_remove("TEKA_TEST_LOCK_FAIL");
     success(command.output().unwrap());
-    assert_eq!(git(&app, &["ls-files"]), FILES.join("\n") + "\n");
+    assert_eq!(git(&app, &["ls-files"]), app_files(&sdk).join("\n") + "\n");
 }
 
 #[test]

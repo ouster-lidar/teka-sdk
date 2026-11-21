@@ -1,13 +1,24 @@
-{ pkgs, version }:
+{ pkgs, sdk }:
 
 let
-  builder = pkgs.callPackage ../../nix/apps/image-builder.nix { inherit version; };
-  image = builder.makeAppImage {
-    name = "verity-check";
-    unit = pkgs.writeText "verity-check.service" "[Service]\nExecStart=/bin/true\n";
+  name = "packaging-probe";
+  inherit (pkgs.stdenv.hostPlatform) system;
+  outputs = sdk.lib.mkAppOutputs {
+    self.dirtyShortRev = "";
+    systems = [ system ];
+    apps = [
+      {
+        package = ./fixtures/app.nix;
+        modules = [ { services.main.systemd.serviceConfig.ExecStart = "/bin/true"; } ];
+      }
+    ];
   };
+  package = outputs.packages.${system}.${name}.targets.${system};
+  inherit (package) image tpkFileName;
+  version = "1.2.3-rc.1+19700101000000.g0000000.ne3b0c44";
   repeat = image.overrideAttrs { name = "verity-check-repeat"; };
 in
+assert tpkFileName == "${name}-${system}-v${version}.tpk";
 pkgs.runCommand "signed-app-images-check"
   {
     nativeBuildInputs = with pkgs; [
@@ -16,6 +27,7 @@ pkgs.runCommand "signed-app-images-check"
       jq
       openssl
       util-linux
+      sdk.packages.${system}.teka
     ];
   }
   ''
@@ -42,5 +54,7 @@ pkgs.runCommand "signed-app-images-check"
     (cd a && check ${image})
     (cd b && check ${repeat})
     cmp a/rootHash b/rootHash
+    teka tpk inspect --json "${package}/${tpkFileName}" |
+      jq -e --arg version ${pkgs.lib.escapeShellArg version} '.manifest.components[0].version == $version'
     touch "$out"
   ''
